@@ -13,7 +13,7 @@ cache = true
 # The cache directory if enabled
 cache_path = 'forge-cache'
 # Import statement remappings
-remappings = ['solmate=lib/solmate/src']
+remappings = ['hyperdrive=lib/hyperdrive/contracts', 'solmate=lib/solmate/src']
 # gas limit - max u64
 gas_limit = "18446744073709551615"
 # allows the ffi to be used
