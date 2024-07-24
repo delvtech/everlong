@@ -4,3 +4,6 @@
 [submodule "lib/hyperdrive"]
 	path = lib/hyperdrive
 	url = https://github.com/delvtech/hyperdrive
+[submodule "lib/solady"]
+	path = lib/solady
+	url = https://github.com/Vectorized/solady
