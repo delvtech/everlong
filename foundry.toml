@@ -5,7 +5,7 @@ src = "contracts"
 # The artifact directory
 out = 'out'
 # A list of paths to look for libraries in
-libs = ['node_modules', 'lib']
+libs = ['lib']
 # The test directory
 test = 'test'
 # Whether to cache builds or not
