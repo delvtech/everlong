@@ -6,7 +6,7 @@ import { IPositions } from "./IPositions.sol";
 
 import { IERC4626 } from "openzeppelin/interfaces/IERC4626.sol";
 
-interface IEverlong is IERC4626, IAdmin, IPositions {
+interface IEverlong is IAdmin, IERC4626, IPositions {
     /// @notice Gets the Everlong instance's kind.
     /// @return The Everlong instance's kind.
     function kind() external pure returns (string memory);
