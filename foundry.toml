@@ -13,13 +13,15 @@ cache = true
 # The cache directory if enabled
 cache_path = 'forge-cache'
 # Import statement remappings
-remappings = ['hyperdrive=lib/hyperdrive/contracts', 'solmate=lib/solmate/src']
+remappings = [
+  'hyperdrive=lib/hyperdrive',
+  'solady=lib/solady/src',
+  'openzeppelin=lib/openzeppelin-contracts/contracts',
+]
 # gas limit - max u64
 gas_limit = "18446744073709551615"
 # allows the ffi to be used
 ffi = true
-
-[profile.production]
 # strict warnings
 deny_warnings = true
 # optimizer settings
