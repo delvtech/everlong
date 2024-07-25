@@ -22,6 +22,11 @@ contract Admin is IAdmin {
         _;
     }
 
+    /// @dev Initialize the admin address to the contract deployer.
+    constructor() {
+        admin = msg.sender;
+    }
+
     /// @inheritdoc IAdmin
     function setAdmin(address _admin) external onlyAdmin {
         admin = _admin;

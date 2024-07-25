@@ -2,8 +2,9 @@
   "name": "everlong",
   "type": "module",
   "scripts": {
-    "build": "forge clean && forge build",
-    "test": "forge test"
+    "build": "forge build --force --sizes --skip test",
+    "format": "prettier -w **/*.sol",
+    "test": "forge test --force"
   },
   "devDependencies": {
     "@types/bun": "latest",

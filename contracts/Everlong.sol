@@ -67,5 +67,5 @@ contract Everlong is EverlongERC4626, Admin, Positions {
         string memory name_,
         string memory symbol_,
         address underlying_
-    ) EverlongERC4626(underlying_, name_, symbol_) {}
+    ) Admin() EverlongERC4626(underlying_, name_, symbol_) {}
 }

@@ -14,9 +14,9 @@ cache = true
 cache_path = 'forge-cache'
 # Import statement remappings
 remappings = [
-  'hyperdrive=lib/hyperdrive',
   'solady=lib/solady/src',
   'openzeppelin=lib/openzeppelin-contracts/contracts',
+  'hyperdrive=lib/hyperdrive',
 ]
 # gas limit - max u64
 gas_limit = "18446744073709551615"
