@@ -1,12 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 import { IAdmin } from "./IAdmin.sol";
-import { IPositions } from "./IPositions.sol";
-
+import { IIdleLiquidity } from "./IIdleLiquidity.sol";
+import { IPositionManager } from "./IPositionManager.sol";
+import { IRebalancing } from "./IRebalancing.sol";
 import { IERC4626 } from "openzeppelin/interfaces/IERC4626.sol";
 
-interface IEverlong is IAdmin, IERC4626, IPositions {
+interface IEverlong is
+    IAdmin,
+    IERC4626,
+    IPositionManager,
+    IIdleLiquidity,
+    IRebalancing
+{
+    /// @notice Gets the address of the underlying Hyperdrive Instance
+    function hyperdrive() external view returns (address);
+
     /// @notice Gets the Everlong instance's kind.
     /// @return The Everlong instance's kind.
     function kind() external pure returns (string memory);

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 import { EverlongTest } from "../harnesses/EverlongTest.t.sol";
 
 /// @dev Extend only the test harness.
