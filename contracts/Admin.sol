@@ -17,7 +17,7 @@ contract Admin is IAdmin {
     /// @dev Ensures that the contract is being called by admin.
     modifier onlyAdmin() {
         if (msg.sender != admin) {
-            revert IAdmin.Unauthorized();
+            revert Unauthorized();
         }
         _;
     }

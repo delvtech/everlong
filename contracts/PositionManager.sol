@@ -35,7 +35,7 @@ contract PositionManager is IPositionManager {
 
         // Return true if the current block timestamp is after
         // the oldest position's `maturityTime`.
-        if (_position.maturityTime < block.timestamp) {
+        if (_position.maturityTime <= block.timestamp) {
             return true;
         }
 

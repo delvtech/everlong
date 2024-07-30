@@ -10,8 +10,6 @@ import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { ERC4626 } from "solady/tokens/ERC4626.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 
-import "forge-std/console2.sol";
-
 ///           ,---..-.   .-.,---.  ,---.   ,-.    .---.  .-. .-.  ,--,
 ///           | .-' \ \ / / | .-'  | .-.\  | |   / .-. ) |  \| |.' .'
 ///           | `-.  \ V /  | `-.  | `-'/  | |   | | |(_)|   | ||  |  __
@@ -129,6 +127,9 @@ contract Everlong is Admin, ERC4626, PositionManager, IRebalancing {
         // If it does not implement `decimals() (uint256)`, use the default.
         (bool success, uint8 result) = _tryGetAssetDecimals(asset());
         _decimals = success ? result : _DEFAULT_UNDERLYING_DECIMALS;
+
+        // Give max approval for `_asset` to the hyperdrive contract.
+        IERC20(_asset).approve(hyperdrive_, type(uint256).max);
     }
 
     function hyperdrive() public view returns (address) {
@@ -170,7 +171,7 @@ contract Everlong is Admin, ERC4626, PositionManager, IRebalancing {
     function canRebalance() public view returns (bool) {
         return
             hasMaturedPositions() ||
-            IERC20(_asset).balanceOf(address(this)) >
+            IERC20(_asset).balanceOf(address(this)) >=
             IHyperdrive(_hyperdrive).getPoolConfig().minimumTransactionAmount;
     }
 
@@ -184,6 +185,9 @@ contract Everlong is Admin, ERC4626, PositionManager, IRebalancing {
         // can be used in the purchase of new positions.
         _closePositions();
         _openPositions();
+
+        // Emit the `Rebalanced()` event.
+        emit Rebalanced();
     }
 
     /// @dev Returns whether virtual shares will be used to mitigate the inflation attack.
@@ -221,7 +225,7 @@ contract Everlong is Admin, ERC4626, PositionManager, IRebalancing {
         // revert("TODO");
     }
 
-    function _openPositions() public {
+    function _openPositions() internal {
         // Obtain the current balance of the contract.
         // If the balance is less than hyperdrive's min tx amount, return.
         // If the balance is greater, use it all to open longs.
@@ -229,7 +233,7 @@ contract Everlong is Admin, ERC4626, PositionManager, IRebalancing {
         uint256 _minTxAmount = IHyperdrive(_hyperdrive)
             .getPoolConfig()
             .minimumTransactionAmount;
-        if (_currentBalance < _minTxAmount) return;
+        if (_currentBalance <= _minTxAmount) return;
         // TODO: Worry about slippage.
         (uint256 _maturityTime, uint256 _bondAmount) = IHyperdrive(_hyperdrive)
             .openLong(
@@ -246,7 +250,11 @@ contract Everlong is Admin, ERC4626, PositionManager, IRebalancing {
     function _closePositions() internal {
         // Loop through mature positions and close them all.
         Position memory _position;
+        // TODO: Enable closing of mature positions incrementally to avoid
+        //       the case where the # of mature positions exceeds the max
+        //       gas per block.
         while (hasMaturedPositions()) {
+            // Retrieve the oldest matured position and close it.
             _position = getPosition(0);
             IHyperdrive(_hyperdrive).closeLong(
                 _position.maturityTime,
@@ -254,6 +262,9 @@ contract Everlong is Admin, ERC4626, PositionManager, IRebalancing {
                 0,
                 IHyperdrive.Options(address(this), _asBase, "")
             );
+
+            // Update accounting for the closed long position.
+            _recordLongsClosed(uint128(_position.bondAmount));
         }
     }
 }

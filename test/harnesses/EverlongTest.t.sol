@@ -53,7 +53,8 @@ contract EverlongTest is HyperdriveTest {
                     "Everlong Test",
                     "ETEST",
                     address(hyperdrive),
-                    true
+                    true,
+                    0
                 )
             )
         );
@@ -61,13 +62,22 @@ contract EverlongTest is HyperdriveTest {
 
     /// @dev Deploy the Everlong instance with custom underlying, name, and symbol.
     function deploy(
-        string memory name,
-        string memory symbol,
-        address underlying,
-        bool asBase
+        string memory _name,
+        string memory _symbol,
+        address _underlying,
+        bool _asBase,
+        uint256 _targetIdleLiquidity
     ) internal {
         everlong = IEverlong(
-            address(new Everlong(name, symbol, address(underlying), asBase))
+            address(
+                new Everlong(
+                    _name,
+                    _symbol,
+                    address(_underlying),
+                    _asBase,
+                    _targetIdleLiquidity
+                )
+            )
         );
     }
 
@@ -78,11 +88,11 @@ contract EverlongTest is HyperdriveTest {
         ERC20Mintable(hyperdrive.baseToken()).mint(recipient, amount);
         ERC20Mintable(hyperdrive.baseToken()).approve(
             address(everlong),
-            amount
+            type(uint256).max
         );
         ERC20Mintable(hyperdrive.baseToken()).approve(
             address(hyperdrive),
-            amount
+            type(uint256).max
         );
     }
 
