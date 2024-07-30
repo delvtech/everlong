@@ -139,6 +139,8 @@ contract EverlongPositionManagerTest is PositionManagerTest {
         _recordLongsClosed(3);
     }
 
+    /// @dev Validate that `hasMaturedPositions()` returns false
+    ///      with no positions.
     function test_hasMaturedPositions_false_when_no_positions() external view {
         // Check that `hasMaturedPositions()` returns false
         // when no positions are held.
@@ -148,6 +150,8 @@ contract EverlongPositionManagerTest is PositionManagerTest {
         );
     }
 
+    /// @dev Validate that `hasMaturedPositions()` returns false
+    ///      with no mature positions.
     function test_hasMaturedPositions_false_when_no_mature_positions()
         external
     {
@@ -161,6 +165,8 @@ contract EverlongPositionManagerTest is PositionManagerTest {
         );
     }
 
+    /// @dev Validate that `hasMaturedPositions()` returns true
+    ///      with a mature position.
     function test_hasMaturedPositions_true_when_single_matured_position()
         external
     {
@@ -177,8 +183,4 @@ contract EverlongPositionManagerTest is PositionManagerTest {
             "should return true with single matured position"
         );
     }
-
-    function test_hasMaturedPositions_true_when_multiple_after_close()
-        external
-    {}
 }

@@ -10,6 +10,7 @@ import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 
+// TODO: Refactor this to include an instance of `Everlong` with exposed internal functions.
 /// @dev Everlong testing harness contract.
 /// @dev Tests should extend this contract and call its `setUp` function.
 contract EverlongTest is HyperdriveTest {

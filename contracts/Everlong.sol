@@ -225,6 +225,9 @@ contract Everlong is Admin, ERC4626, PositionManager, IRebalancing {
         // revert("TODO");
     }
 
+    // TODO: Include consideration for idle liquidity.
+    /// @dev Open the maximum amount of positions possible
+    ///      with the contract's current balance.
     function _openPositions() internal {
         // Obtain the current balance of the contract.
         // If the balance is less than hyperdrive's min tx amount, return.
@@ -247,6 +250,7 @@ contract Everlong is Admin, ERC4626, PositionManager, IRebalancing {
         _recordLongsOpened(uint128(_maturityTime), uint128(_bondAmount));
     }
 
+    /// @dev Close all matured positions.
     function _closePositions() internal {
         // Loop through mature positions and close them all.
         Position memory _position;
