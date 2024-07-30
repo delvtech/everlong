@@ -8,7 +8,7 @@ import { IRebalancing } from "./interfaces/IRebalancing.sol";
 import { DoubleEndedQueue } from "openzeppelin/utils/structs/DoubleEndedQueue.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { ERC4626 } from "solady/tokens/ERC4626.sol";
-import "hyperdrive/test/utils/HyperdriveUtils.sol";
+import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 
 import "forge-std/console2.sol";
 
