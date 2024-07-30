@@ -12,9 +12,6 @@ contract PositionManager is IPositionManager {
     ///      Supports pushing and popping from both the front and back.
     DoubleEndedQueue.Bytes32Deque private _positions;
 
-    /// @dev Last checkpoint time the portfolio was rebalanced.
-    uint256 private _lastRebalancedTimestamp;
-
     /// @inheritdoc IPositionManager
     function getPositionCount() public view returns (uint256) {
         return _positions.length();
@@ -31,11 +28,10 @@ contract PositionManager is IPositionManager {
     function hasMaturedPositions() public view returns (bool) {
         // Return false if there are no positions.
         if (_positions.length() == 0) return false;
-        Position memory _position = _decodePosition(_positions.at(0));
 
         // Return true if the current block timestamp is after
         // the oldest position's `maturityTime`.
-        if (_position.maturityTime <= block.timestamp) {
+        if (_decodePosition(_positions.at(0)).maturityTime <= block.timestamp) {
             return true;
         }
 
@@ -46,7 +42,7 @@ contract PositionManager is IPositionManager {
     /// @dev Account for newly purchased bonds within the `PositionManager`.
     /// @param _maturityTime Maturity time for the newly purchased bonds.
     /// @param _bondAmountPurchased Amount of bonds purchased.
-    function _recordLongsOpened(
+    function _handleOpenLong(
         uint128 _maturityTime,
         uint128 _bondAmountPurchased
     ) internal {
@@ -96,9 +92,10 @@ contract PositionManager is IPositionManager {
     /// @dev Account for closed bonds at the oldest `maturityTime`
     ///      within the `PositionManager`.
     /// @param _bondAmountClosed Amount of bonds closed.
-    function _recordLongsClosed(uint128 _bondAmountClosed) internal {
+    function _handleCloseLong(uint128 _bondAmountClosed) internal {
         // Remove the oldest position from the front queue.
         Position memory _position = _decodePosition(_positions.popFront());
+
         // Compare the input bond amount
         // to the most mature position's `bondAmount`.
         if (_bondAmountClosed > _position.bondAmount) {

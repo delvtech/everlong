@@ -5,10 +5,10 @@ import { Admin } from "./Admin.sol";
 import { PositionManager } from "./PositionManager.sol";
 import { IRebalancing } from "./interfaces/IRebalancing.sol";
 
+import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { DoubleEndedQueue } from "openzeppelin/utils/structs/DoubleEndedQueue.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { ERC4626 } from "solady/tokens/ERC4626.sol";
-import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 
 ///           ,---..-.   .-.,---.  ,---.   ,-.    .---.  .-. .-.  ,--,
 ///           | .-' \ \ / / | .-'  | .-.\  | |   / .-. ) |  \| |.' .'
@@ -97,9 +97,6 @@ contract Everlong is Admin, ERC4626, PositionManager, IRebalancing {
 
     /// @dev Symbol of the Everlong token.
     string internal _symbol;
-
-    /// @dev Last checkpoint time the portfolio was rebalanced.
-    uint256 internal _lastRebalancedTimestamp;
 
     /// @notice Initial configuration paramters for Everlong.
     /// @param hyperdrive_ Address of the Hyperdrive instance wrapped by Everlong.
@@ -247,7 +244,7 @@ contract Everlong is Admin, ERC4626, PositionManager, IRebalancing {
             );
 
         // Update accounting for the newly opened bond positions.
-        _recordLongsOpened(uint128(_maturityTime), uint128(_bondAmount));
+        _handleOpenLong(uint128(_maturityTime), uint128(_bondAmount));
     }
 
     /// @dev Close all matured positions.
@@ -268,7 +265,7 @@ contract Everlong is Admin, ERC4626, PositionManager, IRebalancing {
             );
 
             // Update accounting for the closed long position.
-            _recordLongsClosed(uint128(_position.bondAmount));
+            _handleCloseLong(uint128(_position.bondAmount));
         }
     }
 }
