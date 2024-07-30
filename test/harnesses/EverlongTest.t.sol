@@ -82,6 +82,9 @@ contract EverlongTest is HyperdriveTest {
         );
     }
 
+    // TODO: This is gross, will refactor
+    /// @dev Mint base token to the provided address a
+    ///      and approve both the Everlong and Hyperdrive contract.
     function mintApproveHyperdriveBase(
         address recipient,
         uint256 amount
@@ -97,6 +100,9 @@ contract EverlongTest is HyperdriveTest {
         );
     }
 
+    // TODO: This is gross, will refactor
+    /// @dev Mint vault shares token to the provided address a
+    ///      and approve both the Everlong and Hyperdrive contract.
     function mintApproveHyperdriveShares(
         address recipient,
         uint256 amount
