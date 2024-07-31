@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
-import { EverlongTest } from "../harnesses/EverlongTest.t.sol";
+import { EverlongTest } from "../harnesses/EverlongTest.sol";
 import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 
@@ -76,8 +76,6 @@ contract IEverlongTest is EverlongTest {
             "cannot rebalance without matured positions or balance"
         );
     }
-
-    event Rebalanced();
 
     /// @dev Ensures that `canRebalance()` only returns true with a balance
     ///      greater than or equal to Hyperdrive's minTransactionAmount or

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-import { IAdmin } from "./interfaces/IAdmin.sol";
+import { IEverlongAdmin } from "../interfaces/IEverlongAdmin.sol";
+import { EverlongBase } from "./EverlongBase.sol";
 
 // EverlongAdmin
 // @author DELV
@@ -10,26 +11,23 @@ import { IAdmin } from "./interfaces/IAdmin.sol";
 // @custom:disclaimer The language used in this code is for coding convenience
 //                    only, and is not intended to, and does not, have any
 //                    particular legal or regulatory significance.
-contract Admin is IAdmin {
-    /// @inheritdoc IAdmin
-    address public admin;
-
+abstract contract EverlongAdmin is EverlongBase, IEverlongAdmin {
     /// @dev Ensures that the contract is being called by admin.
     modifier onlyAdmin() {
-        if (msg.sender != admin) {
+        if (msg.sender != _admin) {
             revert Unauthorized();
         }
         _;
     }
 
-    /// @dev Initialize the admin address to the contract deployer.
-    constructor() {
-        admin = msg.sender;
+    /// @inheritdoc IEverlongAdmin
+    function admin() external view returns (address) {
+        return _admin;
     }
 
-    /// @inheritdoc IAdmin
-    function setAdmin(address _admin) external onlyAdmin {
-        admin = _admin;
-        emit AdminUpdated(_admin);
+    /// @inheritdoc IEverlongAdmin
+    function setAdmin(address admin_) external onlyAdmin {
+        _admin = admin_;
+        emit AdminUpdated(admin_);
     }
 }

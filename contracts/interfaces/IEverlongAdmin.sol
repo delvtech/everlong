@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-interface IAdmin {
-    /// @notice Emitted when admin is transferred.
-    event AdminUpdated(address indexed admin);
-
+interface IEverlongAdmin {
     /// @notice Thrown when caller is not the admin.
     error Unauthorized();
 

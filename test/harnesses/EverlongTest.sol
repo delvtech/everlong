@@ -3,7 +3,8 @@ pragma solidity ^0.8.20;
 
 import { VmSafe } from "forge-std/Vm.sol";
 import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
-import { Everlong } from "../../contracts/Everlong.sol";
+import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol";
+import { EverlongExposed } from "../exposed/EverlongExposed.sol";
 
 import { HyperdriveTest } from "hyperdrive/test/utils/HyperdriveTest.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
@@ -13,7 +14,7 @@ import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMat
 // TODO: Refactor this to include an instance of `Everlong` with exposed internal functions.
 /// @dev Everlong testing harness contract.
 /// @dev Tests should extend this contract and call its `setUp` function.
-contract EverlongTest is HyperdriveTest {
+contract EverlongTest is HyperdriveTest, IEverlongEvents {
     // ── Hyperdrive Storage ──────────────────────────────────────────────
     // address alice
     // address bob
@@ -50,12 +51,11 @@ contract EverlongTest is HyperdriveTest {
     function deploy() internal {
         everlong = IEverlong(
             address(
-                new Everlong(
+                new EverlongExposed(
                     "Everlong Test",
                     "ETEST",
                     address(hyperdrive),
-                    true,
-                    0
+                    true
                 )
             )
         );
@@ -66,17 +66,15 @@ contract EverlongTest is HyperdriveTest {
         string memory _name,
         string memory _symbol,
         address _underlying,
-        bool _asBase,
-        uint256 _targetIdleLiquidity
+        bool _asBase
     ) internal {
         everlong = IEverlong(
             address(
-                new Everlong(
+                new EverlongExposed(
                     _name,
                     _symbol,
                     address(_underlying),
-                    _asBase,
-                    _targetIdleLiquidity
+                    _asBase
                 )
             )
         );

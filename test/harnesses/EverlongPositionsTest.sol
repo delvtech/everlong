@@ -1,18 +1,34 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-import { PositionManager } from "../../contracts/PositionManager.sol";
+import { EverlongPositionsExposed } from "../exposed/EverlongPositionsExposed.sol";
+import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol";
+import { IEverlongPositions } from "../../contracts/interfaces/IEverlongPositions.sol";
 import { console2 } from "forge-std/console2.sol";
 import { Test } from "forge-std/Test.sol";
+import { HyperdriveTest } from "hyperdrive/test/utils/HyperdriveTest.sol";
 
-/// @title PositionManagerTest
-/// @dev Tests should extend this contract and call its `setUp` function.
-contract PositionManagerTest is PositionManager, Test {
+/// @title EverlongPositionsTest
+/// @dev Test harness for EverlongPositions with exposed internal methods and utility functions.
+contract EverlongPositionsTest is HyperdriveTest, IEverlongEvents {
+    EverlongPositionsExposed _everlongPositions;
+
+    function setUp() public virtual override {
+        super.setUp();
+        _everlongPositions = new EverlongPositionsExposed(
+            "EverlongPositionsExposed",
+            "EPE",
+            address(hyperdrive),
+            true
+        );
+    }
+
     /// @dev Outputs a table of all positions.
     function logPositions() public view {
         console2.log("-- POSITIONS -------------------------------");
-        for (uint128 i = 0; i < getPositionCount(); ++i) {
-            Position memory p = getPosition(i);
+        for (uint128 i = 0; i < _everlongPositions.getPositionCount(); ++i) {
+            IEverlongPositions.Position memory p = _everlongPositions
+                .getPosition(i);
             console2.log(
                 "index: %s - maturityTime: %s - bondAmount: %s",
                 i,
@@ -30,10 +46,12 @@ contract PositionManagerTest is PositionManager, Test {
     /// @param _error Message to display for failing assertions.
     function assertPosition(
         uint256 _index,
-        Position memory _position,
+        IEverlongPositions.Position memory _position,
         string memory _error
     ) public view {
-        Position memory p = getPosition(_index);
+        IEverlongPositions.Position memory p = _everlongPositions.getPosition(
+            _index
+        );
         assertEq(_position.maturityTime, p.maturityTime, _error);
         assertEq(_position.bondAmount, p.bondAmount, _error);
     }
@@ -42,7 +60,8 @@ contract PositionManagerTest is PositionManager, Test {
     ///      of the most mature (oldest) position.
     function warpToMaturePosition() public {
         // Read the most mature position from the front of the queue.
-        Position memory _position = getPosition(0);
+        IEverlongPositions.Position memory _position = _everlongPositions
+            .getPosition(0);
 
         // Return if the oldest position is already mature.
         if (block.timestamp >= _position.maturityTime) return;
@@ -54,7 +73,9 @@ contract PositionManagerTest is PositionManager, Test {
     /// @dev Increases block.timestamp to equal the maturity time
     ///      of the input position.
     /// @param _position Position to mature.
-    function warpToMaturePosition(Position memory _position) public {
+    function warpToMaturePosition(
+        IEverlongPositions.Position memory _position
+    ) public {
         // Return if the position is already mature.
         if (block.timestamp >= _position.maturityTime) return;
 
