@@ -21,24 +21,52 @@ contract EverlongPositionsExposed is EverlongPositions, Test {
         bool asBase_
     ) EverlongBase(name_, symbol_, hyperdrive_, asBase_) {}
 
+    /// @dev Calculates the amount of excess liquidity that can be spent opening longs.
+    /// @dev Can be overridden by child contracts.
+    /// @return Amount of excess liquidity that can be spent opening longs.
+    function exposed_excessLiquidity() internal view virtual returns (uint256) {
+        return _excessLiquidity();
+    }
+
+    /// @dev Calculates the minimum `openLong` output from Hyperdrive
+    ///       given the amount of capital being spend.
+    /// @dev Can be overridden by child contracts.
+    /// @param _amount Amount of capital provided for `openLong`.
+    /// @return Minimum number of bonds to receive from `openLong`.
+    function exposed_minOpenLongOutput(
+        uint256 _amount
+    ) internal view virtual returns (uint256) {
+        return _minOpenLongOutput(_amount);
+    }
+
+    /// @dev Calculates the minimum vault share price at which to
+    ///      open the long.
+    /// @dev Can be overridden by child contracts.
+    /// @param _amount Amount of capital provided for `openLong`.
+    /// @return minimum vault share price for `openLong`.
+    function exposed_minVaultSharePrice(
+        uint256 _amount
+    ) internal view virtual returns (uint256) {
+        return _minVaultSharePrice(_amount);
+    }
+
+    /// @dev Calculates the minimum proceeds Everlong will accept for
+    ///      closing the long.
+    /// @dev Can be overridden by child contracts.
+    /// @param _maturityTime Maturity time of the long to close.
+    /// @param _bondAmount Amount of bonds to close.
+    function exposed_minCloseLongOutput(
+        uint256 _maturityTime,
+        uint256 _bondAmount
+    ) internal view returns (uint256) {
+        return _minCloseLongOutput(_maturityTime, _bondAmount);
+    }
+
     /// @dev Spend the excess idle liquidity for the Everlong contract.
     /// @dev Can be overridden by implementing contracts to configure
     ///      how much idle to spend and how it is spent.
-    function exposed_spendExcessIdle() public {
-        return _spendExcessIdle();
-    }
-
-    /// @dev Open a long position from the Hyperdrive contract
-    ///      for the input `_amount`.
-    /// @dev Can be overridden by implementing contracts to configure slippage
-    ///      and minimum output.
-    /// @param _amount Amount of `_asset` to spend towards the long.
-    /// @return _maturityTime Maturity time of the newly opened long.
-    /// @return _bondAmount Amount of bonds received from the newly opened long.
-    function exposed_openLong(
-        uint256 _amount
-    ) public returns (uint256 _maturityTime, uint256 _bondAmount) {
-        _openLong(_amount);
+    function exposed_spendExcessLiquidity() public {
+        return _spendExcessLiquidity();
     }
 
     /// @dev Account for newly purchased bonds within the `PositionManager`.

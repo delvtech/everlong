@@ -35,6 +35,11 @@ interface IEverlongPositions {
     /// @return True if any positions are matured, false otherwise.
     function hasMaturedPositions() external view returns (bool);
 
+    /// @notice Determines whether Everlong has sufficient excess liquidity
+    ///         for opening a long.
+    /// @return True if sufficient excess liquidity, false otherwise.
+    function hasSufficientExcessLiquidity() external view returns (bool);
+
     /// @notice Determines whether Everlong's portfolio can currently be rebalanced.
     /// @return True if the portfolio can be rebalanced, false otherwise.
     function canRebalance() external view returns (bool);

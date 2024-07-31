@@ -5,11 +5,104 @@ import { EverlongPositionsTest } from "../harnesses/EverlongPositionsTest.sol";
 import { IEverlongPositions } from "../../contracts/interfaces/IEverlongPositions.sol";
 import { console2 } from "forge-std/console2.sol";
 import { Test } from "forge-std/Test.sol";
+import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
+import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 
 /// @dev Extend the EverlongPositionsTest contract.
 contract TestEverlongPositions is EverlongPositionsTest {
     function setUp() public virtual override {
         super.setUp();
+    }
+
+    /// @dev Validate that `hasMaturedPositions()` returns false
+    ///      with no positions.
+    function test_hasMaturedPositions_false_when_no_positions() external view {
+        // Check that `hasMaturedPositions()` returns false
+        // when no positions are held.
+        assertFalse(
+            _everlongPositions.hasMaturedPositions(),
+            "should return false when no positions"
+        );
+    }
+
+    /// @dev Validate that `hasMaturedPositions()` returns false
+    ///      with no mature positions.
+    function test_hasMaturedPositions_false_when_no_mature_positions()
+        external
+    {
+        // Open an unmature position.
+        _everlongPositions.exposed_handleOpenLong(
+            uint128(block.timestamp) + 1,
+            5
+        );
+        console2.log(block.timestamp);
+
+        // Check that `hasMaturedPositions()` returns false.
+        assertFalse(
+            _everlongPositions.hasMaturedPositions(),
+            "should return false when position is newly created"
+        );
+    }
+
+    /// @dev Validate that `hasMaturedPositions()` returns true
+    ///      with a mature position.
+    function test_hasMaturedPositions_true_when_single_matured_position()
+        external
+    {
+        // Open unmatured positions with different maturity times.
+        _everlongPositions.exposed_handleOpenLong(2, 5);
+        _everlongPositions.exposed_handleOpenLong(3, 5);
+
+        // Mature the first position (second will be unmature).
+        warpToMaturePosition();
+
+        // Check that `hasMaturedPositions()` returns true.
+        assertTrue(
+            _everlongPositions.hasMaturedPositions(),
+            "should return true with single matured position"
+        );
+    }
+
+    /// @dev Validate that `hasSufficientExcessLiquidity` returns false
+    ///       when Everlong has no balance.
+    function test_hasSufficientExcessLiquidity_false_no_balance() external {
+        // Check that the contract has no balance.
+        assertEq(
+            IERC20(_everlongPositions.asset()).balanceOf(
+                address(_everlongPositions)
+            ),
+            0
+        );
+        // Check that `hasSufficientExcessLiquidity` returns false.
+        assertFalse(
+            _everlongPositions.hasSufficientExcessLiquidity(),
+            "hasSufficientExcessLiquidity should return false with no balance"
+        );
+    }
+
+    /// @dev Validate that `hasSufficientExcessLiquidity` returns true
+    ///       when Everlong has a large balance.
+    function test_hasSufficientExcessLiquidity_true_large_balance() external {
+        // Mint the contract some tokens.
+        uint256 _mintAmount = 5_000_000e18;
+        ERC20Mintable(_everlongPositions.asset()).mint(
+            address(_everlongPositions),
+            _mintAmount
+        );
+
+        // Check that the contract has a large balance.
+        assertEq(
+            IERC20(_everlongPositions.asset()).balanceOf(
+                address(_everlongPositions)
+            ),
+            _mintAmount
+        );
+
+        // Check that `hasSufficientExcessLiquidity` returns true.
+        assertTrue(
+            _everlongPositions.hasSufficientExcessLiquidity(),
+            "hasSufficientExcessLiquidity should return false with no balance"
+        );
     }
 
     /// @dev Validates `recordOpenedLongs(..)` behavior when called
@@ -150,54 +243,5 @@ contract TestEverlongPositions is EverlongPositionsTest {
             IEverlongPositions.InconsistentPositionBondAmount.selector
         );
         _everlongPositions.exposed_handleCloseLong(3);
-    }
-
-    /// @dev Validate that `hasMaturedPositions()` returns false
-    ///      with no positions.
-    function test_hasMaturedPositions_false_when_no_positions() external view {
-        // Check that `hasMaturedPositions()` returns false
-        // when no positions are held.
-        assertFalse(
-            _everlongPositions.hasMaturedPositions(),
-            "should return false when no positions"
-        );
-    }
-
-    /// @dev Validate that `hasMaturedPositions()` returns false
-    ///      with no mature positions.
-    function test_hasMaturedPositions_false_when_no_mature_positions()
-        external
-    {
-        // Open an unmature position.
-        _everlongPositions.exposed_handleOpenLong(
-            uint128(block.timestamp) + 1,
-            5
-        );
-        console2.log(block.timestamp);
-
-        // Check that `hasMaturedPositions()` returns false.
-        assertFalse(
-            _everlongPositions.hasMaturedPositions(),
-            "should return false when position is newly created"
-        );
-    }
-
-    /// @dev Validate that `hasMaturedPositions()` returns true
-    ///      with a mature position.
-    function test_hasMaturedPositions_true_when_single_matured_position()
-        external
-    {
-        // Open unmatured positions with different maturity times.
-        _everlongPositions.exposed_handleOpenLong(2, 5);
-        _everlongPositions.exposed_handleOpenLong(3, 5);
-
-        // Mature the first position (second will be unmature).
-        warpToMaturePosition();
-
-        // Check that `hasMaturedPositions()` returns true.
-        assertTrue(
-            _everlongPositions.hasMaturedPositions(),
-            "should return true with single matured position"
-        );
     }
 }

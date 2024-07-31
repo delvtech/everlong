@@ -43,13 +43,19 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
             block.timestamp);
     }
 
+    /// @inheritdoc IEverlongPositions
+    function hasSufficientExcessLiquidity() public view returns (bool) {
+        // Return whether the current excess liquidity is greater than
+        // Hyperdrive's minimum transaction amount.
+        return
+            _excessLiquidity() >=
+            IHyperdrive(_hyperdrive).getPoolConfig().minimumTransactionAmount;
+    }
+
     // TODO: Consider storing hyperdrive's minimumTransactionAmount.
     /// @inheritdoc IEverlongPositions
     function canRebalance() public view returns (bool) {
-        return
-            hasMaturedPositions() ||
-            IERC20(_asset).balanceOf(address(this)) >=
-            IHyperdrive(_hyperdrive).getPoolConfig().minimumTransactionAmount;
+        return hasMaturedPositions() || hasSufficientExcessLiquidity();
     }
 
     // ╭─────────────────────────────────────────────────────────╮
@@ -57,19 +63,70 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
     // ╰─────────────────────────────────────────────────────────╯
 
     /// @inheritdoc IEverlongPositions
-    function rebalance() public override {
-        // If there is no need for rebalancing, return.
-        if (!canRebalance()) return;
-
-        // First close all mature positions so that the proceeds can be
+    function rebalance() public {
+        // Close all mature positions (if present) so that the proceeds can be
         // used to purchase longs.
-        _closeMaturedPositions();
+        if (hasMaturedPositions()) {
+            _closeMaturedPositions();
+        }
 
-        // Spend Everlong's excess idle liquidity on opening a long.
-        _spendExcessIdle();
+        // Spend Everlong's excess idle liquidity (if sufficient) on opening a long.
+        if (hasSufficientExcessLiquidity()) {
+            _spendExcessLiquidity();
+        }
 
         // Emit the `Rebalanced()` event.
         emit Rebalanced();
+    }
+
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Virtual                                                 │
+    // ╰─────────────────────────────────────────────────────────╯
+
+    // TODO: Implement idle liquidity
+    /// @dev Calculates the amount of excess liquidity that can be spent opening longs.
+    /// @dev Can be overridden by child contracts.
+    /// @return Amount of excess liquidity that can be spent opening longs.
+    function _excessLiquidity() internal view virtual returns (uint256) {
+        // Return the current balance of the contract.
+        return IERC20(_asset).balanceOf(address(this));
+    }
+
+    // TODO: Come up with a safer value.
+    /// @dev Calculates the minimum `openLong` output from Hyperdrive
+    ///       given the amount of capital being spend.
+    /// @dev Can be overridden by child contracts.
+    /// @param _amount Amount of capital provided for `openLong`.
+    /// @return Minimum number of bonds to receive from `openLong`.
+    function _minOpenLongOutput(
+        uint256 _amount
+    ) internal view virtual returns (uint256) {
+        return 0;
+    }
+
+    // TODO: Come up with a safer value.
+    /// @dev Calculates the minimum vault share price at which to
+    ///      open the long.
+    /// @dev Can be overridden by child contracts.
+    /// @param _amount Amount of capital provided for `openLong`.
+    /// @return minimum vault share price for `openLong`.
+    function _minVaultSharePrice(
+        uint256 _amount
+    ) internal view virtual returns (uint256) {
+        return 0;
+    }
+
+    // TODO: Come up with a safer value.
+    /// @dev Calculates the minimum proceeds Everlong will accept for
+    ///      closing the long.
+    /// @dev Can be overridden by child contracts.
+    /// @param _maturityTime Maturity time of the long to close.
+    /// @param _bondAmount Amount of bonds to close.
+    function _minCloseLongOutput(
+        uint256 _maturityTime,
+        uint256 _bondAmount
+    ) internal view returns (uint256) {
+        return 0;
     }
 
     // ╭─────────────────────────────────────────────────────────╮
@@ -79,52 +136,21 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
     /// @dev Spend the excess idle liquidity for the Everlong contract.
     /// @dev Can be overridden by implementing contracts to configure
     ///      how much idle to spend and how it is spent.
-    function _spendExcessIdle() internal virtual {
-        // Obtain the current balance of the contract.
-        uint256 _currentBalance = IERC20(_asset).balanceOf(address(this));
-
-        // Obtain the minimum transaction amount from the hyperdrive instance.
-        uint256 _minTxAmount = IHyperdrive(_hyperdrive)
-            .getPoolConfig()
-            .minimumTransactionAmount;
-
-        // Use the entire balance of the Everlong contract to open a long
-        // if the balance is greater than hyperdrive's minimum tx amount.
-        if (_currentBalance >= _minTxAmount) {
-            (uint256 _maturityTime, uint256 _bondAmount) = _openLong(
-                _currentBalance
-            );
-            // Update positions to reflect the newly opened long.
-            _handleOpenLong(uint128(_maturityTime), uint128(_bondAmount));
-        }
-    }
-
-    /// @dev Open a long position from the Hyperdrive contract
-    ///      for the input `_amount`.
-    /// @dev Can be overridden by implementing contracts to configure slippage
-    ///      and minimum output.
-    /// @param _amount Amount of `_asset` to spend towards the long.
-    /// @return _maturityTime Maturity time of the newly opened long.
-    /// @return _bondAmount Amount of bonds received from the newly opened long.
-    function _openLong(
-        uint256 _amount
-    ) internal virtual returns (uint256 _maturityTime, uint256 _bondAmount) {
-        // Obtain the current balance of the contract.
-        // If the balance is greater than hyperdrive's min tx amount,
-        // use it all to open longs.
-        uint256 _currentBalance = IERC20(_asset).balanceOf(address(this));
-        uint256 _minTxAmount = IHyperdrive(_hyperdrive)
-            .getPoolConfig()
-            .minimumTransactionAmount;
-        if (_currentBalance >= _minTxAmount) {
-            // TODO: Worry about slippage.
-            (_maturityTime, _bondAmount) = IHyperdrive(_hyperdrive).openLong(
-                _currentBalance,
-                0,
-                0,
+    function _spendExcessLiquidity() internal {
+        // Open the long position with the available excess liquidity.
+        // TODO: Worry about slippage.
+        // TODO: Ensure amount < maxLongAmount
+        uint256 _amount = _excessLiquidity();
+        (uint256 _maturityTime, uint256 _bondAmount) = IHyperdrive(_hyperdrive)
+            .openLong(
+                _amount,
+                _minOpenLongOutput(_amount),
+                _minVaultSharePrice(_amount),
                 IHyperdrive.Options(address(this), _asBase, "")
             );
-        }
+
+        // Update positions to reflect the newly opened long.
+        _handleOpenLong(uint128(_maturityTime), uint128(_bondAmount));
     }
 
     /// @dev Account for newly purchased bonds within the `PositionManager`.
@@ -191,37 +217,19 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         while (hasMaturedPositions()) {
             // Retrieve the oldest matured position and close it.
             _position = getPosition(0);
-            _closeLong(
-                uint256(_position.maturityTime),
-                uint256(_position.bondAmount)
+            IHyperdrive(_hyperdrive).closeLong(
+                _position.maturityTime,
+                _position.bondAmount,
+                _minCloseLongOutput(
+                    _position.maturityTime,
+                    _position.bondAmount
+                ),
+                IHyperdrive.Options(address(this), _asBase, "")
             );
 
             // Update positions to reflect the newly closed long.
             _handleCloseLong(uint128(_position.bondAmount));
         }
-    }
-
-    /// @dev Closes a long position from the Hyperdrive contract
-    ///      for the input `_amount`.
-    /// @dev Can be overridden by implementing contracts to configure slippage
-    ///      and minimum output.
-    /// @param _maturityTime Maturity time of the long to close.
-    /// @param _bondAmount Amount of bonds to close from the position.
-    /// @return _proceeds Amount of `asset` received from closing the long.
-    function _closeLong(
-        uint256 _maturityTime,
-        uint256 _bondAmount
-    ) internal virtual returns (uint256 _proceeds) {
-        // Obtain the current balance of the contract.
-        // If the balance is greater than hyperdrive's min tx amount,
-        // use it all to open longs.
-        // TODO: Worry about slippage.
-        _proceeds = IHyperdrive(_hyperdrive).closeLong(
-            _maturityTime,
-            _bondAmount,
-            0,
-            IHyperdrive.Options(address(this), _asBase, "")
-        );
     }
 
     /// @dev Account for closed bonds at the oldest `maturityTime`
@@ -272,18 +280,6 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         return
             (bytes32(bytes16(_maturityTime)) >> 128) |
             bytes32(bytes16(_bondAmount));
-    }
-
-    /// @dev Encodes the `Position` struct into bytes32
-    ///      to store in the queue.
-    /// @param _position The `Position` to encode.
-    /// @return The bytes32 encoded `Position`.
-    function _encodePosition(
-        Position memory _position
-    ) public pure returns (bytes32) {
-        return
-            (bytes32(bytes16(_position.maturityTime)) >> 128) |
-            bytes32(bytes16(_position.bondAmount));
     }
 
     /// @dev Decodes the bytes32 data into a `Position` struct.
