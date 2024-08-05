@@ -11,6 +11,10 @@ import { EverlongBase } from "./EverlongBase.sol";
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
 abstract contract EverlongAdmin is EverlongBase, IEverlongAdmin {
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Modifiers                                               │
+    // ╰─────────────────────────────────────────────────────────╯
+
     /// @dev Ensures that the contract is being called by admin.
     modifier onlyAdmin() {
         if (msg.sender != _admin) {
@@ -19,14 +23,22 @@ abstract contract EverlongAdmin is EverlongBase, IEverlongAdmin {
         _;
     }
 
-    /// @inheritdoc IEverlongAdmin
-    function admin() external view returns (address) {
-        return _admin;
-    }
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Public                                                  │
+    // ╰─────────────────────────────────────────────────────────╯
 
     /// @inheritdoc IEverlongAdmin
     function setAdmin(address admin_) external onlyAdmin {
         _admin = admin_;
         emit AdminUpdated(admin_);
+    }
+
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Views                                                   │
+    // ╰─────────────────────────────────────────────────────────╯
+
+    /// @inheritdoc IEverlongAdmin
+    function admin() external view returns (address) {
+        return _admin;
     }
 }

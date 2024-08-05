@@ -17,48 +17,6 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
     using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
 
     // ╭─────────────────────────────────────────────────────────╮
-    // │ Views                                                   │
-    // ╰─────────────────────────────────────────────────────────╯
-
-    /// @inheritdoc IEverlongPositions
-    function getPositionCount() public view returns (uint256) {
-        return _positions.length();
-    }
-
-    /// @inheritdoc IEverlongPositions
-    function getPosition(
-        uint256 _index
-    ) public view returns (Position memory position) {
-        position = _decodePosition(_positions.at(_index));
-    }
-
-    /// @inheritdoc IEverlongPositions
-    function hasMaturedPositions() public view returns (bool) {
-        // Return false if there are no positions.
-        if (_positions.length() == 0) return false;
-
-        // Return true if the current block timestamp is after
-        // the oldest position's `maturityTime`.
-        return (_decodePosition(_positions.at(0)).maturityTime <=
-            block.timestamp);
-    }
-
-    /// @inheritdoc IEverlongPositions
-    function hasSufficientExcessLiquidity() public view returns (bool) {
-        // Return whether the current excess liquidity is greater than
-        // Hyperdrive's minimum transaction amount.
-        return
-            _excessLiquidity() >=
-            IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount;
-    }
-
-    // TODO: Consider storing hyperdrive's minimumTransactionAmount.
-    /// @inheritdoc IEverlongPositions
-    function canRebalance() public view returns (bool) {
-        return hasMaturedPositions() || hasSufficientExcessLiquidity();
-    }
-
-    // ╭─────────────────────────────────────────────────────────╮
     // │ Public                                                  │
     // ╰─────────────────────────────────────────────────────────╯
 
@@ -140,6 +98,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         // Open the long position with the available excess liquidity.
         // TODO: Worry about slippage.
         // TODO: Ensure amount < maxLongAmount
+        // TODO: Idle liquidity implementation
         uint256 _amount = _excessLiquidity();
         (uint256 _maturityTime, uint256 _bondAmount) = IHyperdrive(hyperdrive)
             .openLong(
@@ -291,5 +250,47 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         uint128 _maturityTime = uint128(bytes16(_position << 128));
         uint128 _bondAmount = uint128(bytes16(_position));
         return Position(_maturityTime, _bondAmount);
+    }
+
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Views                                                   │
+    // ╰─────────────────────────────────────────────────────────╯
+
+    /// @inheritdoc IEverlongPositions
+    function getPositionCount() public view returns (uint256) {
+        return _positions.length();
+    }
+
+    /// @inheritdoc IEverlongPositions
+    function getPosition(
+        uint256 _index
+    ) public view returns (Position memory position) {
+        position = _decodePosition(_positions.at(_index));
+    }
+
+    /// @inheritdoc IEverlongPositions
+    function hasMaturedPositions() public view returns (bool) {
+        // Return false if there are no positions.
+        if (_positions.length() == 0) return false;
+
+        // Return true if the current block timestamp is after
+        // the oldest position's `maturityTime`.
+        return (_decodePosition(_positions.at(0)).maturityTime <=
+            block.timestamp);
+    }
+
+    /// @inheritdoc IEverlongPositions
+    function hasSufficientExcessLiquidity() public view returns (bool) {
+        // Return whether the current excess liquidity is greater than
+        // Hyperdrive's minimum transaction amount.
+        return
+            _excessLiquidity() >=
+            IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount;
+    }
+
+    // TODO: Consider storing hyperdrive's minimumTransactionAmount.
+    /// @inheritdoc IEverlongPositions
+    function canRebalance() public view returns (bool) {
+        return hasMaturedPositions() || hasSufficientExcessLiquidity();
     }
 }

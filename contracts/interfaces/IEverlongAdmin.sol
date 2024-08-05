@@ -5,11 +5,19 @@ interface IEverlongAdmin {
     /// @notice Thrown when caller is not the admin.
     error Unauthorized();
 
-    /// @notice Gets the admin address of the Everlong instance.
-    /// @return The admin address of this Everlong instance.
-    function admin() external view returns (address);
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Public                                                  │
+    // ╰─────────────────────────────────────────────────────────╯
 
     /// @notice Allows admin to transfer the admin role.
     /// @param _admin The new admin address.
     function setAdmin(address _admin) external;
+
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Views                                                   │
+    // ╰─────────────────────────────────────────────────────────╯
+
+    /// @notice Gets the admin address of the Everlong instance.
+    /// @return The admin address of this Everlong instance.
+    function admin() external view returns (address);
 }

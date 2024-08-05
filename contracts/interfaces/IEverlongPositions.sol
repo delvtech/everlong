@@ -2,6 +2,10 @@
 pragma solidity 0.8.20;
 
 interface IEverlongPositions {
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Errors                                                  │
+    // ╰─────────────────────────────────────────────────────────╯
+
     /// @notice Thrown when attempting to insert a position with
     ///         a `maturityTime` sooner than the most recent position's.
     error InconsistentPositionMaturity();
@@ -9,6 +13,10 @@ interface IEverlongPositions {
     /// @notice Thrown when attempting to close a position with
     ///         a `bondAmount` greater than that contained by the position.
     error InconsistentPositionBondAmount();
+
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Structs                                                 │
+    // ╰─────────────────────────────────────────────────────────╯
 
     /// @dev Tracks the total amount of bonds managed by Everlong
     ///      with the same maturityTime.
@@ -18,6 +26,17 @@ interface IEverlongPositions {
         /// @dev Quantity of bonds in the position.
         uint128 bondAmount;
     }
+
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Public                                                  │
+    // ╰─────────────────────────────────────────────────────────╯
+
+    /// @notice Rebalances the Everlong bond portfolio if needed.
+    function rebalance() external;
+
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Views                                                   │
+    // ╰─────────────────────────────────────────────────────────╯
 
     /// @notice Gets the number of positions managed by the Everlong instance.
     /// @return The number of positions.
@@ -43,7 +62,4 @@ interface IEverlongPositions {
     /// @notice Determines whether Everlong's portfolio can currently be rebalanced.
     /// @return True if the portfolio can be rebalanced, false otherwise.
     function canRebalance() external view returns (bool);
-
-    /// @notice Rebalances the Everlong bond portfolio if needed.
-    function rebalance() external;
 }
