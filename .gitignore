@@ -134,3 +134,6 @@ forge-cache
 
 # coverage
 lcov.info
+
+# vscode workspace settings
+.vscode

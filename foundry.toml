@@ -24,6 +24,7 @@ gas_limit = "18446744073709551615"
 # allows the ffi to be used
 ffi = true
 # strict warnings
+# TODO: Reenable
 # deny_warnings = true
 # optimizer settings
 optimizer = true

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 import { EverlongPositionsTest } from "../harnesses/EverlongPositionsTest.sol";
 import { IEverlongPositions } from "../../contracts/interfaces/IEverlongPositions.sol";
