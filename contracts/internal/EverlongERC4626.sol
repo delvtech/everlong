@@ -31,18 +31,18 @@ abstract contract EverlongERC4626 is ERC4626 {
     string internal _symbol;
 
     /// @notice Initial configuration paramters for EverlongERC4626.
-    /// @param name_ Name of the ERC20 token managed by Everlong.
-    /// @param symbol_ Symbol of the ERC20 token managed by Everlong.
-    /// @param asset_ Base token used by Everlong for deposits/withdrawals.
-    constructor(string memory name_, string memory symbol_, address asset_) {
+    /// @param __name Name of the ERC20 token managed by Everlong.
+    /// @param __symbol Symbol of the ERC20 token managed by Everlong.
+    /// @param __asset Base token used by Everlong for deposits/withdrawals.
+    constructor(string memory __name, string memory __symbol, address __asset) {
         // Store constructor parameters.
-        _name = name_;
-        _symbol = symbol_;
-        _asset = asset_;
+        _name = __name;
+        _symbol = __symbol;
+        _asset = __asset;
 
         // Attempt to retrieve the decimals from the {_asset} contract.
         // If it does not implement `decimals() (uint256)`, use the default.
-        (bool success, uint8 result) = _tryGetAssetDecimals(asset_);
+        (bool success, uint8 result) = _tryGetAssetDecimals(__asset);
         _decimals = success ? result : _DEFAULT_UNDERLYING_DECIMALS;
     }
 
