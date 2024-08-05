@@ -247,8 +247,8 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
     function _decodePosition(
         bytes32 _position
     ) public pure returns (Position memory) {
-        uint128 _maturityTime = uint128(bytes16(_position << 128));
-        uint128 _bondAmount = uint128(bytes16(_position));
+        uint128 _maturityTime = uint128(uint256(_position) >> 128);
+        uint128 _bondAmount = uint128(uint256(_position));
         return Position(_maturityTime, _bondAmount);
     }
 
