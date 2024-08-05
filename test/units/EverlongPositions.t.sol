@@ -198,6 +198,18 @@ contract TestEverlongPositions is EverlongPositionsTest {
     }
 
     /// @dev Validates `recordLongsClosed(..)` behavior when
+    ///      called with more than the bondAmount of the position.
+    function test_exposed_handleCloseLong_revert_greater_amount() external {
+        // Record opening and partially closing a long.
+        // Check that `PositionUpdated` event is emitted.
+        _everlongPositions.exposed_handleOpenLong(1, 2);
+        vm.expectRevert(
+            IEverlongPositions.InconsistentPositionBondAmount.selector
+        );
+        _everlongPositions.exposed_handleCloseLong(3);
+    }
+
+    /// @dev Validates `recordLongsClosed(..)` behavior when
     ///      called with the full bondAmount of the position.
     function test_exposed_handleCloseLong_full_amount() external {
         // Record opening and fully closing a long.
@@ -231,17 +243,5 @@ contract TestEverlongPositions is EverlongPositionsTest {
             1,
             "position count should be 1 after opening and closing a long for the partial bond amount"
         );
-    }
-
-    /// @dev Validates `recordLongsClosed(..)` behavior when
-    ///      called with more than the bondAmount of the position.
-    function test_exposed_handleCloseLong_greater_amount() external {
-        // Record opening and partially closing a long.
-        // Check that `PositionUpdated` event is emitted.
-        _everlongPositions.exposed_handleOpenLong(1, 2);
-        vm.expectRevert(
-            IEverlongPositions.InconsistentPositionBondAmount.selector
-        );
-        _everlongPositions.exposed_handleCloseLong(3);
     }
 }
