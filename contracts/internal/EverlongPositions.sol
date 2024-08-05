@@ -199,8 +199,8 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         // Remove the oldest position from the front queue.
         Position memory _position = _decodePosition(_positions.popFront());
 
-        // Compare the input bond amount
-        // to the most mature position's `bondAmount`.
+        // Compare the input bond amount to the most mature position's
+        // `bondAmount`.
         if (_bondAmountClosed > _position.bondAmount) {
             revert InconsistentPositionBondAmount();
         } else if (_bondAmountClosed == _position.bondAmount) {
