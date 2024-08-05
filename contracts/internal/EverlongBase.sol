@@ -71,8 +71,8 @@ abstract contract EverlongBase is EverlongERC4626, IEverlongEvents {
         _asBase = __asBase;
         _admin = msg.sender;
 
-        // Give max approval for `_asset` to the hyperdrive contract.
-        IERC20(_asset).approve(_hyperdrive, type(uint256).max);
+        // Give 1 wei approval to make the slot "dirty".
+        IERC20(_asset).approve(_hyperdrive, 1);
     }
 
     // ╭─────────────────────────────────────────────────────────╮
