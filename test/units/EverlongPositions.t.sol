@@ -64,7 +64,7 @@ contract TestEverlongPositions is EverlongPositionsTest {
     }
 
     /// @dev Validate that `hasSufficientExcessLiquidity` returns false
-    ///       when Everlong has no balance.
+    ///      when Everlong has no balance.
     function test_hasSufficientExcessLiquidity_false_no_balance() external {
         // Check that the contract has no balance.
         assertEq(
