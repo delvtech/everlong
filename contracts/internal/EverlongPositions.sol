@@ -203,9 +203,10 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         // `bondAmount`.
         if (_bondAmountClosed > _position.bondAmount) {
             revert InconsistentPositionBondAmount();
-        } else if (_bondAmountClosed == _position.bondAmount) {
-            // The amount to close equals the position size.
-            // Nothing further needs to be done.
+        } 
+        // The amount to close equals the position size.
+        // Nothing further needs to be done.
+        else if (_bondAmountClosed == _position.bondAmount) {
             emit PositionClosed(_position.maturityTime);
         } else {
             // The amount to close is not equal to the position size.
