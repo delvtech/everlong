@@ -9,7 +9,7 @@ import { ERC4626 } from "solady/tokens/ERC4626.sol";
 /// @custom:disclaimer The language used in this code is for coding convenience
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
-contract EverlongERC4626 is ERC4626 {
+abstract contract EverlongERC4626 is ERC4626 {
     /// @notice Virtual shares are used to mitigate inflation attacks.
     bool public constant useVirtualShares = true;
 

@@ -15,7 +15,7 @@ import { ERC4626 } from "solady/tokens/ERC4626.sol";
 /// @custom:disclaimer The language used in this code is for coding convenience
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
-contract EverlongBase is EverlongERC4626, IEverlongEvents {
+abstract contract EverlongBase is EverlongERC4626, IEverlongEvents {
     using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
 
     // ╭─────────────────────────────────────────────────────────╮
