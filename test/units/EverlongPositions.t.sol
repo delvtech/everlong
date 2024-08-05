@@ -108,7 +108,6 @@ contract TestEverlongPositions is EverlongPositionsTest {
     ///      with no preexisting positions.
     function test_exposed_handleOpenLong_no_positions() external {
         // Initial count should be zero.
-        console2.log(_everlongPositions.getPositionCount());
         assertEq(
             _everlongPositions.getPositionCount(),
             0,
