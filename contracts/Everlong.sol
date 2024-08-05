@@ -62,7 +62,7 @@ import { EverlongPositions } from "./internal/EverlongPositions.sol";
 /// @custom:disclaimer The language used in this code is for coding convenience
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
-abstract contract Everlong is EverlongAdmin, EverlongPositions {
+contract Everlong is EverlongAdmin, EverlongPositions {
     /// @notice Initial configuration paramters for Everlong.
     /// @param name_ Name of the ERC20 token managed by Everlong.
     /// @param symbol_ Symbol of the ERC20 token managed by Everlong.
