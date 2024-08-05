@@ -126,7 +126,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
             _decodePosition(_positions.back()).maturityTime > _maturityTime
         ) {
             // Revert because the incoming position's `maturityTime`
-            //  is sooner than the most recently added position's maturity.
+            // is sooner than the most recently added position's maturity.
             revert InconsistentPositionMaturity();
         } else if (
             _positions.length() != 0 &&
