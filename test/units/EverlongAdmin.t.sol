@@ -7,7 +7,7 @@ import { IEverlongAdmin } from "../../contracts/interfaces/IEverlongAdmin.sol";
 import { console2 } from "forge-std/console2.sol";
 import { Test } from "forge-std/Test.sol";
 
-/// @dev Extend the `Admin` contract to access the event selectors.
+/// @dev Tests EverlongAdmin functionality.
 contract TestEverlongAdmin is EverlongAdminTest {
     function setUp() public virtual override {
         super.setUp();
