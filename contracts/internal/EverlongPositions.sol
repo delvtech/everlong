@@ -49,7 +49,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         // Hyperdrive's minimum transaction amount.
         return
             _excessLiquidity() >=
-            IHyperdrive(_hyperdrive).getPoolConfig().minimumTransactionAmount;
+            IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount;
     }
 
     // TODO: Consider storing hyperdrive's minimumTransactionAmount.
@@ -141,7 +141,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         // TODO: Worry about slippage.
         // TODO: Ensure amount < maxLongAmount
         uint256 _amount = _excessLiquidity();
-        (uint256 _maturityTime, uint256 _bondAmount) = IHyperdrive(_hyperdrive)
+        (uint256 _maturityTime, uint256 _bondAmount) = IHyperdrive(hyperdrive)
             .openLong(
                 _amount,
                 _minOpenLongOutput(_amount),
@@ -217,7 +217,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         while (hasMaturedPositions()) {
             // Retrieve the oldest matured position and close it.
             _position = getPosition(0);
-            IHyperdrive(_hyperdrive).closeLong(
+            IHyperdrive(hyperdrive).closeLong(
                 _position.maturityTime,
                 _position.bondAmount,
                 _minCloseLongOutput(
