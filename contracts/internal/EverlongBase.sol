@@ -47,7 +47,7 @@ abstract contract EverlongBase is EverlongERC4626, IEverlongEvents {
     // │ Constructor                                             │
     // ╰─────────────────────────────────────────────────────────╯
 
-    /// @notice Initial configuration paramters for Everlong.
+    /// @notice Initial configuration parameters for Everlong.
     /// @param hyperdrive_ Address of the Hyperdrive instance wrapped by Everlong.
     /// @param name_ Name of the ERC20 token managed by Everlong.
     /// @param symbol_ Symbol of the ERC20 token managed by Everlong.
