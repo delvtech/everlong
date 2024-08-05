@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.20;
 
-import { EverlongPositionsTest } from "../harnesses/EverlongPositionsTest.sol";
-import { IEverlongPositions } from "../../contracts/interfaces/IEverlongPositions.sol";
 import { console2 } from "forge-std/console2.sol";
 import { Test } from "forge-std/Test.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
+import { IEverlongPositions } from "../../contracts/interfaces/IEverlongPositions.sol";
+import { EverlongPositionsTest } from "../harnesses/EverlongPositionsTest.sol";
 
 /// @dev Extend the EverlongPositionsTest contract.
 contract TestEverlongPositions is EverlongPositionsTest {

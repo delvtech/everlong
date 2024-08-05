@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.20;
 
-import { VmSafe } from "forge-std/Vm.sol";
-import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
-import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol";
-import { EverlongExposed } from "../exposed/EverlongExposed.sol";
-
 import { HyperdriveTest } from "hyperdrive/test/utils/HyperdriveTest.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
+import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
+import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol";
+import { EverlongExposed } from "../exposed/EverlongExposed.sol";
 
 // TODO: Refactor this to include an instance of `Everlong` with exposed internal functions.
 /// @dev Everlong testing harness contract.

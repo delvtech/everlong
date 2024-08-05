@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.20;
 
-import { EverlongPositionsExposed } from "../exposed/EverlongPositionsExposed.sol";
-import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol";
-import { IEverlongPositions } from "../../contracts/interfaces/IEverlongPositions.sol";
 import { console2 } from "forge-std/console2.sol";
 import { Test } from "forge-std/Test.sol";
 import { HyperdriveTest } from "hyperdrive/test/utils/HyperdriveTest.sol";
+import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol";
+import { IEverlongPositions } from "../../contracts/interfaces/IEverlongPositions.sol";
+import { EverlongPositionsExposed } from "../exposed/EverlongPositionsExposed.sol";
 
 /// @title EverlongPositionsTest
 /// @dev Test harness for EverlongPositions with exposed internal methods and utility functions.

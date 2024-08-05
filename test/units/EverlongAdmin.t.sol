@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.20;
+
 import { EverlongAdminTest } from "../harnesses/EverlongAdminTest.sol";
 import { EverlongAdminExposed } from "../exposed/EverlongAdminExposed.sol";
 import { EverlongAdmin } from "../../contracts/internal/EverlongAdmin.sol";

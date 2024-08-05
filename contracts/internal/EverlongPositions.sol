@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.20;
 
-import { IEverlongPositions } from "../interfaces/IEverlongPositions.sol";
-import { EverlongBase } from "./EverlongBase.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { DoubleEndedQueue } from "openzeppelin/utils/structs/DoubleEndedQueue.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
+import { IEverlongPositions } from "../interfaces/IEverlongPositions.sol";
+import { EverlongBase } from "./EverlongBase.sol";
 
 /// @author DELV
 /// @title EverlongPositions

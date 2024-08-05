@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.20;
-import { EverlongTest } from "../harnesses/EverlongTest.sol";
-import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
+
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
+import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
+import { EverlongTest } from "../harnesses/EverlongTest.sol";
 
 /// @dev Extend only the test harness.
 contract IEverlongTest is EverlongTest {
