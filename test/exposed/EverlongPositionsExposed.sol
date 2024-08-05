@@ -21,16 +21,16 @@ contract EverlongPositionsExposed is EverlongPositions, Test {
         bool asBase_
     ) EverlongBase(name_, symbol_, hyperdrive_, asBase_) {}
 
-    /// @dev Calculates the amount of excess liquidity that can be spent opening longs.
-    /// @dev Can be overridden by child contracts.
+    /// @notice Calculates the amount of excess liquidity that can be spent opening longs.
+    /// @notice Can be overridden by child contracts.
     /// @return Amount of excess liquidity that can be spent opening longs.
     function exposed_excessLiquidity() public view virtual returns (uint256) {
         return _excessLiquidity();
     }
 
-    /// @dev Calculates the minimum `openLong` output from Hyperdrive
+    /// @notice Calculates the minimum `openLong` output from Hyperdrive
     ///       given the amount of capital being spend.
-    /// @dev Can be overridden by child contracts.
+    /// @notice Can be overridden by child contracts.
     /// @param _amount Amount of capital provided for `openLong`.
     /// @return Minimum number of bonds to receive from `openLong`.
     function exposed_minOpenLongOutput(
@@ -39,9 +39,9 @@ contract EverlongPositionsExposed is EverlongPositions, Test {
         return _minOpenLongOutput(_amount);
     }
 
-    /// @dev Calculates the minimum vault share price at which to
+    /// @notice Calculates the minimum vault share price at which to
     ///      open the long.
-    /// @dev Can be overridden by child contracts.
+    /// @notice Can be overridden by child contracts.
     /// @param _amount Amount of capital provided for `openLong`.
     /// @return minimum vault share price for `openLong`.
     function exposed_minVaultSharePrice(
@@ -50,9 +50,9 @@ contract EverlongPositionsExposed is EverlongPositions, Test {
         return _minVaultSharePrice(_amount);
     }
 
-    /// @dev Calculates the minimum proceeds Everlong will accept for
+    /// @notice Calculates the minimum proceeds Everlong will accept for
     ///      closing the long.
-    /// @dev Can be overridden by child contracts.
+    /// @notice Can be overridden by child contracts.
     /// @param _maturityTime Maturity time of the long to close.
     /// @param _bondAmount Amount of bonds to close.
     function exposed_minCloseLongOutput(
@@ -62,14 +62,14 @@ contract EverlongPositionsExposed is EverlongPositions, Test {
         return _minCloseLongOutput(_maturityTime, _bondAmount);
     }
 
-    /// @dev Spend the excess idle liquidity for the Everlong contract.
-    /// @dev Can be overridden by implementing contracts to configure
+    /// @notice Spend the excess idle liquidity for the Everlong contract.
+    /// @notice Can be overridden by implementing contracts to configure
     ///      how much idle to spend and how it is spent.
     function exposed_spendExcessLiquidity() public {
         return _spendExcessLiquidity();
     }
 
-    /// @dev Account for newly purchased bonds within the `PositionManager`.
+    /// @notice Account for newly purchased bonds within the `PositionManager`.
     /// @param _maturityTime Maturity time for the newly purchased bonds.
     /// @param _bondAmountPurchased Amount of bonds purchased.
     function exposed_handleOpenLong(
@@ -79,12 +79,12 @@ contract EverlongPositionsExposed is EverlongPositions, Test {
         return _handleOpenLong(_maturityTime, _bondAmountPurchased);
     }
 
-    /// @dev Close all matured positions.
+    /// @notice Close all matured positions.
     function exposed_closeMaturedPositions() public {
         return _closeMaturedPositions();
     }
 
-    /// @dev Account for closed bonds at the oldest `maturityTime`
+    /// @notice Account for closed bonds at the oldest `maturityTime`
     ///      within the `PositionManager`.
     /// @param _bondAmountClosed Amount of bonds closed.
     function exposed_handleCloseLong(uint128 _bondAmountClosed) public {
