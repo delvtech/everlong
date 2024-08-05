@@ -26,10 +26,10 @@ interface IEverlongEvents {
         uint256 index
     );
 
-    /// @notice Emitted when Everlong's underlying portfolio is rebalanced.
-    event Rebalanced();
-
     /// @notice Emitted when an existing position is closed.
     /// TODO: Reconsider naming https://github.com/delvtech/hyperdrive/pull/1096#discussion_r1681337414
     event PositionClosed(uint128 indexed maturityTime);
+
+    /// @notice Emitted when Everlong's underlying portfolio is rebalanced.
+    event Rebalanced();
 }
