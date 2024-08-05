@@ -81,7 +81,7 @@ contract TestEverlongPositions is EverlongPositionsTest {
     }
 
     /// @dev Validate that `hasSufficientExcessLiquidity` returns true
-    ///       when Everlong has a large balance.
+    ///      when Everlong has a large balance.
     function test_hasSufficientExcessLiquidity_true_large_balance() external {
         // Mint the contract some tokens.
         uint256 _mintAmount = 5_000_000e18;
