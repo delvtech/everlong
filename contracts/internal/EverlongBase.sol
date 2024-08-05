@@ -4,6 +4,7 @@ pragma solidity 0.8.20;
 import { EverlongAdmin } from "./EverlongAdmin.sol";
 import { EverlongERC4626 } from "./EverlongERC4626.sol";
 import { IEverlongEvents } from "../interfaces/IEverlongEvents.sol";
+import { EVERLONG_KIND, EVERLONG_VERSION } from "../libraries/Constants.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { DoubleEndedQueue } from "openzeppelin/utils/structs/DoubleEndedQueue.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
@@ -82,12 +83,12 @@ abstract contract EverlongBase is EverlongERC4626, IEverlongEvents {
     /// @notice Returns the kind of the Everlong instance.
     /// @return Everlong contract kind.
     function kind() public view virtual returns (string memory) {
-        return "Everlong";
+        return EVERLONG_KIND;
     }
 
     /// @notice Returns the version of the Everlong instance.
     /// @return Everlong contract version.
     function version() public view virtual returns (string memory) {
-        return "v0.0.1";
+        return EVERLONG_VERSION;
     }
 }
