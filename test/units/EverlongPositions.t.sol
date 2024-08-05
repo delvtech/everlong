@@ -35,7 +35,6 @@ contract TestEverlongPositions is EverlongPositionsTest {
             uint128(block.timestamp) + 1,
             5
         );
-        console2.log(block.timestamp);
 
         // Check that `hasMaturedPositions()` returns false.
         assertFalse(
