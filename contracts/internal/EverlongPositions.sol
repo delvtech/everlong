@@ -203,7 +203,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         // `bondAmount`.
         if (_bondAmountClosed > _position.bondAmount) {
             revert InconsistentPositionBondAmount();
-        } 
+        }
         // The amount to close equals the position size.
         // Nothing further needs to be done.
         else if (_bondAmountClosed == _position.bondAmount) {
@@ -238,9 +238,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         uint128 _maturityTime,
         uint128 _bondAmount
     ) public pure returns (bytes32) {
-        return
-            (bytes32(bytes16(_maturityTime)) >> 128) |
-            bytes32(bytes16(_bondAmount));
+        return bytes32((uint256(_maturityTime) << 128) | uint256(_bondAmount));
     }
 
     /// @dev Decodes the bytes32 data into a `Position` struct.

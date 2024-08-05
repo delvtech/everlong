@@ -24,7 +24,7 @@ contract EverlongPositionsExposed is EverlongPositions, Test {
     /// @dev Calculates the amount of excess liquidity that can be spent opening longs.
     /// @dev Can be overridden by child contracts.
     /// @return Amount of excess liquidity that can be spent opening longs.
-    function exposed_excessLiquidity() internal view virtual returns (uint256) {
+    function exposed_excessLiquidity() public view virtual returns (uint256) {
         return _excessLiquidity();
     }
 
@@ -35,7 +35,7 @@ contract EverlongPositionsExposed is EverlongPositions, Test {
     /// @return Minimum number of bonds to receive from `openLong`.
     function exposed_minOpenLongOutput(
         uint256 _amount
-    ) internal view virtual returns (uint256) {
+    ) public view virtual returns (uint256) {
         return _minOpenLongOutput(_amount);
     }
 
@@ -46,7 +46,7 @@ contract EverlongPositionsExposed is EverlongPositions, Test {
     /// @return minimum vault share price for `openLong`.
     function exposed_minVaultSharePrice(
         uint256 _amount
-    ) internal view virtual returns (uint256) {
+    ) public view virtual returns (uint256) {
         return _minVaultSharePrice(_amount);
     }
 
@@ -58,7 +58,7 @@ contract EverlongPositionsExposed is EverlongPositions, Test {
     function exposed_minCloseLongOutput(
         uint256 _maturityTime,
         uint256 _bondAmount
-    ) internal view returns (uint256) {
+    ) public view returns (uint256) {
         return _minCloseLongOutput(_maturityTime, _bondAmount);
     }
 
