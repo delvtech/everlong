@@ -33,7 +33,7 @@ abstract contract EverlongBase is EverlongERC4626, IEverlongEvents {
     address internal immutable _hyperdrive;
 
     /// @dev Whether to use Hyperdrive's base token to purchase bonds.
-    //          If false, use the Hyperdrive's `vaultSharesToken`.
+    ///      If false, use the Hyperdrive's `vaultSharesToken`.
     bool internal immutable _asBase;
 
     /// Positions ///
