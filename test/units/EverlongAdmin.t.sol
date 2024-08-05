@@ -14,7 +14,7 @@ contract TestEverlongAdmin is EverlongAdminTest {
     }
 
     /// @dev Validates revert when `setAdmin` called by non-admin.
-    function test_setAdmin_revert_unauthorized() external {
+    function test_setAdmin_failure_unauthorized() external {
         // Ensure that an unauthorized user cannot set the admin address.
         vm.expectRevert(IEverlongAdmin.Unauthorized.selector);
         _everlongAdmin.setAdmin(address(0));

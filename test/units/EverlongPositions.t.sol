@@ -185,7 +185,7 @@ contract TestEverlongPositions is EverlongPositionsTest {
     /// @dev Validates `recordOpenedLongs(..)` behavior when called
     ///      with a position with a maturity time sooner than the most
     ///      recently added position's maturity time.
-    function test_exposed_handleOpenLong_revert_shorter_maturity() external {
+    function test_exposed_handleOpenLong_failure_shorter_maturity() external {
         // Record an opened position.
         _everlongPositions.exposed_handleOpenLong(5, 1);
 
@@ -199,7 +199,7 @@ contract TestEverlongPositions is EverlongPositionsTest {
 
     /// @dev Validates `recordLongsClosed(..)` behavior when
     ///      called with more than the bondAmount of the position.
-    function test_exposed_handleCloseLong_revert_greater_amount() external {
+    function test_exposed_handleCloseLong_failure_greater_amount() external {
         // Record opening and partially closing a long.
         // Check that `PositionUpdated` event is emitted.
         _everlongPositions.exposed_handleOpenLong(1, 2);
