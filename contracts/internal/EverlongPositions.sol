@@ -191,6 +191,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         }
     }
 
+    // PERF: Popping then pushing the same position is inefficient.
     /// @dev Account for closed bonds at the oldest `maturityTime`
     ///      within the `PositionManager`.
     /// @param _bondAmountClosed Amount of bonds closed.
