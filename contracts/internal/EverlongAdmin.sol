@@ -24,7 +24,7 @@ abstract contract EverlongAdmin is EverlongBase, IEverlongAdmin {
     }
 
     // ╭─────────────────────────────────────────────────────────╮
-    // │ Public                                                  │
+    // │ Stateful                                                │
     // ╰─────────────────────────────────────────────────────────╯
 
     /// @inheritdoc IEverlongAdmin
@@ -34,7 +34,7 @@ abstract contract EverlongAdmin is EverlongBase, IEverlongAdmin {
     }
 
     // ╭─────────────────────────────────────────────────────────╮
-    // │ Views                                                   │
+    // │ Getters                                                 │
     // ╰─────────────────────────────────────────────────────────╯
 
     /// @inheritdoc IEverlongAdmin

@@ -77,7 +77,7 @@ abstract contract EverlongBase is EverlongERC4626, IEverlongEvents {
     }
 
     // ╭─────────────────────────────────────────────────────────╮
-    // │ Views                                                   │
+    // │ Getters                                                 │
     // ╰─────────────────────────────────────────────────────────╯
 
     /// @notice Returns the kind of the Everlong instance.

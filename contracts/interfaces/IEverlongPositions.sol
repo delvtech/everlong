@@ -28,14 +28,14 @@ interface IEverlongPositions {
     }
 
     // ╭─────────────────────────────────────────────────────────╮
-    // │ Public                                                  │
+    // │ Stateful                                                │
     // ╰─────────────────────────────────────────────────────────╯
 
     /// @notice Rebalances the Everlong bond portfolio if needed.
     function rebalance() external;
 
     // ╭─────────────────────────────────────────────────────────╮
-    // │ Views                                                   │
+    // │ Getters                                                 │
     // ╰─────────────────────────────────────────────────────────╯
 
     /// @notice Gets the number of positions managed by the Everlong instance.

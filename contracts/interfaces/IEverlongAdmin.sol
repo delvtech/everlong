@@ -2,11 +2,15 @@
 pragma solidity 0.8.20;
 
 interface IEverlongAdmin {
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Errors                                                  │
+    // ╰─────────────────────────────────────────────────────────╯
+
     /// @notice Thrown when caller is not the admin.
     error Unauthorized();
 
     // ╭─────────────────────────────────────────────────────────╮
-    // │ Public                                                  │
+    // │ Stateful                                                │
     // ╰─────────────────────────────────────────────────────────╯
 
     /// @notice Allows admin to transfer the admin role.
@@ -14,7 +18,7 @@ interface IEverlongAdmin {
     function setAdmin(address _admin) external;
 
     // ╭─────────────────────────────────────────────────────────╮
-    // │ Views                                                   │
+    // │ Getters                                                 │
     // ╰─────────────────────────────────────────────────────────╯
 
     /// @notice Gets the admin address of the Everlong instance.

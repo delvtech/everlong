@@ -10,6 +10,10 @@ import { ERC4626 } from "solady/tokens/ERC4626.sol";
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
 abstract contract EverlongERC4626 is ERC4626 {
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Storage                                                 │
+    // ╰─────────────────────────────────────────────────────────╯
+
     /// @notice Virtual shares are used to mitigate inflation attacks.
     bool public constant useVirtualShares = true;
 
@@ -30,6 +34,10 @@ abstract contract EverlongERC4626 is ERC4626 {
     /// @dev Symbol of the Everlong token.
     string internal _symbol;
 
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Constructor                                             │
+    // ╰─────────────────────────────────────────────────────────╯
+
     /// @notice Initial configuration paramters for EverlongERC4626.
     /// @param __name Name of the ERC20 token managed by Everlong.
     /// @param __symbol Symbol of the ERC20 token managed by Everlong.
@@ -46,24 +54,9 @@ abstract contract EverlongERC4626 is ERC4626 {
         _decimals = success ? result : _DEFAULT_UNDERLYING_DECIMALS;
     }
 
-    /// @notice Address of the token to use for deposits/withdrawals.
-    /// @dev MUST be an ERC20 token contract.
-    /// @return Asset address.
-    function asset() public view virtual override returns (address) {
-        return _asset;
-    }
-
-    /// @notice Returns the name of the Everlong token.
-    /// @return Everlong token name.
-    function name() public view virtual override returns (string memory) {
-        return _name;
-    }
-
-    /// @notice Returns the symbol of the Everlong token.
-    /// @return Everlong token symbol.
-    function symbol() public view virtual override returns (string memory) {
-        return _symbol;
-    }
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Internal                                                │
+    // ╰─────────────────────────────────────────────────────────╯
 
     /// @dev Returns whether virtual shares will be used to mitigate the inflation attack.
     /// @dev See: https://github.com/OpenZeppelin/openzeppelin-contracts/issues/3706
@@ -98,5 +91,28 @@ abstract contract EverlongERC4626 is ERC4626 {
     // TODO: Might not need this but including for convenience.
     function _afterDeposit(uint256, uint256) internal override {
         // revert("TODO");
+    }
+
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Getters                                                 │
+    // ╰─────────────────────────────────────────────────────────╯
+
+    /// @notice Address of the token to use for deposits/withdrawals.
+    /// @dev MUST be an ERC20 token contract.
+    /// @return Asset address.
+    function asset() public view virtual override returns (address) {
+        return _asset;
+    }
+
+    /// @notice Returns the name of the Everlong token.
+    /// @return Everlong token name.
+    function name() public view virtual override returns (string memory) {
+        return _name;
+    }
+
+    /// @notice Returns the symbol of the Everlong token.
+    /// @return Everlong token symbol.
+    function symbol() public view virtual override returns (string memory) {
+        return _symbol;
     }
 }

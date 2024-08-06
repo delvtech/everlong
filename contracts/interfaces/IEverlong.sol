@@ -12,6 +12,10 @@ interface IEverlong is
     IEverlongPositions,
     IEverlongEvents
 {
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Getters                                                 │
+    // ╰─────────────────────────────────────────────────────────╯
+
     /// @notice Gets the address of the underlying Hyperdrive Instance
     function hyperdrive() external view returns (address);
 

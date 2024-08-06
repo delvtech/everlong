@@ -17,7 +17,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
     using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
 
     // ╭─────────────────────────────────────────────────────────╮
-    // │ Public                                                  │
+    // │ Stateful                                                │
     // ╰─────────────────────────────────────────────────────────╯
 
     /// @inheritdoc IEverlongPositions
@@ -253,7 +253,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
     }
 
     // ╭─────────────────────────────────────────────────────────╮
-    // │ Views                                                   │
+    // │ Getters                                                 │
     // ╰─────────────────────────────────────────────────────────╯
 
     /// @inheritdoc IEverlongPositions
