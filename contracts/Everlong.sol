@@ -64,14 +64,14 @@ import { EverlongPositions } from "./internal/EverlongPositions.sol";
 ///                    particular legal or regulatory significance.
 contract Everlong is EverlongAdmin, EverlongPositions {
     /// @notice Initial configuration paramters for Everlong.
-    /// @param name_ Name of the ERC20 token managed by Everlong.
-    /// @param symbol_ Symbol of the ERC20 token managed by Everlong.
-    /// @param hyperdrive_ Address of the Hyperdrive instance wrapped by Everlong.
-    /// @param asBase_ Whether to use Hyperdrive's base token for bond purchases.
+    /// @param _name Name of the ERC20 token managed by Everlong.
+    /// @param _symbol Symbol of the ERC20 token managed by Everlong.
+    /// @param __hyperdrive Address of the Hyperdrive instance wrapped by Everlong.
+    /// @param __asBase Whether to use Hyperdrive's base token for bond purchases.
     constructor(
-        string memory name_,
-        string memory symbol_,
-        address hyperdrive_,
-        bool asBase_
-    ) EverlongBase(name_, symbol_, hyperdrive_, asBase_) {}
+        string memory _name,
+        string memory _symbol,
+        address __hyperdrive,
+        bool __asBase
+    ) EverlongBase(_name, _symbol, __hyperdrive, __asBase) {}
 }
