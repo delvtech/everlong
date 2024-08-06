@@ -2,17 +2,10 @@
 pragma solidity 0.8.20;
 
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
-import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
 import { EverlongTest } from "../harnesses/EverlongTest.sol";
 
 /// @dev Extend only the test harness.
 contract IEverlongTest is EverlongTest {
-    /// @dev Set up the hyperdrive test from super and deploy Everlong.
-    function setUp() public virtual override {
-        super.setUp();
-        deploy();
-    }
-
     /// @dev Ensure that the `hyperdrive()` view function is implemented.
     function test_hyperdrive() external view {
         assertEq(
@@ -96,7 +89,7 @@ contract IEverlongTest is EverlongTest {
         // Initialize the Hyperdrive instance by adding liquidity from Alice.
         uint256 fixedRate = 0.5e18;
         uint256 contribution = 10_000e18;
-        uint256 lpShares = initialize(alice, fixedRate, contribution);
+        initialize(alice, fixedRate, contribution);
 
         // 1. Mint some tokens to Everlong for opening Longs.
         // Ensure Everlong's balance is gte Hyperdrive's minTransactionAmount.

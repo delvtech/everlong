@@ -4,10 +4,8 @@ pragma solidity 0.8.20;
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { DoubleEndedQueue } from "openzeppelin/utils/structs/DoubleEndedQueue.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
-import { ERC4626 } from "solady/tokens/ERC4626.sol";
 import { IEverlongEvents } from "../interfaces/IEverlongEvents.sol";
 import { EVERLONG_KIND, EVERLONG_VERSION } from "../libraries/Constants.sol";
-import { EverlongAdmin } from "./EverlongAdmin.sol";
 import { EverlongERC4626 } from "./EverlongERC4626.sol";
 
 /// @author DELV

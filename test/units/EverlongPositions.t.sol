@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.20;
 
+// solhint-disable-next-line no-console, no-unused-import
 import { console2 as console } from "forge-std/console2.sol";
-import { Test } from "forge-std/Test.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { IEverlongPositions } from "../../contracts/interfaces/IEverlongPositions.sol";
-import { EverlongPositionsTest } from "../harnesses/EverlongPositionsTest.sol";
+import { EverlongTest } from "../harnesses/EverlongTest.sol";
 
-/// @dev Extend the EverlongPositionsTest contract.
-contract TestEverlongPositions is EverlongPositionsTest {
+/// @dev Tests for Everlong position management functionality.
+contract TestEverlongPositions is EverlongTest {
     function setUp() public virtual override {
         super.setUp();
     }
@@ -20,7 +20,7 @@ contract TestEverlongPositions is EverlongPositionsTest {
         // Check that `hasMaturedPositions()` returns false
         // when no positions are held.
         assertFalse(
-            _everlongPositions.hasMaturedPositions(),
+            everlong.hasMaturedPositions(),
             "should return false when no positions"
         );
     }
@@ -31,14 +31,11 @@ contract TestEverlongPositions is EverlongPositionsTest {
         external
     {
         // Open an unmature position.
-        _everlongPositions.exposed_handleOpenLong(
-            uint128(block.timestamp) + 1,
-            5
-        );
+        everlong.exposed_handleOpenLong(uint128(block.timestamp) + 1, 5);
 
         // Check that `hasMaturedPositions()` returns false.
         assertFalse(
-            _everlongPositions.hasMaturedPositions(),
+            everlong.hasMaturedPositions(),
             "should return false when position is newly created"
         );
     }
@@ -49,15 +46,15 @@ contract TestEverlongPositions is EverlongPositionsTest {
         external
     {
         // Open unmatured positions with different maturity times.
-        _everlongPositions.exposed_handleOpenLong(2, 5);
-        _everlongPositions.exposed_handleOpenLong(3, 5);
+        everlong.exposed_handleOpenLong(2, 5);
+        everlong.exposed_handleOpenLong(3, 5);
 
         // Mature the first position (second will be unmature).
-        warpToMaturePosition();
+        advanceTime(1, 0);
 
         // Check that `hasMaturedPositions()` returns true.
         assertTrue(
-            _everlongPositions.hasMaturedPositions(),
+            everlong.hasMaturedPositions(),
             "should return true with single matured position"
         );
     }
@@ -66,15 +63,10 @@ contract TestEverlongPositions is EverlongPositionsTest {
     ///      when Everlong has no balance.
     function test_hasSufficientExcessLiquidity_false_no_balance() external {
         // Check that the contract has no balance.
-        assertEq(
-            IERC20(_everlongPositions.asset()).balanceOf(
-                address(_everlongPositions)
-            ),
-            0
-        );
+        assertEq(IERC20(everlong.asset()).balanceOf(address(everlong)), 0);
         // Check that `hasSufficientExcessLiquidity` returns false.
         assertFalse(
-            _everlongPositions.hasSufficientExcessLiquidity(),
+            everlong.hasSufficientExcessLiquidity(),
             "hasSufficientExcessLiquidity should return false with no balance"
         );
     }
@@ -84,22 +76,17 @@ contract TestEverlongPositions is EverlongPositionsTest {
     function test_hasSufficientExcessLiquidity_true_large_balance() external {
         // Mint the contract some tokens.
         uint256 _mintAmount = 5_000_000e18;
-        ERC20Mintable(_everlongPositions.asset()).mint(
-            address(_everlongPositions),
-            _mintAmount
-        );
+        ERC20Mintable(everlong.asset()).mint(address(everlong), _mintAmount);
 
         // Check that the contract has a large balance.
         assertEq(
-            IERC20(_everlongPositions.asset()).balanceOf(
-                address(_everlongPositions)
-            ),
+            IERC20(everlong.asset()).balanceOf(address(everlong)),
             _mintAmount
         );
 
         // Check that `hasSufficientExcessLiquidity` returns true.
         assertTrue(
-            _everlongPositions.hasSufficientExcessLiquidity(),
+            everlong.hasSufficientExcessLiquidity(),
             "hasSufficientExcessLiquidity should return false with no balance"
         );
     }
@@ -109,7 +96,7 @@ contract TestEverlongPositions is EverlongPositionsTest {
     function test_exposed_handleOpenLong_no_positions() external {
         // Initial count should be zero.
         assertEq(
-            _everlongPositions.getPositionCount(),
+            everlong.getPositionCount(),
             0,
             "initial position count should be 0"
         );
@@ -120,9 +107,9 @@ contract TestEverlongPositions is EverlongPositionsTest {
         // - Position count is increased
         vm.expectEmit(true, true, true, true);
         emit PositionOpened(1, 1, 0);
-        _everlongPositions.exposed_handleOpenLong(1, 1);
+        everlong.exposed_handleOpenLong(1, 1);
         assertEq(
-            _everlongPositions.getPositionCount(),
+            everlong.getPositionCount(),
             1,
             "position count should be 1 after opening 1 long"
         );
@@ -132,12 +119,12 @@ contract TestEverlongPositions is EverlongPositionsTest {
     ///      with multiple positions having distinct maturity times.
     function test_exposed_handleOpenLong_distinct_maturity() external {
         // Record two opened positions with distinct maturity times.
-        _everlongPositions.exposed_handleOpenLong(1, 1);
-        _everlongPositions.exposed_handleOpenLong(2, 2);
+        everlong.exposed_handleOpenLong(1, 1);
+        everlong.exposed_handleOpenLong(2, 2);
 
         // Check position count is 2.
         assertEq(
-            _everlongPositions.getPositionCount(),
+            everlong.getPositionCount(),
             2,
             "position count should be 2 after opening 2 longs with distinct maturities"
         );
@@ -160,14 +147,14 @@ contract TestEverlongPositions is EverlongPositionsTest {
     function test_exposed_handleOpenLong_same_maturity() external {
         // Record two opened positions with same maturity times.
         // Check that `PositionUpdated` event is emitted.
-        _everlongPositions.exposed_handleOpenLong(1, 1);
+        everlong.exposed_handleOpenLong(1, 1);
         vm.expectEmit(true, true, true, true);
         emit PositionUpdated(1, 2, 0);
-        _everlongPositions.exposed_handleOpenLong(1, 1);
+        everlong.exposed_handleOpenLong(1, 1);
 
         // Check position count is 1.
         assertEq(
-            _everlongPositions.getPositionCount(),
+            everlong.getPositionCount(),
             1,
             "position count should be 1 after opening 2 longs with same maturity"
         );
@@ -185,14 +172,14 @@ contract TestEverlongPositions is EverlongPositionsTest {
     ///      recently added position's maturity time.
     function test_exposed_handleOpenLong_failure_shorter_maturity() external {
         // Record an opened position.
-        _everlongPositions.exposed_handleOpenLong(5, 1);
+        everlong.exposed_handleOpenLong(5, 1);
 
         // Ensure than recording another position with a lower maturity time
         // results in a revert.
         vm.expectRevert(
             IEverlongPositions.InconsistentPositionMaturity.selector
         );
-        _everlongPositions.exposed_handleOpenLong(1, 1);
+        everlong.exposed_handleOpenLong(1, 1);
     }
 
     /// @dev Validates `recordLongsClosed(..)` behavior when
@@ -200,11 +187,11 @@ contract TestEverlongPositions is EverlongPositionsTest {
     function test_exposed_handleCloseLong_failure_greater_amount() external {
         // Record opening and partially closing a long.
         // Check that `PositionUpdated` event is emitted.
-        _everlongPositions.exposed_handleOpenLong(1, 2);
+        everlong.exposed_handleOpenLong(1, 2);
         vm.expectRevert(
             IEverlongPositions.InconsistentPositionBondAmount.selector
         );
-        _everlongPositions.exposed_handleCloseLong(3);
+        everlong.exposed_handleCloseLong(3);
     }
 
     /// @dev Validates `recordLongsClosed(..)` behavior when
@@ -212,14 +199,14 @@ contract TestEverlongPositions is EverlongPositionsTest {
     function test_exposed_handleCloseLong_full_amount() external {
         // Record opening and fully closing a long.
         // Check that `PositionClosed` event is emitted.
-        _everlongPositions.exposed_handleOpenLong(1, 1);
+        everlong.exposed_handleOpenLong(1, 1);
         vm.expectEmit(true, true, true, true);
         emit PositionClosed(1);
-        _everlongPositions.exposed_handleCloseLong(1);
+        everlong.exposed_handleCloseLong(1);
 
         // Check position count is 0.
         assertEq(
-            _everlongPositions.getPositionCount(),
+            everlong.getPositionCount(),
             0,
             "position count should be 0 after opening and closing a long for the full bond amount"
         );
@@ -230,14 +217,14 @@ contract TestEverlongPositions is EverlongPositionsTest {
     function test_exposed_handleCloseLong_partial_amount() external {
         // Record opening and partially closing a long.
         // Check that `PositionUpdated` event is emitted.
-        _everlongPositions.exposed_handleOpenLong(1, 2);
+        everlong.exposed_handleOpenLong(1, 2);
         vm.expectEmit(true, true, true, true);
         emit PositionUpdated(1, 1, 0);
-        _everlongPositions.exposed_handleCloseLong(1);
+        everlong.exposed_handleCloseLong(1);
 
         // Check position count is 1.
         assertEq(
-            _everlongPositions.getPositionCount(),
+            everlong.getPositionCount(),
             1,
             "position count should be 1 after opening and closing a long for the partial bond amount"
         );

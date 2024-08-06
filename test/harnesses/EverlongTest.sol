@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.20;
 
+// solhint-disable-next-line no-console, no-unused-import
 import { console2 as console } from "forge-std/console2.sol";
 import { HyperdriveTest } from "hyperdrive/test/utils/HyperdriveTest.sol";
-import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
-import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
-import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
 import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol";
+import { IEverlongPositions } from "../../contracts/interfaces/IEverlongPositions.sol";
 import { EverlongExposed } from "../exposed/EverlongExposed.sol";
 
 // TODO: Refactor this to include an instance of `Everlong` with exposed internal functions.
@@ -37,26 +36,28 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     // IHyperdrive                   hyperdrive
 
     /// @dev Everlong instance to test.
-    IEverlong internal everlong;
+    EverlongExposed internal everlong;
+
+    /// @dev Everlong token name.
+    string internal EVERLONG_NAME = "Everlong Testing";
+
+    /// @dev Everlong token symbol.
+    string internal EVERLONG_SYMBOL = "evTest";
 
     function setUp() public virtual override {
         super.setUp();
+        vm.startPrank(deployer);
+        deploy();
+        vm.stopPrank();
     }
-
-    string internal constant DEFAULT_NAME = "Everlong Test";
-    string internal constant DEFAULT_SYMBOL = "ETEST";
 
     /// @dev Deploy the Everlong instance with default underlying, name, and symbol.
     function deploy() internal {
-        everlong = IEverlong(
-            address(
-                new EverlongExposed(
-                    "Everlong Test",
-                    "ETEST",
-                    address(hyperdrive),
-                    true
-                )
-            )
+        everlong = new EverlongExposed(
+            EVERLONG_NAME,
+            EVERLONG_SYMBOL,
+            address(hyperdrive),
+            true
         );
     }
 
@@ -67,15 +68,11 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         address _underlying,
         bool _asBase
     ) internal {
-        everlong = IEverlong(
-            address(
-                new EverlongExposed(
-                    _name,
-                    _symbol,
-                    address(_underlying),
-                    _asBase
-                )
-            )
+        everlong = new EverlongExposed(
+            _name,
+            _symbol,
+            address(_underlying),
+            _asBase
         );
     }
 
@@ -109,5 +106,41 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             address(everlong),
             amount
         );
+    }
+
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Positions                                               │
+    // ╰─────────────────────────────────────────────────────────╯
+
+    /// @dev Outputs a table of all positions.
+    function logPositions() public view {
+        /* solhint-disable no-console */
+        console.log("-- POSITIONS -------------------------------");
+        for (uint128 i = 0; i < everlong.getPositionCount(); ++i) {
+            IEverlongPositions.Position memory p = everlong.getPosition(i);
+            console.log(
+                "index: %s - maturityTime: %s - bondAmount: %s",
+                i,
+                p.maturityTime,
+                p.bondAmount
+            );
+        }
+        console.log("--------------------------------------------");
+        /* solhint-enable no-console */
+    }
+
+    /// @dev Asserts that the position at the specified index is equal
+    ///      to the input `position`.
+    /// @param _index Index of the position to compare.
+    /// @param _position Input position to validate against
+    /// @param _error Message to display for failing assertions.
+    function assertPosition(
+        uint256 _index,
+        IEverlongPositions.Position memory _position,
+        string memory _error
+    ) public view {
+        IEverlongPositions.Position memory p = everlong.getPosition(_index);
+        assertEq(_position.maturityTime, p.maturityTime, _error);
+        assertEq(_position.bondAmount, p.bondAmount, _error);
     }
 }

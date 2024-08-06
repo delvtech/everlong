@@ -100,6 +100,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         // TODO: Ensure amount < maxLongAmount
         // TODO: Idle liquidity implementation
         uint256 _amount = _excessLiquidity();
+        IERC20(_asset).approve(hyperdrive, _amount);
         (uint256 _maturityTime, uint256 _bondAmount) = IHyperdrive(hyperdrive)
             .openLong(
                 _amount,

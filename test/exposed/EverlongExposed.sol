@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.20;
 
-import { console2 as console } from "forge-std/console2.sol";
 import { Test } from "forge-std/Test.sol";
-import { Everlong } from "../../contracts/Everlong.sol";
 import { EverlongBase } from "../../contracts/internal/EverlongBase.sol";
+import { EverlongAdminExposed } from "./EverlongAdminExposed.sol";
+import { EverlongPositionsExposed } from "./EverlongPositionsExposed.sol";
 
 /// @title EverlongExposed
 /// @dev Exposes all internal functions for the `Everlong` contract.
-contract EverlongExposed is Everlong, Test {
+contract EverlongExposed is
+    EverlongAdminExposed,
+    EverlongPositionsExposed,
+    Test
+{
     /// @notice Initial configuration paramters for Everlong.
     /// @param hyperdrive_ Address of the Hyperdrive instance wrapped by Everlong.
     /// @param name_ Name of the ERC20 token managed by Everlong.
@@ -19,5 +23,5 @@ contract EverlongExposed is Everlong, Test {
         string memory symbol_,
         address hyperdrive_,
         bool asBase_
-    ) Everlong(name_, symbol_, hyperdrive_, asBase_) {}
+    ) EverlongBase(name_, symbol_, hyperdrive_, asBase_) {}
 }
