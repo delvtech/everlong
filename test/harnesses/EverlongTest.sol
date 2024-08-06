@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.20;
 
+import { console2 as console } from "forge-std/console2.sol";
 import { HyperdriveTest } from "hyperdrive/test/utils/HyperdriveTest.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";

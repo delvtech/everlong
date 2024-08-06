@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.20;
 
-import { console2 } from "forge-std/console2.sol";
+import { console2 as console } from "forge-std/console2.sol";
 import { Test } from "forge-std/Test.sol";
 import { Everlong } from "../../contracts/Everlong.sol";
 import { EverlongBase } from "../../contracts/internal/EverlongBase.sol";

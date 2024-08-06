@@ -41,7 +41,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
     // │ Virtual                                                 │
     // ╰─────────────────────────────────────────────────────────╯
 
-    // TODO: Implement idle liquidity
+    // TODO: Implement idle liquidity and possibly remove.
     /// @dev Calculates the amount of excess liquidity that can be spent opening longs.
     /// @dev Can be overridden by child contracts.
     /// @return Amount of excess liquidity that can be spent opening longs.
@@ -50,7 +50,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         return IERC20(_asset).balanceOf(address(this));
     }
 
-    // TODO: Come up with a safer value.
+    // TODO: Come up with a safer value or remove.
     /// @dev Calculates the minimum `openLong` output from Hyperdrive
     ///       given the amount of capital being spend.
     /// @dev Can be overridden by child contracts.
@@ -62,7 +62,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         return 0;
     }
 
-    // TODO: Come up with a safer value.
+    // TODO: Come up with a safer value or remove.
     /// @dev Calculates the minimum vault share price at which to
     ///      open the long.
     /// @dev Can be overridden by child contracts.
@@ -74,7 +74,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         return 0;
     }
 
-    // TODO: Come up with a safer value.
+    // TODO: Come up with a safer value or remove.
     /// @dev Calculates the minimum proceeds Everlong will accept for
     ///      closing the long.
     /// @dev Can be overridden by child contracts.
