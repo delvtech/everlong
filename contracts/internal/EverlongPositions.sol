@@ -7,7 +7,7 @@ import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { IEverlong } from "../interfaces/IEverlong.sol";
 import { IEverlongPositions } from "../interfaces/IEverlongPositions.sol";
 import { Position } from "../types/Position.sol";
-import { EverlongBase } from "./EverlongBase.sol";
+import { EverlongStorage } from "./EverlongStorage.sol";
 
 /// @author DELV
 /// @title EverlongPositions
@@ -15,7 +15,7 @@ import { EverlongBase } from "./EverlongBase.sol";
 /// @custom:disclaimer The language used in this code is for coding convenience
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
-abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
+abstract contract EverlongPositions is EverlongStorage, IEverlongPositions {
     using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
 
     // ╭─────────────────────────────────────────────────────────╮
@@ -168,6 +168,33 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
     // ╭─────────────────────────────────────────────────────────╮
     // │ Position Closing (Internal)                             │
     // ╰─────────────────────────────────────────────────────────╯
+
+    /// @dev Close positions until the minimum output is met.
+    /// @param _minOutput Output needed from closed positions.
+    function _closePositionsByOutput(uint256 _minOutput) internal {
+        // Loop through  positions and close them all.
+        Position memory _position;
+        uint256 _output;
+        // TODO: Enable closing of positions incrementally to avoid
+        //       the case where the # of mature positions exceeds the max
+        //       gas per block.
+        while (_output < _minOutput) {
+            // Retrieve the oldest position and close it.
+            _position = getPosition(0);
+            _output += IHyperdrive(hyperdrive).closeLong(
+                _position.maturityTime,
+                _position.bondAmount,
+                _minCloseLongOutput(
+                    _position.maturityTime,
+                    _position.bondAmount
+                ),
+                IHyperdrive.Options(address(this), _asBase, "")
+            );
+
+            // Update positions to reflect the newly closed long.
+            _handleCloseLong(uint128(_position.bondAmount));
+        }
+    }
 
     /// @dev Close all matured positions.
     function _closeMaturedPositions() internal {

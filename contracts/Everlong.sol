@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.20;
 
-import { EverlongAdmin } from "./internal/EverlongAdmin.sol";
 import { EverlongBase } from "./internal/EverlongBase.sol";
-import { EverlongPositions } from "./internal/EverlongPositions.sol";
 
 ///           ,---..-.   .-.,---.  ,---.   ,-.    .---.  .-. .-.  ,--,
 ///           | .-' \ \ / / | .-'  | .-.\  | |   / .-. ) |  \| |.' .'
@@ -62,7 +60,7 @@ import { EverlongPositions } from "./internal/EverlongPositions.sol";
 /// @custom:disclaimer The language used in this code is for coding convenience
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
-contract Everlong is EverlongAdmin, EverlongPositions {
+contract Everlong is EverlongBase {
     /// @notice Initial configuration paramters for Everlong.
     /// @param _name Name of the ERC20 token managed by Everlong.
     /// @param _symbol Symbol of the ERC20 token managed by Everlong.

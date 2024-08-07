@@ -4,8 +4,8 @@ pragma solidity 0.8.20;
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { DoubleEndedQueue } from "openzeppelin/utils/structs/DoubleEndedQueue.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
-import { IEverlongEvents } from "../interfaces/IEverlongEvents.sol";
 import { EVERLONG_KIND, EVERLONG_VERSION } from "../libraries/Constants.sol";
+import { EverlongAdmin } from "./EverlongAdmin.sol";
 import { EverlongERC4626 } from "./EverlongERC4626.sol";
 
 // TODO: Reassess whether centralized configuration management makes sense.
@@ -16,33 +16,8 @@ import { EverlongERC4626 } from "./EverlongERC4626.sol";
 /// @custom:disclaimer The language used in this code is for coding convenience
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
-abstract contract EverlongBase is EverlongERC4626, IEverlongEvents {
+abstract contract EverlongBase is EverlongAdmin, EverlongERC4626 {
     using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
-
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ Storage                                                 │
-    // ╰─────────────────────────────────────────────────────────╯
-
-    // Admin //
-
-    /// @dev Address of the contract admin.
-    address internal _admin;
-
-    // Hyperdrive //
-
-    /// @dev Address of the Hyperdrive instance wrapped by Everlong.
-    address public immutable hyperdrive;
-
-    /// @dev Whether to use Hyperdrive's base token to purchase bonds.
-    //          If false, use the Hyperdrive's `vaultSharesToken`.
-    bool internal immutable _asBase;
-
-    // Positions //
-
-    // TODO: Reassess using a more tailored data structure.
-    /// @dev Utility data structure to manage the position queue.
-    ///      Supports pushing and popping from both the front and back.
-    DoubleEndedQueue.Bytes32Deque internal _positions;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Constructor                                             │

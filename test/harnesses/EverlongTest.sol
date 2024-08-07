@@ -84,14 +84,12 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         uint256 amount
     ) internal {
         ERC20Mintable(hyperdrive.baseToken()).mint(recipient, amount);
+        vm.startPrank(recipient);
         ERC20Mintable(hyperdrive.baseToken()).approve(
             address(everlong),
-            type(uint256).max
+            amount
         );
-        ERC20Mintable(hyperdrive.baseToken()).approve(
-            address(hyperdrive),
-            type(uint256).max
-        );
+        vm.stopPrank();
     }
 
     // TODO: This is gross, will refactor

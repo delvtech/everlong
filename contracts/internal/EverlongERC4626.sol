@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.20;
 
+import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { ERC4626 } from "solady/tokens/ERC4626.sol";
+import { EverlongPositions } from "./EverlongPositions.sol";
 
 /// @author DELV
 /// @title EverlongERC4626
@@ -9,31 +11,7 @@ import { ERC4626 } from "solady/tokens/ERC4626.sol";
 /// @custom:disclaimer The language used in this code is for coding convenience
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
-abstract contract EverlongERC4626 is ERC4626 {
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ Storage                                                 │
-    // ╰─────────────────────────────────────────────────────────╯
-
-    /// @notice Virtual shares are used to mitigate inflation attacks.
-    bool public constant useVirtualShares = true;
-
-    /// @notice Used to reduce the feasibility of an inflation attack.
-    /// TODO: Determine the appropriate value for our case. Current value
-    ///       was picked arbitrarily.
-    uint8 public constant decimalsOffset = 3;
-
-    /// @dev Address of the token to use for Hyperdrive bond purchase/close.
-    address internal immutable _asset;
-
-    /// @dev Decimals used by the `_asset`.
-    uint8 internal immutable _decimals;
-
-    /// @dev Name of the Everlong token.
-    string internal _name;
-
-    /// @dev Symbol of the Everlong token.
-    string internal _symbol;
-
+abstract contract EverlongERC4626 is ERC4626, EverlongPositions {
     // ╭─────────────────────────────────────────────────────────╮
     // │ Constructor                                             │
     // ╰─────────────────────────────────────────────────────────╯
@@ -52,6 +30,73 @@ abstract contract EverlongERC4626 is ERC4626 {
         // If it does not implement `decimals() (uint256)`, use the default.
         (bool success, uint8 result) = _tryGetAssetDecimals(__asset);
         _decimals = success ? result : _DEFAULT_UNDERLYING_DECIMALS;
+    }
+
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Stateful                                                │
+    // ╰─────────────────────────────────────────────────────────╯
+
+    /// @inheritdoc ERC4626
+    function deposit(
+        uint256 assets,
+        address to
+    ) public override returns (uint256 shares) {
+        IERC20(_asset).approve(hyperdrive, assets);
+        shares = super.deposit(assets, to);
+    }
+    /// @inheritdoc ERC4626
+    function mint(uint256, address) public override returns (uint256 assets) {
+        revert("mint not implemented, please use deposit");
+    }
+
+    /// @inheritdoc ERC4626
+    function withdraw(
+        uint256,
+        address,
+        address
+    ) public override returns (uint256 shares) {
+        revert("withdraw not implemented, please use redeem");
+    }
+
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Overrides                                               │
+    // ╰─────────────────────────────────────────────────────────╯
+
+    // TODO: Actually estimate this based on current position contents.
+    //       Currently, this is obtained from tracking deposits - withdrawals
+    //       which results in Everlong taking all profit and users receiving
+    //       exactly what they put in.
+    /// @notice Returns the total value of assets managed by Everlong.
+    /// @return Total managed asset value.
+    function totalAssets() public view override returns (uint256) {
+        return _virtualAssets;
+    }
+
+    // TODO: Might not need this but including for convenience.
+    function _beforeWithdraw(
+        uint256 _assets,
+        uint256
+    ) internal virtual override {
+        _virtualAssets -= _assets;
+        // Check if Everlong has sufficient assets to service the withdrawal.
+        if (IERC20(_asset).balanceOf(address(this)) < _assets) {
+            // Everlong does not have sufficient assets to service withdrawal.
+            // First try closing all mature positions. If sufficient to
+            // service the withdrawal, then continue.
+            _closeMaturedPositions();
+            uint256 _currentBalance = IERC20(_asset).balanceOf(address(this));
+            if (_currentBalance >= _assets) return;
+
+            // Close remaining positions until Everlong's balance is
+            // enough to meet the withdrawal.
+            _closePositionsByOutput(_assets - _currentBalance);
+        }
+    }
+
+    // TODO: Might not need this but including for convenience.
+    function _afterDeposit(uint256 _assets, uint256) internal virtual override {
+        _virtualAssets += _assets;
+        rebalance();
     }
 
     // ╭─────────────────────────────────────────────────────────╮
@@ -81,16 +126,6 @@ abstract contract EverlongERC4626 is ERC4626 {
     /// @dev MUST NOT revert.
     function _decimalsOffset() internal view virtual override returns (uint8) {
         return decimalsOffset;
-    }
-
-    // TODO: Might not need this but including for convenience.
-    function _beforeWithdraw(uint256, uint256) internal override {
-        // revert("TODO");
-    }
-
-    // TODO: Might not need this but including for convenience.
-    function _afterDeposit(uint256, uint256) internal override {
-        // revert("TODO");
     }
 
     // ╭─────────────────────────────────────────────────────────╮
