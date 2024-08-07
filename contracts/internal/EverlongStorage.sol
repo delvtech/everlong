@@ -19,12 +19,12 @@ abstract contract EverlongStorage is IEverlongEvents {
     // │ Storage                                                 │
     // ╰─────────────────────────────────────────────────────────╯
 
-    // Admin //
+    // ── Admin ──────────────────────────────────────────────────
 
     /// @dev Address of the contract admin.
     address internal _admin;
 
-    // Hyperdrive //
+    // ── Hyperdrive ─────────────────────────────────────────────
 
     /// @dev Address of the Hyperdrive instance wrapped by Everlong.
     address public hyperdrive;
@@ -33,14 +33,15 @@ abstract contract EverlongStorage is IEverlongEvents {
     //          If false, use the Hyperdrive's `vaultSharesToken`.
     bool internal _asBase;
 
-    // Positions //
+    // ── Positions ──────────────────────────────────────────────
 
     // TODO: Reassess using a more tailored data structure.
     /// @dev Utility data structure to manage the position queue.
     ///      Supports pushing and popping from both the front and back.
     DoubleEndedQueue.Bytes32Deque internal _positions;
 
-    // ERC4626 //
+    // ── ERC4626 ────────────────────────────────────────────────
+
     /// @notice Virtual shares are used to mitigate inflation attacks.
     bool public constant useVirtualShares = true;
 

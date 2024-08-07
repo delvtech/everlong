@@ -31,12 +31,12 @@ interface IEverlong is
     // │ Errors                                                  │
     // ╰─────────────────────────────────────────────────────────╯
 
-    // Admin //
+    // ── Admin ──────────────────────────────────────────────────
 
     /// @notice Thrown when caller is not the admin.
     error Unauthorized();
 
-    // Positions //
+    // ── Positions ──────────────────────────────────────────────
 
     /// @notice Thrown when attempting to insert a position with
     ///         a `maturityTime` sooner than the most recent position's.
