@@ -1,7 +1,6 @@
 name: Code Coverage
 
 on:
-  push:
   pull_request:
   merge_group:
 
