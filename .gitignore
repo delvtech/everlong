@@ -131,3 +131,9 @@ dist
 
 # foundry cache
 forge-cache
+
+# coverage
+lcov.info
+
+# vscode workspace settings
+.vscode
