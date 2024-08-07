@@ -9,8 +9,8 @@ import { IEverlongPositions } from "./IEverlongPositions.sol";
 interface IEverlong is
     IEverlongAdmin,
     IERC4626,
-    IEverlongPositions,
-    IEverlongEvents
+    IEverlongEvents,
+    IEverlongPositions
 {
     // ╭─────────────────────────────────────────────────────────╮
     // │ Getters                                                 │
@@ -26,4 +26,23 @@ interface IEverlong is
     /// @notice Gets the Everlong instance's version.
     /// @return The Everlong instance's version.
     function version() external pure returns (string memory);
+
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Errors                                                  │
+    // ╰─────────────────────────────────────────────────────────╯
+
+    // Admin //
+
+    /// @notice Thrown when caller is not the admin.
+    error Unauthorized();
+
+    // Positions //
+
+    /// @notice Thrown when attempting to insert a position with
+    ///         a `maturityTime` sooner than the most recent position's.
+    error InconsistentPositionMaturity();
+
+    /// @notice Thrown when attempting to close a position with
+    ///         a `bondAmount` greater than that contained by the position.
+    error InconsistentPositionBondAmount();
 }

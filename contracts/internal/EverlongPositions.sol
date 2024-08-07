@@ -4,7 +4,9 @@ pragma solidity 0.8.20;
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { DoubleEndedQueue } from "openzeppelin/utils/structs/DoubleEndedQueue.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
+import { IEverlong } from "../interfaces/IEverlong.sol";
 import { IEverlongPositions } from "../interfaces/IEverlongPositions.sol";
+import { Position } from "../types/Position.sol";
 import { EverlongBase } from "./EverlongBase.sol";
 
 /// @author DELV
@@ -128,7 +130,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         ) {
             // Revert because the incoming position's `maturityTime`
             // is sooner than the most recently added position's maturity.
-            revert InconsistentPositionMaturity();
+            revert IEverlong.InconsistentPositionMaturity();
         } else if (
             _positions.length() != 0 &&
             _decodePosition(_positions.back()).maturityTime == _maturityTime
@@ -203,7 +205,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         // Compare the input bond amount to the most mature position's
         // `bondAmount`.
         if (_bondAmountClosed > _position.bondAmount) {
-            revert InconsistentPositionBondAmount();
+            revert IEverlong.InconsistentPositionBondAmount();
         }
         // The amount to close equals the position size.
         // Nothing further needs to be done.

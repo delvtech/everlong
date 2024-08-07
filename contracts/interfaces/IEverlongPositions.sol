@@ -1,32 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.20;
 
+import { Position } from "../types/Position.sol";
+
 interface IEverlongPositions {
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ Errors                                                  │
-    // ╰─────────────────────────────────────────────────────────╯
-
-    /// @notice Thrown when attempting to insert a position with
-    ///         a `maturityTime` sooner than the most recent position's.
-    error InconsistentPositionMaturity();
-
-    /// @notice Thrown when attempting to close a position with
-    ///         a `bondAmount` greater than that contained by the position.
-    error InconsistentPositionBondAmount();
-
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ Structs                                                 │
-    // ╰─────────────────────────────────────────────────────────╯
-
-    /// @dev Tracks the total amount of bonds managed by Everlong
-    ///      with the same maturityTime.
-    struct Position {
-        /// @dev Checkpoint time when the position matures.
-        uint128 maturityTime;
-        /// @dev Quantity of bonds in the position.
-        uint128 bondAmount;
-    }
-
     // ╭─────────────────────────────────────────────────────────╮
     // │ Stateful                                                │
     // ╰─────────────────────────────────────────────────────────╯
@@ -45,10 +22,10 @@ interface IEverlongPositions {
     /// @notice Gets the position at an index.
     ///         Position `maturityTime` increases with each index.
     /// @param _index The index of the position.
-    /// @return position The position.
+    /// @return The position.
     function getPosition(
         uint256 _index
-    ) external view returns (Position memory position);
+    ) external view returns (Position memory);
 
     /// @notice Determines whether any positions are matured.
     /// @return True if any positions are matured, false otherwise.

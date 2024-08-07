@@ -5,7 +5,8 @@ pragma solidity 0.8.20;
 import { console2 as console } from "forge-std/console2.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
-import { IEverlongPositions } from "../../contracts/interfaces/IEverlongPositions.sol";
+import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
+import { Position } from "../../contracts/types/Position.sol";
 import { EverlongTest } from "../harnesses/EverlongTest.sol";
 
 /// @dev Tests for Everlong position management functionality.
@@ -132,12 +133,12 @@ contract TestEverlongPositions is EverlongTest {
         // Check position order is [(1,1),(2,2)].
         assertPosition(
             0,
-            IEverlongPositions.Position(1, 1),
+            Position({ maturityTime: 1, bondAmount: 1 }),
             "position at index 0 should be (1,1) after opening 2 longs with distinct maturities"
         );
         assertPosition(
             1,
-            IEverlongPositions.Position(2, 2),
+            Position(uint128(2), uint128(2)),
             "position at index 1 should be (2,2) after opening 2 longs with distinct maturities"
         );
     }
@@ -162,7 +163,7 @@ contract TestEverlongPositions is EverlongTest {
         // Check position is now (1,2).
         assertPosition(
             0,
-            IEverlongPositions.Position(1, 2),
+            Position(uint128(1), uint128(2)),
             "position at index 0 should be (1,2) after opening two longs with same maturity"
         );
     }
@@ -176,9 +177,7 @@ contract TestEverlongPositions is EverlongTest {
 
         // Ensure than recording another position with a lower maturity time
         // results in a revert.
-        vm.expectRevert(
-            IEverlongPositions.InconsistentPositionMaturity.selector
-        );
+        vm.expectRevert(IEverlong.InconsistentPositionMaturity.selector);
         everlong.exposed_handleOpenLong(1, 1);
     }
 
@@ -188,9 +187,7 @@ contract TestEverlongPositions is EverlongTest {
         // Record opening and partially closing a long.
         // Check that `PositionUpdated` event is emitted.
         everlong.exposed_handleOpenLong(1, 2);
-        vm.expectRevert(
-            IEverlongPositions.InconsistentPositionBondAmount.selector
-        );
+        vm.expectRevert(IEverlong.InconsistentPositionBondAmount.selector);
         everlong.exposed_handleCloseLong(3);
     }
 

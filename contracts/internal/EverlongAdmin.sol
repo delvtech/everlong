@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.20;
 
+import { IEverlong } from "../interfaces/IEverlong.sol";
 import { IEverlongAdmin } from "../interfaces/IEverlongAdmin.sol";
 import { EverlongBase } from "./EverlongBase.sol";
 
@@ -18,7 +19,7 @@ abstract contract EverlongAdmin is EverlongBase, IEverlongAdmin {
     /// @dev Ensures that the contract is being called by admin.
     modifier onlyAdmin() {
         if (msg.sender != _admin) {
-            revert Unauthorized();
+            revert IEverlong.Unauthorized();
         }
         _;
     }
