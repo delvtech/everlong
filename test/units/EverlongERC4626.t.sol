@@ -9,53 +9,66 @@ import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol"
 
 /// @dev Tests EverlongERC4626 functionality.
 contract TestEverlongERC4626 is EverlongTest {
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ Deposit/Mint                                            │
-    // ╰─────────────────────────────────────────────────────────╯
-
-    /// @dev Validates that `deposit()` rebalances positions.
-    function test_deposit_causes_rebalance() external {
+    /// @dev Validates behavior of the `deposit()` function for a single
+    ///        depositor.
+    ///   @dev When calling the `deposit()` function...
+    ///        1. The `Rebalanced` event should be emitted
+    ///        2. The balance of the Everlong contract should be minimal.
+    ///        3. The share amount issued to the depositor should be equal to the
+    ///           total supply of Everlong shares.
+    ///        4. The amount of assets deposited should relate to the share
+    ///           count as follows:
+    ///           shares_issued = assets_deposited * (10 ^ decimalsOffset)
+    function test_deposit_single_depositor() external {
         // Initialize the Hyperdrive instance by adding liquidity from Alice.
         uint256 fixedRate = 0.5e18;
         uint256 contribution = 10_000e18;
         initialize(alice, fixedRate, contribution);
 
         // Mint bob some assets and approve the Everlong contract.
-        mintApproveHyperdriveBase(bob, 1e18);
+        uint256 depositAmount = 1e18;
+        mintApproveHyperdriveBase(bob, depositAmount);
 
-        // Deposit assets into Everlong as Bob.
+        // 1. Deposit assets into Everlong as Bob and confirm `Rebalanced` event
+        //    is emitted.
         vm.startPrank(bob);
         vm.expectEmit(true, true, true, true);
         emit IEverlongEvents.Rebalanced();
-        everlong.deposit(1e18, bob);
+        everlong.deposit(depositAmount, bob);
         vm.stopPrank();
+
+        // 2. Confirm that Everlong's balance is less than Hyperdrive's
+        //    minimum transaction amount.
+        assertLt(
+            ERC20Mintable(everlong.asset()).balanceOf(address(everlong)),
+            hyperdrive.getPoolConfig().minimumTransactionAmount,
+            "Everlong balance should be below min tx amount after single depositor deposit+rebalance"
+        );
+
+        // 3. Confirm that Bob's share balance equals the total supply of shares.
+        assertEq(
+            everlong.balanceOf(bob),
+            everlong.totalSupply(),
+            "single depositor share balance should equal total supply of shares"
+        );
+
+        // 4. Confirm `shares_issued = assets_deposited * (10 ^ decimalsOffset)`
+        assertEq(
+            everlong.balanceOf(bob),
+            depositAmount * (10 ** everlong.decimalsOffset())
+        );
     }
 
-    /// @dev Validates that `_afterDeposit` increases total assets.
-    function test_afterDeposit_virtual_asset_increase() external {
-        // Call `_afterDeposit` with some assets.
-        everlong.exposed_afterDeposit(5, 1);
-        // Ensure `totalAssets()` is increased by the correct amount.
-        assertEq(everlong.totalAssets(), 5);
-    }
-
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ Withdraw/Redeem                                         │
-    // ╰─────────────────────────────────────────────────────────╯
-
-    /// @dev Validates that `redeem()` will close all positions with a
-    //       mature position sufficient to cover withdrawal amount.
+    /// @dev Validates that `redeem()` will close the necessary positions with a
+    ///       mature position sufficient to cover withdrawal amount.
     function test_redeem_close_positions_mature() external {
         // Initialize the Hyperdrive instance by adding liquidity from Alice.
         uint256 fixedRate = 0.5e18;
         uint256 contribution = 10_000e18;
         initialize(alice, fixedRate, contribution);
 
-        // Mint Bob and Celine some assets and approve the Everlong contract.
-        mintApproveHyperdriveBase(bob, 10e18);
-        mintApproveHyperdriveBase(celine, 2e18);
-
         // Deposit assets into Everlong as Bob.
+        mintApproveHyperdriveBase(bob, 10e18);
         vm.startPrank(bob);
         everlong.deposit(1e18, bob);
         vm.stopPrank();
@@ -68,6 +81,7 @@ contract TestEverlongERC4626 is EverlongTest {
         assertFalse(everlong.hasMaturedPositions());
 
         // Deposit assets into Everlong as Celine to create another position.
+        mintApproveHyperdriveBase(celine, 2e18);
         vm.startPrank(celine);
         everlong.deposit(2e18, celine);
         vm.stopPrank();
@@ -86,14 +100,16 @@ contract TestEverlongERC4626 is EverlongTest {
         everlong.redeem(everlong.balanceOf(bob), bob, bob);
         vm.stopPrank();
 
-        // Confirm that Everlong now has one immature position.
-        assertEq(everlong.getPositionCount(), 1);
+        // Confirm that Everlong has two immature positions:
+        // 1. Created from Celine's deposit.
+        // 2. Created from rebalance on Bob's redemption.
+        assertEq(everlong.getPositionCount(), 2);
         assertGt(everlong.getPosition(0).maturityTime, block.timestamp);
     }
 
     /// @dev Validates that `redeem()` will close all positions when closing
     ///      an immature position is required to service the withdrawal.
-    function test_redeem_close_all_positions_immature() external {
+    function test_redeem_close_positions_immature() external {
         // Initialize the Hyperdrive instance by adding liquidity from Alice.
         uint256 fixedRate = 0.5e18;
         uint256 contribution = 10_000e18;
@@ -132,6 +148,18 @@ contract TestEverlongERC4626 is EverlongTest {
         vm.startPrank(bob);
         everlong.redeem(everlong.balanceOf(bob), bob, bob);
         vm.stopPrank();
+
+        // Confirm that Everlong now has only the position created from
+        // rebalancing on Bob's redemption.
+        assertEq(everlong.getPositionCount(), 1);
+    }
+
+    /// @dev Validates that `_afterDeposit` increases total assets.
+    function test_afterDeposit_virtual_asset_increase() external {
+        // Call `_afterDeposit` with some assets.
+        everlong.exposed_afterDeposit(5, 1);
+        // Ensure `totalAssets()` is increased by the correct amount.
+        assertEq(everlong.totalAssets(), 5);
     }
 
     /// @dev Validates that `_beforeWithdraw` decreases total assets.

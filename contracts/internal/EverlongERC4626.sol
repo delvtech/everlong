@@ -44,11 +44,24 @@ abstract contract EverlongERC4626 is ERC4626, EverlongPositions {
         IERC20(_asset).approve(hyperdrive, assets);
         shares = super.deposit(assets, to);
     }
+
+    /// @inheritdoc ERC4626
+    function redeem(
+        uint256 shares,
+        address to,
+        address owner
+    ) public override returns (uint256 assets) {
+        assets = super.redeem(shares, to, owner);
+        rebalance();
+    }
+
+    // TODO: Implement.
     /// @inheritdoc ERC4626
     function mint(uint256, address) public override returns (uint256 assets) {
         revert("mint not implemented, please use deposit");
     }
 
+    // TODO: Implement.
     /// @inheritdoc ERC4626
     function withdraw(
         uint256,

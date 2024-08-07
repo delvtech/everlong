@@ -122,21 +122,20 @@ abstract contract EverlongPositions is EverlongStorage, IEverlongPositions {
         uint128 _maturityTime,
         uint128 _bondAmountPurchased
     ) internal {
-        // Compare the maturity time of the purchased bonds
-        // to the most recent position's `maturityTime`.
+        // Revert if the incoming position's `maturityTime`
+        // is sooner than the most recently added position's maturity.
         if (
             _positions.length() != 0 &&
             _decodePosition(_positions.back()).maturityTime > _maturityTime
         ) {
-            // Revert because the incoming position's `maturityTime`
-            // is sooner than the most recently added position's maturity.
             revert IEverlong.InconsistentPositionMaturity();
-        } else if (
+        }
+        // A position already exists with the incoming `maturityTime`.
+        // The existing position's `bondAmount` is updated.
+        else if (
             _positions.length() != 0 &&
             _decodePosition(_positions.back()).maturityTime == _maturityTime
         ) {
-            // A position already exists with the incoming `maturityTime`.
-            // The existing position's `bondAmount` is updated.
             Position memory _oldPosition = _decodePosition(
                 _positions.popBack()
             );
@@ -151,9 +150,10 @@ abstract contract EverlongPositions is EverlongStorage, IEverlongPositions {
                 _oldPosition.bondAmount + _bondAmountPurchased,
                 _positions.length() - 1
             );
-        } else {
-            // No position exists with the incoming `maturityTime`.
-            // Push a new position to the end of the queue.
+        }
+        // No position exists with the incoming `maturityTime`.
+        // Push a new position to the end of the queue.
+        else {
             _positions.pushBack(
                 _encodePosition(_maturityTime, _bondAmountPurchased)
             );
@@ -173,11 +173,11 @@ abstract contract EverlongPositions is EverlongStorage, IEverlongPositions {
     /// @param _minOutput Output needed from closed positions.
     function _closePositionsByOutput(uint256 _minOutput) internal {
         // Loop through  positions and close them all.
-        Position memory _position;
-        uint256 _output;
         // TODO: Enable closing of positions incrementally to avoid
         //       the case where the # of mature positions exceeds the max
         //       gas per block.
+        Position memory _position;
+        uint256 _output;
         while (_output < _minOutput) {
             // Retrieve the oldest position and close it.
             _position = getPosition(0);
@@ -199,10 +199,10 @@ abstract contract EverlongPositions is EverlongStorage, IEverlongPositions {
     /// @dev Close all matured positions.
     function _closeMaturedPositions() internal {
         // Loop through mature positions and close them all.
-        Position memory _position;
         // TODO: Enable closing of mature positions incrementally to avoid
         //       the case where the # of mature positions exceeds the max
         //       gas per block.
+        Position memory _position;
         while (hasMaturedPositions()) {
             // Retrieve the oldest matured position and close it.
             _position = getPosition(0);

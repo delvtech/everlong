@@ -5,8 +5,8 @@ import { EverlongBase } from "../../contracts/internal/EverlongBase.sol";
 import { EverlongAdminExposed } from "./EverlongAdminExposed.sol";
 import { EverlongERC4626Exposed } from "./EverlongERC4626Exposed.sol";
 
-/// @title EverlongExposed
-/// @dev Exposes all internal functions for the `Everlong` contract.
+/// @title EverlongBaseExposed
+/// @dev Exposes all internal functions for the `EverlongBase` contract.
 abstract contract EverlongBaseExposed is
     EverlongAdminExposed,
     EverlongERC4626Exposed,
