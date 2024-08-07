@@ -154,6 +154,38 @@ contract TestEverlongERC4626 is EverlongTest {
         assertEq(everlong.getPositionCount(), 1);
     }
 
+    /// @dev Ensure that the `hyperdrive()` view function is implemented.
+    function test_hyperdrive() external view {
+        assertEq(
+            everlong.hyperdrive(),
+            address(hyperdrive),
+            "hyperdrive() should return hyperdrive address"
+        );
+    }
+
+    /// @dev Ensure that the `asset()` view function is implemented.
+    function test_asset() external view {
+        assertEq(
+            everlong.asset(),
+            address(hyperdrive.baseToken()),
+            "asset() should return hyperdrive base token address"
+        );
+    }
+
+    /// @dev Ensure that the `name()` view function is implemented.
+    function test_name() external view {
+        assertNotEq(everlong.name(), "", "name() not return an empty string");
+    }
+
+    /// @dev Ensure that the `symbol()` view function is implemented.
+    function test_symbol() external view {
+        assertNotEq(
+            everlong.symbol(),
+            "",
+            "symbol() not return an empty string"
+        );
+    }
+
     /// @dev Validates that `_afterDeposit` increases total assets.
     function test_afterDeposit_virtual_asset_increase() external {
         // Call `_afterDeposit` with some assets.
