@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 // solhint-disable-next-line no-console, no-unused-import
 import { console2 as console } from "forge-std/console2.sol";

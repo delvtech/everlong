@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 import { IERC4626 } from "openzeppelin/interfaces/IERC4626.sol";
 import { IEverlongAdmin } from "./IEverlongAdmin.sol";

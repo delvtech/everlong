@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.20;
+pragma solidity 0.8.22;
 
 import { IEverlong } from "../interfaces/IEverlong.sol";
 import { IEverlongAdmin } from "../interfaces/IEverlongAdmin.sol";

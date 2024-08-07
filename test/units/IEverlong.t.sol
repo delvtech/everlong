@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { EverlongTest } from "../harnesses/EverlongTest.sol";

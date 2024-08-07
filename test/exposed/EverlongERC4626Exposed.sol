@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 import { EverlongPositionsExposed } from "../exposed/EverlongPositionsExposed.sol";
 import { EverlongERC4626 } from "../../contracts/internal/EverlongERC4626.sol";
