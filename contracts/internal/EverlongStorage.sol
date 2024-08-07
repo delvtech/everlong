@@ -14,11 +14,6 @@ import { IEverlongEvents } from "../interfaces/IEverlongEvents.sol";
 ///                    particular legal or regulatory significance.
 abstract contract EverlongStorage is IEverlongEvents {
     using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
-
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ Storage                                                 │
-    // ╰─────────────────────────────────────────────────────────╯
-
     // ── Admin ──────────────────────────────────────────────────
 
     /// @dev Address of the contract admin.
