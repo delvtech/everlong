@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import { EverlongTest } from "../harnesses/EverlongTest.sol";
 
-/// @dev
+/// @dev Tests Everlong functionality.
 contract TestEverlong is EverlongTest {
     /// @dev Ensure that the `hyperdrive()` view function is implemented.
     function test_hyperdrive() external view {
