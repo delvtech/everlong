@@ -8,6 +8,8 @@ import { IEverlongEvents } from "../interfaces/IEverlongEvents.sol";
 import { EVERLONG_KIND, EVERLONG_VERSION } from "../libraries/Constants.sol";
 import { EverlongERC4626 } from "./EverlongERC4626.sol";
 
+// TODO: Reassess whether centralized configuration management makes sense.
+//       https://github.com/delvtech/everlong/pull/2#discussion_r1703799747
 /// @author DELV
 /// @title EverlongBase
 /// @notice Base contract for Everlong.
@@ -21,12 +23,12 @@ abstract contract EverlongBase is EverlongERC4626, IEverlongEvents {
     // │ Storage                                                 │
     // ╰─────────────────────────────────────────────────────────╯
 
-    /// Admin ///
+    // Admin //
 
     /// @dev Address of the contract admin.
     address internal _admin;
 
-    /// Hyperdrive ///
+    // Hyperdrive //
 
     /// @dev Address of the Hyperdrive instance wrapped by Everlong.
     address public immutable hyperdrive;
@@ -35,7 +37,7 @@ abstract contract EverlongBase is EverlongERC4626, IEverlongEvents {
     //          If false, use the Hyperdrive's `vaultSharesToken`.
     bool internal immutable _asBase;
 
-    /// Positions ///
+    // Positions //
 
     // TODO: Reassess using a more tailored data structure.
     /// @dev Utility data structure to manage the position queue.

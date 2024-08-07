@@ -1,6 +1,9 @@
 name: test
 
-on: workflow_dispatch
+on:
+  push:
+  pull_request:
+  merge_group:
 
 env:
   FOUNDRY_PROFILE: ci
@@ -24,11 +27,10 @@ jobs:
 
       - name: Run Forge build
         run: |
-          forge --version
-          forge build --sizes
+          make build
         id: build
 
       - name: Run Forge tests
         run: |
-          forge test -vvv
+          make test
         id: test
