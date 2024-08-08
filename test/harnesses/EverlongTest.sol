@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 // solhint-disable-next-line no-console, no-unused-import
 import { console2 as console } from "forge-std/console2.sol";
@@ -78,34 +78,18 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
 
     // TODO: This is gross, will refactor
     /// @dev Mint base token to the provided address a
-    ///      and approve both the Everlong and Hyperdrive contract.
-    function mintApproveHyperdriveBase(
+    ///      and approve the Everlong contract.
+    function mintApproveEverlongBaseAsset(
         address recipient,
         uint256 amount
     ) internal {
         ERC20Mintable(hyperdrive.baseToken()).mint(recipient, amount);
+        vm.startPrank(recipient);
         ERC20Mintable(hyperdrive.baseToken()).approve(
-            address(everlong),
-            type(uint256).max
-        );
-        ERC20Mintable(hyperdrive.baseToken()).approve(
-            address(hyperdrive),
-            type(uint256).max
-        );
-    }
-
-    // TODO: This is gross, will refactor
-    /// @dev Mint vault shares token to the provided address a
-    ///      and approve both the Everlong and Hyperdrive contract.
-    function mintApproveHyperdriveShares(
-        address recipient,
-        uint256 amount
-    ) internal {
-        ERC20Mintable(hyperdrive.vaultSharesToken()).mint(recipient, amount);
-        ERC20Mintable(hyperdrive.vaultSharesToken()).approve(
             address(everlong),
             amount
         );
+        vm.stopPrank();
     }
 
     // ╭─────────────────────────────────────────────────────────╮
