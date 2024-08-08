@@ -78,8 +78,8 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
 
     // TODO: This is gross, will refactor
     /// @dev Mint base token to the provided address a
-    ///      and approve both the Everlong and Hyperdrive contract.
-    function mintApproveHyperdriveBase(
+    ///      and approve the Everlong contract.
+    function mintApproveEverlongBaseAsset(
         address recipient,
         uint256 amount
     ) internal {

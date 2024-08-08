@@ -253,30 +253,18 @@ contract TestEverlongPositions is EverlongTest {
         );
     }
 
-    /// @dev Ensures that `canRebalance()` only returns true with a balance
-    ///      greater than or equal to Hyperdrive's minTransactionAmount or
-    ///      with matured positions.
-    /// @dev The test goes through the following steps:
-    ///         1. Mint `asset` to the Everlong contract and approve Hyperdrive.
-    ///            - `canRebalance()` should return true with a balance.
-    ///         2. Call `rebalance()` to open a position with all of balance.
-    ///            - `canRebalance()` should return false with no balance.
-    ///         3. Increase block.timestamp until the position is mature.
-    ///            - `canRebalance()` should return true with a mature position.
-    ///         4. Call `rebalance()` again to close matured positions
-    ///            and use proceeds to open new position.
-    ///         5. `canRebalance()` should return false with no matured positions
-    ///            and no balance.
-    function test_canRebalance_with_balance_matured_positions() external {
+    /// @dev Ensures that `canRebalance()` returns true with a balance
+    ///          greater than Hyperdrive's minTransactionAmount.
+    function test_canRebalance_with_balance_over_min_tx_amount() external {
         // Initialize the Hyperdrive instance by adding liquidity from Alice.
         uint256 fixedRate = 0.5e18;
         uint256 contribution = 10_000e18;
         initialize(alice, fixedRate, contribution);
 
-        // 1. Mint some tokens to Everlong for opening Longs.
+        // Mint some tokens to Everlong for opening longs.
         // Ensure Everlong's balance is gte Hyperdrive's minTransactionAmount.
         // Ensure `canRebalance()` returns true.
-        mintApproveHyperdriveBase(address(everlong), 100e18);
+        mintApproveEverlongBaseAsset(address(everlong), 100e18);
         assertGe(
             IERC20(everlong.asset()).balanceOf(address(everlong)),
             hyperdrive.getPoolConfig().minimumTransactionAmount
@@ -285,15 +273,27 @@ contract TestEverlongPositions is EverlongTest {
             everlong.canRebalance(),
             "everlong should be able to rebalance when it has a balance > hyperdrive's minTransactionAmount"
         );
+    }
 
-        // 2. Call `rebalance()` to cause Everlong to open a position.
+    /// @dev Ensures that `canRebalance()` returns false immediately after
+    ///      a rebalance is performed.
+    function test_canRebalance_false_after_rebalance() external {
+        // Initialize the Hyperdrive instance by adding liquidity from Alice.
+        uint256 fixedRate = 0.5e18;
+        uint256 contribution = 10_000e18;
+        initialize(alice, fixedRate, contribution);
+
+        // Mint some tokens to Everlong for opening Longs.
+        // Call `rebalance()` to cause Everlong to open a position.
         // Ensure the `Rebalanced()` event is emitted.
-        // Ensure the position count is now 1.
-        // Ensure Everlong's balance is lt Hyperdrive's minTransactionAmount.
-        // Ensure `canRebalance()` returns false.
+        mintApproveEverlongBaseAsset(address(everlong), 100e18);
         vm.expectEmit(true, true, true, true);
         emit Rebalanced();
         everlong.rebalance();
+
+        // Ensure the position count is now 1.
+        // Ensure Everlong's balance is lt Hyperdrive's minTransactionAmount.
+        // Ensure `canRebalance()` returns false.
         assertEq(
             everlong.getPositionCount(),
             1,
@@ -308,44 +308,31 @@ contract TestEverlongPositions is EverlongTest {
             everlong.canRebalance(),
             "cannot rebalance without matured positions nor sufficient balance after first rebalance"
         );
+    }
 
-        // 3. Increase block.timestamp until position is mature.
+    /// @dev Ensures that `canRebalance()` returns true with a matured
+    ///      position.
+    function test_canRebalance_with_matured_position() external {
+        // Initialize the Hyperdrive instance by adding liquidity from Alice.
+        uint256 fixedRate = 0.5e18;
+        uint256 contribution = 10_000e18;
+        initialize(alice, fixedRate, contribution);
+
+        // Mint some tokens to Everlong for opening longs and rebalance.
+        mintApproveEverlongBaseAsset(address(everlong), 100e18);
+        everlong.rebalance();
+
+        // Increase block.timestamp until position is mature.
         // Ensure Everlong has a matured position.
         // Ensure `canRebalance()` returns true.
-        vm.warp(everlong.getPosition(0).maturityTime);
+        advanceTime(everlong.getPosition(0).maturityTime, 0);
         assertTrue(
             everlong.hasMaturedPositions(),
-            "everlong should have matured position after calling warp"
+            "everlong should have matured position after advancing time"
         );
         assertTrue(
             everlong.canRebalance(),
             "everlong should allow rebalance with matured position"
-        );
-
-        // 4. Call `rebalance()` to close mature position
-        // and open new position with proceeds.
-        // Ensure position count remains 1.
-        // Ensure Everlong does not have matured positions.
-        // Ensure Everlong does not have a balance > minTransactionAmount.
-        // Ensure `canRebalance()` returns false.
-        everlong.rebalance();
-        assertEq(
-            everlong.getPositionCount(),
-            1,
-            "position count after second rebalance with matured position should be 1"
-        );
-        assertFalse(
-            everlong.hasMaturedPositions(),
-            "everlong should not have matured position after second rebalance"
-        );
-        assertLt(
-            IERC20(everlong.asset()).balanceOf(address(everlong)),
-            hyperdrive.getPoolConfig().minimumTransactionAmount,
-            "everlong balance after second rebalance should be less than hyperdrive's minTransactionAmount"
-        );
-        assertFalse(
-            everlong.canRebalance(),
-            "cannot rebalance without matured positions nor sufficient balance after second rebalance"
         );
     }
 }

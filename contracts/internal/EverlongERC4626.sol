@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.22;
 
+import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
+import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { ERC4626 } from "solady/tokens/ERC4626.sol";
 import { EverlongPositions } from "./EverlongPositions.sol";
@@ -85,7 +87,16 @@ abstract contract EverlongERC4626 is ERC4626, EverlongPositions {
         return _virtualAssets;
     }
 
-    // TODO: Might not need this but including for convenience.
+    /// @inheritdoc ERC4626
+    function maxDeposit(
+        address
+    ) public view override returns (uint256 maxAssets) {
+        maxAssets = HyperdriveUtils.calculateMaxLong(IHyperdrive(hyperdrive));
+    }
+
+    /// @dev Decrement the virtual assets and close sufficient positions to
+    ///      service the withdrawal.
+    /// @param _assets Amount of assets owed to the withdrawer.
     function _beforeWithdraw(
         uint256 _assets,
         uint256
@@ -106,7 +117,9 @@ abstract contract EverlongERC4626 is ERC4626, EverlongPositions {
         }
     }
 
-    // TODO: Might not need this but including for convenience.
+    /// @dev Increment the virtual assets and rebalance positions to use
+    ///      the newly-deposited liquidity.
+    /// @param _assets Amount of assets deposited.
     function _afterDeposit(uint256 _assets, uint256) internal virtual override {
         _virtualAssets += _assets;
         rebalance();

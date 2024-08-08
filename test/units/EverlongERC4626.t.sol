@@ -27,7 +27,7 @@ contract TestEverlongERC4626 is EverlongTest {
 
         // Mint bob some assets and approve the Everlong contract.
         uint256 depositAmount = 1e18;
-        mintApproveHyperdriveBase(bob, depositAmount);
+        mintApproveEverlongBaseAsset(bob, depositAmount);
 
         // 1. Deposit assets into Everlong as Bob and confirm `Rebalanced` event
         //    is emitted.
@@ -68,7 +68,7 @@ contract TestEverlongERC4626 is EverlongTest {
         initialize(alice, fixedRate, contribution);
 
         // Deposit assets into Everlong as Bob.
-        mintApproveHyperdriveBase(bob, 10e18);
+        mintApproveEverlongBaseAsset(bob, 10e18);
         vm.startPrank(bob);
         everlong.deposit(1e18, bob);
         vm.stopPrank();
@@ -81,7 +81,7 @@ contract TestEverlongERC4626 is EverlongTest {
         assertFalse(everlong.hasMaturedPositions());
 
         // Deposit assets into Everlong as Celine to create another position.
-        mintApproveHyperdriveBase(celine, 2e18);
+        mintApproveEverlongBaseAsset(celine, 2e18);
         vm.startPrank(celine);
         everlong.deposit(2e18, celine);
         vm.stopPrank();
@@ -116,7 +116,7 @@ contract TestEverlongERC4626 is EverlongTest {
         initialize(alice, fixedRate, contribution);
 
         // Mint Bob and Celine some assets and approve the Everlong contract.
-        mintApproveHyperdriveBase(bob, 10e18);
+        mintApproveEverlongBaseAsset(bob, 10e18);
 
         // Deposit assets into Everlong as Bob.
         vm.startPrank(bob);
@@ -186,10 +186,52 @@ contract TestEverlongERC4626 is EverlongTest {
         );
     }
 
+    /// @dev Validates that `maxDeposit(..)` returns a value that is
+    ///      reasonable (less than uint256.max) and actually depositable.
+    function test_maxDeposit_is_depositable() external {
+        // Initialize the Hyperdrive instance by adding liquidity from Alice.
+        uint256 fixedRate = 0.5e18;
+        uint256 contribution = 10_000e18;
+        initialize(alice, fixedRate, contribution);
+
+        // Ensure that `maxDeposit(Bob)` is less than uint256.max.
+        uint256 maxDeposit = everlong.maxDeposit(bob);
+        assertLt(maxDeposit, type(uint256).max);
+
+        // Attempt to deposit `maxDeposit` as Bob.
+        mintApproveEverlongBaseAsset(bob, maxDeposit);
+        vm.startPrank(bob);
+        everlong.deposit(maxDeposit, bob);
+        vm.stopPrank();
+    }
+
+    /// @dev Validates that `maxDeposit(..)` decreases when a deposit is made.
+    function test_maxDeposit_decreases_after_deposit() external {
+        // Initialize the Hyperdrive instance by adding liquidity from Alice.
+        uint256 fixedRate = 0.5e18;
+        uint256 contribution = 10_000e18;
+        initialize(alice, fixedRate, contribution);
+
+        // Make the maximum deposit as Bob.
+        uint256 maxDeposit = everlong.maxDeposit(bob);
+        mintApproveEverlongBaseAsset(bob, maxDeposit);
+        vm.startPrank(bob);
+        everlong.deposit(maxDeposit, bob);
+        vm.stopPrank();
+
+        // Ensure that the new maximum deposit is less than before.
+        assertLt(
+            everlong.maxDeposit(bob),
+            maxDeposit,
+            "max deposit should decrease after a deposit is made"
+        );
+    }
+
     /// @dev Validates that `_afterDeposit` increases total assets.
     function test_afterDeposit_virtual_asset_increase() external {
         // Call `_afterDeposit` with some assets.
         everlong.exposed_afterDeposit(5, 1);
+
         // Ensure `totalAssets()` is increased by the correct amount.
         assertEq(everlong.totalAssets(), 5);
     }

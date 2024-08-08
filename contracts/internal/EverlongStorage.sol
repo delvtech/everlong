@@ -21,7 +21,7 @@ abstract contract EverlongStorage is IEverlongEvents {
 
     // ── Hyperdrive ─────────────────────────────────────────────
 
-    /// @dev Address of the Hyperdrive instance wrapped by Everlong.
+    /// @notice Address of the Hyperdrive instance wrapped by Everlong.
     address public hyperdrive;
 
     /// @dev Whether to use Hyperdrive's base token to purchase bonds.
