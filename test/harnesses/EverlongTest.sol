@@ -92,20 +92,6 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         vm.stopPrank();
     }
 
-    // TODO: This is gross, will refactor
-    /// @dev Mint vault shares token to the provided address a
-    ///      and approve both the Everlong and Hyperdrive contract.
-    function mintApproveHyperdriveShares(
-        address recipient,
-        uint256 amount
-    ) internal {
-        ERC20Mintable(hyperdrive.vaultSharesToken()).mint(recipient, amount);
-        ERC20Mintable(hyperdrive.vaultSharesToken()).approve(
-            address(everlong),
-            amount
-        );
-    }
-
     // ╭─────────────────────────────────────────────────────────╮
     // │ Positions                                               │
     // ╰─────────────────────────────────────────────────────────╯
