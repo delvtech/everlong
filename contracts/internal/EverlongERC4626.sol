@@ -44,7 +44,13 @@ abstract contract EverlongERC4626 is ERC4626, EverlongPositions {
         address to,
         address owner
     ) public override returns (uint256 assets) {
+        // Execute the original ERC4626 `redeem(...)` logic which includes
+        // calling the `_beforeWithdraw(...)` hook to ensure there is
+        // sufficient idle liquidity to service the redemption.
         assets = super.redeem(shares, to, owner);
+
+        // Rebalance Everlong's positions by closing any matured positions
+        // and reinvesting the proceeds in new bonds.
         rebalance();
     }
 
