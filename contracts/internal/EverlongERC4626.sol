@@ -98,7 +98,13 @@ abstract contract EverlongERC4626 is ERC4626, EverlongPositions {
         uint256 _assets,
         uint256
     ) internal virtual override {
+        // TODO: Re-evaluate this accounting logic after discussing
+        //       withdrawal shares and whether to close immature positions.
+        //
+        // Decrement the virtual value of assets under Everlong control by the
+        // value of the assets being redeemed.
         _virtualAssets -= _assets;
+
         // Check if Everlong has sufficient assets to service the withdrawal.
         if (IERC20(_asset).balanceOf(address(this)) < _assets) {
             // Everlong does not have sufficient assets to service withdrawal.
