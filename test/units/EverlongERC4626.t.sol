@@ -11,12 +11,12 @@ import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol"
 contract TestEverlongERC4626 is EverlongTest {
     /// @dev Validates behavior of the `deposit()` function for a single
     ///        depositor.
-    ///   @dev When calling the `deposit()` function...
-    ///        1. The `Rebalanced` event should be emitted
-    ///        2. The balance of the Everlong contract should be minimal.
-    ///        3. The share amount issued to the depositor should be equal to the
+    ///  @dev When calling the `deposit()` function...
+    ///       1. The `Rebalanced` event should be emitted
+    ///       2. The balance of the Everlong contract should be minimal.
+    ///       3. The share amount issued to the depositor should be equal to the
     ///           total supply of Everlong shares.
-    ///        4. The amount of assets deposited should relate to the share
+    ///       4. The amount of assets deposited should relate to the share
     ///           count as follows:
     ///           shares_issued = assets_deposited * (10 ^ decimalsOffset)
     function test_deposit_single_depositor() external {
