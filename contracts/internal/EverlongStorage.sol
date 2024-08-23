@@ -22,15 +22,16 @@ abstract contract EverlongStorage is IEverlongEvents {
     // ── Hyperdrive ─────────────────────────────────────────────
 
     /// @notice Address of the Hyperdrive instance wrapped by Everlong.
-    address public hyperdrive;
+    address immutable _hyperdrive;
 
     /// @dev Whether to use Hyperdrive's base token to purchase bonds.
     //          If false, use the Hyperdrive's `vaultSharesToken`.
-    bool internal _asBase;
+    bool immutable _asBase;
 
     // ── Positions ──────────────────────────────────────────────
 
     // TODO: Reassess using a more tailored data structure.
+    //
     /// @dev Utility data structure to manage the position queue.
     ///      Supports pushing and popping from both the front and back.
     DoubleEndedQueue.Bytes32Deque internal _positions;
@@ -46,7 +47,7 @@ abstract contract EverlongStorage is IEverlongEvents {
     uint8 public constant decimalsOffset = 3;
 
     /// @dev Address of the token to use for Hyperdrive bond purchase/close.
-    address internal _asset;
+    address immutable _asset;
 
     // TODO: Remove in favor of more sophisticated position valuation.
     // TODO: Use some SafeMath library.

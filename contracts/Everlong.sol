@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.22;
 
+import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
+import { IEverlong } from "./interfaces/IEverlong.sol";
+import { EverlongAdmin } from "./internal/EverlongAdmin.sol";
 import { EverlongBase } from "./internal/EverlongBase.sol";
+import { EverlongERC4626 } from "./internal/EverlongERC4626.sol";
+import { EverlongPositions } from "./internal/EverlongPositions.sol";
+import { EVERLONG_KIND, EVERLONG_VERSION } from "./libraries/Constants.sol";
 
 ///           ,---..-.   .-.,---.  ,---.   ,-.    .---.  .-. .-.  ,--,
 ///           | .-' \ \ / / | .-'  | .-.\  | |   / .-. ) |  \| |.' .'
@@ -60,16 +66,59 @@ import { EverlongBase } from "./internal/EverlongBase.sol";
 /// @custom:disclaimer The language used in this code is for coding convenience
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
-contract Everlong is EverlongBase {
-    /// @notice Initial configuration paramters for Everlong.
-    /// @param _name Name of the ERC20 token managed by Everlong.
-    /// @param _symbol Symbol of the ERC20 token managed by Everlong.
-    /// @param __hyperdrive Address of the Hyperdrive instance wrapped by Everlong.
-    /// @param __asBase Whether to use Hyperdrive's base token for bond purchases.
+contract Everlong is
+    IEverlong,
+    EverlongBase,
+    EverlongAdmin,
+    EverlongPositions,
+    EverlongERC4626
+{
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Constructor                                             │
+    // ╰─────────────────────────────────────────────────────────╯
+
+    /// @notice Initial configuration paramters for EverlongERC4626.
+    /// @param __name Name of the ERC20 token managed by Everlong.
+    /// @param __symbol Symbol of the ERC20 token managed by Everlong.
+    /// @param __hyperdrive Address of the Hyperdrive instance.
+    /// @param __asBase Whether to use the base or shares token from Hyperdrive.
     constructor(
-        string memory _name,
-        string memory _symbol,
+        string memory __name,
+        string memory __symbol,
         address __hyperdrive,
         bool __asBase
-    ) EverlongBase(_name, _symbol, __hyperdrive, __asBase) {}
+    ) {
+        // Store constructor parameters.
+        _name = __name;
+        _symbol = __symbol;
+        _hyperdrive = __hyperdrive;
+        _asBase = __asBase;
+        _asset = __asBase
+            ? IHyperdrive(__hyperdrive).baseToken()
+            : IHyperdrive(__hyperdrive).vaultSharesToken();
+
+        // Attempt to retrieve the decimals from the {_asset} contract.
+        // If it does not implement `decimals() (uint256)`, use the default.
+        (bool success, uint8 result) = _tryGetAssetDecimals(_asset);
+        _decimals = success ? result : _DEFAULT_UNDERLYING_DECIMALS;
+    }
+
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Getters                                                 │
+    // ╰─────────────────────────────────────────────────────────╯
+
+    /// @inheritdoc IEverlong
+    function kind() external view returns (string memory) {
+        return EVERLONG_KIND;
+    }
+
+    /// @inheritdoc IEverlong
+    function version() external view returns (string memory) {
+        return EVERLONG_VERSION;
+    }
+
+    /// @inheritdoc IEverlong
+    function hyperdrive() external view returns (address) {
+        return _hyperdrive;
+    }
 }

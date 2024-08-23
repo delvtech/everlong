@@ -3,7 +3,7 @@ pragma solidity 0.8.22;
 
 import { IEverlong } from "../interfaces/IEverlong.sol";
 import { IEverlongAdmin } from "../interfaces/IEverlongAdmin.sol";
-import { EverlongStorage } from "./EverlongStorage.sol";
+import { EverlongBase } from "../internal/EverlongBase.sol";
 
 /// @author DELV
 /// @title EverlongAdmin
@@ -11,7 +11,7 @@ import { EverlongStorage } from "./EverlongStorage.sol";
 /// @custom:disclaimer The language used in this code is for coding convenience
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
-abstract contract EverlongAdmin is EverlongStorage, IEverlongAdmin {
+abstract contract EverlongAdmin is EverlongBase, IEverlongAdmin {
     // ╭─────────────────────────────────────────────────────────╮
     // │ Modifiers                                               │
     // ╰─────────────────────────────────────────────────────────╯

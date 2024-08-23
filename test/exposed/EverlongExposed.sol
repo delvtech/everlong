@@ -3,11 +3,20 @@ pragma solidity ^0.8.20;
 
 import { Test } from "forge-std/Test.sol";
 import { Everlong } from "../../contracts/Everlong.sol";
-import { EverlongBaseExposed } from "./EverlongBaseExposed.sol";
+
+import { EverlongAdminExposed } from "./EverlongAdminExposed.sol";
+import { EverlongERC4626Exposed } from "./EverlongERC4626Exposed.sol";
+import { EverlongPositionsExposed } from "./EverlongPositionsExposed.sol";
 
 /// @title EverlongExposed
 /// @dev Exposes all internal functions for the `Everlong` contract.
-contract EverlongExposed is EverlongBaseExposed, Everlong, Test {
+contract EverlongExposed is
+    EverlongAdminExposed,
+    EverlongERC4626Exposed,
+    EverlongPositionsExposed,
+    Everlong,
+    Test
+{
     /// @notice Initial configuration paramters for Everlong.
     /// @param hyperdrive_ Address of the Hyperdrive instance wrapped by Everlong.
     /// @param name_ Name of the ERC20 token managed by Everlong.

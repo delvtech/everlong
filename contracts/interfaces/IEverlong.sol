@@ -45,4 +45,8 @@ interface IEverlong is
     /// @notice Thrown when attempting to close a position with
     ///         a `bondAmount` greater than that contained by the position.
     error InconsistentPositionBondAmount();
+
+    /// @notice Thrown when a target idle amount is too high to be reached
+    ///         even after closing all positions.
+    error TargetIdleTooHigh();
 }

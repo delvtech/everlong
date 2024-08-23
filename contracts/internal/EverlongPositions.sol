@@ -7,7 +7,7 @@ import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { IEverlong } from "../interfaces/IEverlong.sol";
 import { IEverlongPositions } from "../interfaces/IEverlongPositions.sol";
 import { Position } from "../types/Position.sol";
-import { EverlongStorage } from "./EverlongStorage.sol";
+import { EverlongBase } from "./EverlongBase.sol";
 
 /// @author DELV
 /// @title EverlongPositions
@@ -15,7 +15,7 @@ import { EverlongStorage } from "./EverlongStorage.sol";
 /// @custom:disclaimer The language used in this code is for coding convenience
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
-abstract contract EverlongPositions is EverlongStorage, IEverlongPositions {
+abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
     using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
 
     // ╭─────────────────────────────────────────────────────────╮
@@ -23,7 +23,12 @@ abstract contract EverlongPositions is EverlongStorage, IEverlongPositions {
     // ╰─────────────────────────────────────────────────────────╯
 
     /// @inheritdoc IEverlongPositions
-    function rebalance() public {
+    function rebalance() external {
+        _rebalance();
+    }
+
+    /// @dev Rebalances the Everlong bond portfolio if needed.
+    function _rebalance() public override {
         // Close all mature positions (if present) so that the proceeds can be
         // used to purchase longs.
         if (hasMaturedPositions()) {
@@ -102,8 +107,8 @@ abstract contract EverlongPositions is EverlongStorage, IEverlongPositions {
         // TODO: Ensure amount < maxLongAmount
         // TODO: Idle liquidity implementation
         uint256 _amount = _excessLiquidity();
-        IERC20(_asset).approve(hyperdrive, _amount);
-        (uint256 _maturityTime, uint256 _bondAmount) = IHyperdrive(hyperdrive)
+        IERC20(_asset).approve(_hyperdrive, _amount);
+        (uint256 _maturityTime, uint256 _bondAmount) = IHyperdrive(_hyperdrive)
             .openLong(
                 _amount,
                 _minOpenLongOutput(_amount),
@@ -169,35 +174,52 @@ abstract contract EverlongPositions is EverlongStorage, IEverlongPositions {
     // │ Position Closing (Internal)                             │
     // ╰─────────────────────────────────────────────────────────╯
 
-    /// @dev Close positions until the minimum output is met.
-    /// @param _minOutput Output needed from closed positions.
-    function _closePositionsByOutput(uint256 _minOutput) internal {
-        // Loop through  positions and close them all.
-        // TODO: Enable closing of positions incrementally to avoid
-        //       the case where the # of mature positions exceeds the max
-        //       gas per block.
-        Position memory _position;
-        uint256 _output;
-        while (_output < _minOutput) {
-            // Retrieve the oldest position and close it.
-            _position = getPosition(0);
-            _output += IHyperdrive(hyperdrive).closeLong(
-                _position.maturityTime,
-                _position.bondAmount,
-                _minCloseLongOutput(
-                    _position.maturityTime,
-                    _position.bondAmount
-                ),
+    /// @inheritdoc EverlongBase
+    function _increaseIdle(
+        uint256 _target
+    ) internal override returns (uint256 idle) {
+        // Obtain the current amount of idle held by Everlong and return if
+        // it is above the target.
+        idle = IERC20(_asset).balanceOf(address(this));
+        if (idle > _target) return idle;
+
+        // Close all matured positions and return if updated idle is above
+        // the target.
+        idle += _closeMaturedPositions();
+        if (idle > _target) return idle;
+
+        // Close immature positions from oldest to newest until idle is
+        // above the target.
+        uint256 positionCount = _positions.length();
+        Position memory position;
+        while (positionCount > 0) {
+            position = getPosition(0);
+
+            // Close the position and add output to the current idle.
+            idle += IHyperdrive(_hyperdrive).closeLong(
+                position.maturityTime,
+                position.bondAmount,
+                _minCloseLongOutput(position.maturityTime, position.bondAmount),
                 IHyperdrive.Options(address(this), _asBase, "")
             );
 
-            // Update positions to reflect the newly closed long.
-            _handleCloseLong(uint128(_position.bondAmount));
+            // Update accounting for the closed position.
+            _handleCloseLong(uint128(position.bondAmount));
+
+            // Return if the updated idle is above the target.
+            if (idle > _target) return idle;
+
+            positionCount--;
         }
+
+        // Revert since all positions are closed and the target idle is
+        // has not been met;
+        revert IEverlong.TargetIdleTooHigh();
     }
 
     /// @dev Close all matured positions.
-    function _closeMaturedPositions() internal {
+    /// @return output Output received from closing the positions.
+    function _closeMaturedPositions() internal returns (uint256 output) {
         // Loop through mature positions and close them all.
         // TODO: Enable closing of mature positions incrementally to avoid
         //       the case where the # of mature positions exceeds the max
@@ -206,7 +228,7 @@ abstract contract EverlongPositions is EverlongStorage, IEverlongPositions {
         while (hasMaturedPositions()) {
             // Retrieve the oldest matured position and close it.
             _position = getPosition(0);
-            IHyperdrive(hyperdrive).closeLong(
+            output += IHyperdrive(_hyperdrive).closeLong(
                 _position.maturityTime,
                 _position.bondAmount,
                 _minCloseLongOutput(
@@ -315,7 +337,7 @@ abstract contract EverlongPositions is EverlongStorage, IEverlongPositions {
         // Hyperdrive's minimum transaction amount.
         return
             _excessLiquidity() >=
-            IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount;
+            IHyperdrive(_hyperdrive).getPoolConfig().minimumTransactionAmount;
     }
 
     // TODO: Consider storing hyperdrive's minimumTransactionAmount.
