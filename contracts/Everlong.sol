@@ -66,13 +66,7 @@ import { EVERLONG_KIND, EVERLONG_VERSION } from "./libraries/Constants.sol";
 /// @custom:disclaimer The language used in this code is for coding convenience
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
-contract Everlong is
-    IEverlong,
-    EverlongBase,
-    EverlongAdmin,
-    EverlongPositions,
-    EverlongERC4626
-{
+contract Everlong is EverlongAdmin, EverlongPositions, EverlongERC4626 {
     // ╭─────────────────────────────────────────────────────────╮
     // │ Constructor                                             │
     // ╰─────────────────────────────────────────────────────────╯
@@ -107,17 +101,19 @@ contract Everlong is
     // │ Getters                                                 │
     // ╰─────────────────────────────────────────────────────────╯
 
-    /// @inheritdoc IEverlong
+    /// @notice Gets the Everlong instance's kind.
+    /// @return The Everlong instance's kind.
     function kind() external view returns (string memory) {
         return EVERLONG_KIND;
     }
 
-    /// @inheritdoc IEverlong
+    /// @notice Gets the Everlong instance's version.
+    /// @return The Everlong instance's version.
     function version() external view returns (string memory) {
         return EVERLONG_VERSION;
     }
 
-    /// @inheritdoc IEverlong
+    /// @notice Gets the address of the underlying Hyperdrive Instance
     function hyperdrive() external view returns (address) {
         return _hyperdrive;
     }
