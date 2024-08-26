@@ -48,13 +48,13 @@ abstract contract EverlongStorage {
     /// @dev Address of the token to use for Hyperdrive bond purchase/close.
     address internal immutable _asset;
 
+    /// @dev Decimals used by the `_asset`.
+    uint8 internal immutable _decimals;
+
     // TODO: Remove in favor of more sophisticated position valuation.
     // TODO: Use some SafeMath library.
     /// @dev Virtual asset count to track amount deposited into Hyperdrive.
     uint256 internal _virtualAssets;
-
-    /// @dev Decimals used by the `_asset`.
-    uint8 internal immutable _decimals;
 
     /// @dev Name of the Everlong token.
     string internal _name;
