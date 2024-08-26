@@ -17,12 +17,12 @@ contract TestEverlong is EverlongTest {
 
     /// @dev Ensure that the `kind()` view function is implemented.
     function test_kind() external view {
-        assertNotEq(everlong.kind(), EVERLONG_KIND, "kind does not match");
+        assertEq(everlong.kind(), EVERLONG_KIND, "kind does not match");
     }
 
     /// @dev Ensure that the `version()` view function is implemented.
     function test_version() external view {
-        assertNotEq(
+        assertEq(
             everlong.version(),
             EVERLONG_VERSION,
             "version does not match"

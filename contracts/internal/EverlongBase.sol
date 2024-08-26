@@ -2,6 +2,7 @@
 pragma solidity 0.8.22;
 
 import { DoubleEndedQueue } from "openzeppelin/utils/structs/DoubleEndedQueue.sol";
+import { IEverlongEvents } from "../interfaces/IEverlongEvents.sol";
 import { EverlongStorage } from "./EverlongStorage.sol";
 
 // TODO: Reassess whether centralized configuration management makes sense.
@@ -12,7 +13,7 @@ import { EverlongStorage } from "./EverlongStorage.sol";
 /// @custom:disclaimer The language used in this code is for coding convenience
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
-abstract contract EverlongBase is EverlongStorage {
+abstract contract EverlongBase is EverlongStorage, IEverlongEvents {
     using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
 
     // ╭─────────────────────────────────────────────────────────╮

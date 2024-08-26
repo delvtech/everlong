@@ -18,10 +18,9 @@ contract TestEverlongAdmin is EverlongTest {
     /// @dev Validates successful `setAdmin` call by current `admin`.
     function test_setAdmin_success_deployer() external {
         // Ensure that the deployer can set the admin address.
-        vm.expectEmit(true, false, false, true);
-        emit AdminUpdated(address(0));
-        vm.startPrank(deployer);
-        everlong.setAdmin(address(0));
-        assertEq(everlong.admin(), address(0), "admin address not updated");
+        vm.expectEmit(true, true, true, true);
+        emit AdminUpdated(alice);
+        everlong.setAdmin(alice);
+        assertEq(everlong.admin(), alice, "admin address not updated");
     }
 }

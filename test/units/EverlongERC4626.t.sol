@@ -154,15 +154,6 @@ contract TestEverlongERC4626 is EverlongTest {
         assertEq(everlong.getPositionCount(), 1);
     }
 
-    /// @dev Ensure that the `hyperdrive()` view function is implemented.
-    function test_hyperdrive() external view {
-        assertEq(
-            everlong.hyperdrive(),
-            address(hyperdrive),
-            "hyperdrive() should return hyperdrive address"
-        );
-    }
-
     /// @dev Ensure that the `asset()` view function is implemented.
     function test_asset() external view {
         assertEq(

@@ -2,7 +2,6 @@
 pragma solidity 0.8.22;
 
 import { DoubleEndedQueue } from "openzeppelin/utils/structs/DoubleEndedQueue.sol";
-import { IEverlongEvents } from "../interfaces/IEverlongEvents.sol";
 
 // TODO: Reassess whether centralized configuration management makes sense.
 //       https://github.com/delvtech/everlong/pull/2#discussion_r1703799747
@@ -12,7 +11,7 @@ import { IEverlongEvents } from "../interfaces/IEverlongEvents.sol";
 /// @custom:disclaimer The language used in this code is for coding convenience
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
-abstract contract EverlongStorage is IEverlongEvents {
+abstract contract EverlongStorage {
     using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
     // ── Admin ──────────────────────────────────────────────────
 
@@ -22,11 +21,11 @@ abstract contract EverlongStorage is IEverlongEvents {
     // ── Hyperdrive ─────────────────────────────────────────────
 
     /// @notice Address of the Hyperdrive instance wrapped by Everlong.
-    address immutable _hyperdrive;
+    address internal immutable _hyperdrive;
 
     /// @dev Whether to use Hyperdrive's base token to purchase bonds.
     //          If false, use the Hyperdrive's `vaultSharesToken`.
-    bool immutable _asBase;
+    bool internal immutable _asBase;
 
     // ── Positions ──────────────────────────────────────────────
 
@@ -47,7 +46,7 @@ abstract contract EverlongStorage is IEverlongEvents {
     uint8 public constant decimalsOffset = 3;
 
     /// @dev Address of the token to use for Hyperdrive bond purchase/close.
-    address immutable _asset;
+    address internal immutable _asset;
 
     // TODO: Remove in favor of more sophisticated position valuation.
     // TODO: Use some SafeMath library.
