@@ -28,7 +28,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
     }
 
     /// @dev Rebalances the Everlong bond portfolio if needed.
-    function _rebalance() public override {
+    function _rebalance() internal override {
         // Close all mature positions (if present) so that the proceeds can be
         // used to purchase longs.
         if (hasMaturedPositions()) {
@@ -181,12 +181,12 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         // Obtain the current amount of idle held by Everlong and return if
         // it is above the target.
         idle = IERC20(_asset).balanceOf(address(this));
-        if (idle > _target) return idle;
+        if (idle >= _target) return idle;
 
         // Close all matured positions and return if updated idle is above
         // the target.
         idle += _closeMaturedPositions();
-        if (idle > _target) return idle;
+        if (idle >= _target) return idle;
 
         // Close immature positions from oldest to newest until idle is
         // above the target.
@@ -207,7 +207,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
             _handleCloseLong(uint128(position.bondAmount));
 
             // Return if the updated idle is above the target.
-            if (idle > _target) return idle;
+            if (idle >= _target) return idle;
 
             positionCount--;
         }

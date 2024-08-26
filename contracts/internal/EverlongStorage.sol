@@ -54,7 +54,7 @@ abstract contract EverlongStorage {
     uint256 internal _virtualAssets;
 
     /// @dev Decimals used by the `_asset`.
-    uint8 internal _decimals;
+    uint8 internal immutable _decimals;
 
     /// @dev Name of the Everlong token.
     string internal _name;

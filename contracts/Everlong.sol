@@ -91,6 +91,9 @@ contract Everlong is EverlongAdmin, EverlongPositions, EverlongERC4626 {
             ? IHyperdrive(__hyperdrive).baseToken()
             : IHyperdrive(__hyperdrive).vaultSharesToken();
 
+        // Set the admin to the contract deployer.
+        _admin = msg.sender;
+
         // Attempt to retrieve the decimals from the {_asset} contract.
         // If it does not implement `decimals() (uint256)`, use the default.
         (bool success, uint8 result) = _tryGetAssetDecimals(_asset);
