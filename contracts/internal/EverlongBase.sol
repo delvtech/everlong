@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.22;
 
-import { DoubleEndedQueue } from "openzeppelin/utils/structs/DoubleEndedQueue.sol";
+import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
+import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
+import { HyperdriveMath } from "hyperdrive/contracts/src/libraries/HyperdriveMath.sol";
 import { IEverlongEvents } from "../interfaces/IEverlongEvents.sol";
 import { EverlongStorage } from "./EverlongStorage.sol";
 
@@ -14,7 +16,7 @@ import { EverlongStorage } from "./EverlongStorage.sol";
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
 abstract contract EverlongBase is EverlongStorage, IEverlongEvents {
-    using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
+    using FixedPointMath for uint256;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Stateful                                                │
@@ -30,4 +32,35 @@ abstract contract EverlongBase is EverlongStorage, IEverlongEvents {
     function _increaseIdle(
         uint256 _target
     ) internal virtual returns (uint256 idle);
+
+    function estimateLongProceeds(
+        uint256 bondAmount,
+        uint256 normalizedTimeRemaining,
+        uint256 openVaultSharePrice,
+        uint256 closeVaultSharePrice
+    ) internal view returns (uint256) {
+        IHyperdrive.PoolInfo memory poolInfo = IHyperdrive(_hyperdrive)
+            .getPoolInfo();
+        IHyperdrive.PoolConfig memory poolConfig = IHyperdrive(_hyperdrive)
+            .getPoolConfig();
+        (, , uint256 shareProceeds) = HyperdriveMath.calculateCloseLong(
+            HyperdriveMath.calculateEffectiveShareReserves(
+                poolInfo.shareReserves,
+                poolInfo.shareAdjustment
+            ),
+            poolInfo.bondReserves,
+            bondAmount,
+            normalizedTimeRemaining,
+            poolConfig.timeStretch,
+            poolInfo.vaultSharePrice,
+            poolConfig.initialVaultSharePrice
+        );
+        if (closeVaultSharePrice < openVaultSharePrice) {
+            shareProceeds = shareProceeds.mulDivDown(
+                closeVaultSharePrice,
+                openVaultSharePrice
+            );
+        }
+        return shareProceeds.mulDivDown(poolInfo.vaultSharePrice, 1e18);
+    }
 }

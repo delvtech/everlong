@@ -12,7 +12,7 @@ import { Positions } from "../libraries/Positions.sol";
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
 abstract contract EverlongStorage {
-    using Positions for Positions.Positions;
+    using Positions for Positions.PositionQueue;
     // ── Admin ──────────────────────────────────────────────────
 
     /// @dev Address of the contract admin.
@@ -33,7 +33,7 @@ abstract contract EverlongStorage {
     //
     /// @dev Utility data structure to manage the position queue.
     ///      Supports pushing and popping from both the front and back.
-    Positions.Positions internal _positions;
+    Positions.PositionQueue internal _positions;
 
     // ── ERC4626 ────────────────────────────────────────────────
 
@@ -50,11 +50,6 @@ abstract contract EverlongStorage {
 
     /// @dev Decimals used by the `_asset`.
     uint8 internal immutable _decimals;
-
-    // TODO: Remove in favor of more sophisticated position valuation.
-    // TODO: Use some SafeMath library.
-    /// @dev Virtual asset count to track amount deposited into Hyperdrive.
-    uint256 internal _virtualAssets;
 
     /// @dev Name of the Everlong token.
     string internal _name;

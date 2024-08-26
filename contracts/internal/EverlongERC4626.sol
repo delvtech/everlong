@@ -5,6 +5,7 @@ import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { HyperdriveMath } from "hyperdrive/contracts/src/libraries/HyperdriveMath.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
+import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { ERC4626 } from "solady/tokens/ERC4626.sol";
 import { EverlongBase } from "./EverlongBase.sol";
 
@@ -64,7 +65,17 @@ abstract contract EverlongERC4626 is ERC4626, EverlongBase {
     /// @notice Returns the total value of assets managed by Everlong.
     /// @return Total managed asset value.
     function totalAssets() public view override returns (uint256) {
-        return _virtualAssets;
+        return
+            IERC20(_asset).balanceOf(address(this)) +
+            estimateLongProceeds(
+                _positions._quantity,
+                HyperdriveUtils.calculateTimeRemaining(
+                    IHyperdrive(_hyperdrive),
+                    _positions._avgMaturity
+                ),
+                _positions._avgVaultSharePrice,
+                IHyperdrive(_hyperdrive).getPoolInfo().vaultSharePrice
+            );
     }
 
     /// @inheritdoc ERC4626
@@ -83,10 +94,6 @@ abstract contract EverlongERC4626 is ERC4626, EverlongBase {
     ) internal virtual override {
         // TODO: Re-evaluate this accounting logic after discussing
         //       withdrawal shares and whether to close immature positions.
-        //
-        // Increase the virtual value of Everlong controlled assets by the
-        // amount deposited.
-        _virtualAssets -= _assets;
 
         // Close remaining positions until Everlong's balance is enough to
         // meet the withdrawal.
@@ -100,48 +107,13 @@ abstract contract EverlongERC4626 is ERC4626, EverlongBase {
         // TODO: Re-evaluate this accounting logic after discussing
         //       withdrawal shares and whether to close immature positions.
         //
-        // Increase the virtual value of Everlong controlled assets by the
-        // amount deposited.
-        _virtualAssets += _assets;
-
         // Rebalance the Everlong portfolio.
-        _rebalance();
+        // _rebalance();
     }
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Internal                                                │
     // ╰─────────────────────────────────────────────────────────╯
-
-    function estimateLongProceeds(
-        uint256 bondAmount,
-        uint256 normalizedTimeRemaining,
-        uint256 openVaultSharePrice,
-        uint256 closeVaultSharePrice
-    ) internal view returns (uint256) {
-        IHyperdrive.PoolInfo memory poolInfo = IHyperdrive(_hyperdrive)
-            .getPoolInfo();
-        IHyperdrive.PoolConfig memory poolConfig = IHyperdrive(_hyperdrive)
-            .getPoolConfig();
-        (, , uint256 shareProceeds) = HyperdriveMath.calculateCloseLong(
-            HyperdriveMath.calculateEffectiveShareReserves(
-                poolInfo.shareReserves,
-                poolInfo.shareAdjustment
-            ),
-            poolInfo.bondReserves,
-            bondAmount,
-            normalizedTimeRemaining,
-            poolConfig.timeStretch,
-            poolInfo.vaultSharePrice,
-            poolConfig.initialVaultSharePrice
-        );
-        if (closeVaultSharePrice < openVaultSharePrice) {
-            shareProceeds = shareProceeds.mulDivDown(
-                closeVaultSharePrice,
-                openVaultSharePrice
-            );
-        }
-        return shareProceeds.mulDivDown(poolInfo.vaultSharePrice, 1e18);
-    }
 
     /// @dev Returns whether virtual shares will be used to mitigate the inflation attack.
     /// @dev See: https://github.com/OpenZeppelin/openzeppelin-contracts/issues/3706

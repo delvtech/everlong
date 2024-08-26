@@ -38,13 +38,17 @@ interface IEverlong is
 
     // ── Positions ──────────────────────────────────────────────
 
-    /// @notice Thrown when attempting to insert a position with
-    ///         a `maturityTime` sooner than the most recent position's.
-    error InconsistentPositionMaturity();
+    /// @notice Thrown when attempting to retrieve a nonexistent position from
+    ///         the PositionQueue.
+    error PositionOutOfBounds();
 
-    /// @notice Thrown when attempting to close a position with
-    ///         a `bondAmount` greater than that contained by the position.
-    error InconsistentPositionBondAmount();
+    /// @notice Thrown when attempting to remove a position from an empty
+    ///         PositionQueue.
+    error PositionQueueEmpty();
+
+    /// @notice Thrown when the PositionQueue has run out of indices to store
+    ///         positions.
+    error PositionQueueFull();
 
     /// @notice Thrown when a target idle amount is too high to be reached
     ///         even after closing all positions.

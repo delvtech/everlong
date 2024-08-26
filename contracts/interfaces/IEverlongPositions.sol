@@ -31,12 +31,19 @@ interface IEverlongPositions {
     /// @return True if any positions are matured, false otherwise.
     function hasMaturedPositions() external view returns (bool);
 
-    /// @notice Determines whether Everlong has sufficient excess liquidity
+    /// @notice Determines whether Everlong has sufficient idle liquidity
     ///         for opening a long.
-    /// @return True if sufficient excess liquidity, false otherwise.
-    function hasSufficientExcessLiquidity() external view returns (bool);
+    /// @return True if sufficient idle liquidity, false otherwise.
+    function hasSufficientIdle() external view returns (bool);
 
     /// @notice Determines whether Everlong's portfolio can currently be rebalanced.
     /// @return True if the portfolio can be rebalanced, false otherwise.
     function canRebalance() external view returns (bool);
+
+    // FIXME: Add Comment
+    function avgMaturity() external view returns (uint256);
+    // FIXME: Add Comment
+    function quantity() external view returns (uint256);
+    // FIXME: Add Comment
+    function avgVaultSharePrice() external view returns (uint256);
 }

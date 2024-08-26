@@ -103,10 +103,10 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         for (uint128 i = 0; i < everlong.getPositionCount(); ++i) {
             Position memory p = everlong.getPosition(i);
             console.log(
-                "index: %s - maturityTime: %s - bondAmount: %s",
+                "index: %s - maturity: %s - quantity: %s ",
                 i,
-                p.maturityTime,
-                p.bondAmount
+                p.maturity,
+                p.quantity
             );
         }
         console.log("--------------------------------------------");
@@ -124,7 +124,8 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         string memory _error
     ) public view {
         Position memory p = everlong.getPosition(_index);
-        assertEq(_position.maturityTime, p.maturityTime, _error);
-        assertEq(_position.bondAmount, p.bondAmount, _error);
+        assertEq(_position.maturity, p.maturity, _error);
+        assertEq(_position.quantity, p.quantity, _error);
+        assertEq(_position.vaultSharePrice, p.vaultSharePrice, _error);
     }
 }

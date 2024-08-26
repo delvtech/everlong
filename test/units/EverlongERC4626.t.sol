@@ -90,7 +90,7 @@ contract TestEverlongERC4626 is EverlongTest {
         assertEq(everlong.getPositionCount(), 2);
 
         // Advance time to mature Bob's position but not Celine's.
-        advanceTime(everlong.getPosition(0).maturityTime - block.timestamp, 0);
+        advanceTime(everlong.getPosition(0).maturity - block.timestamp, 0);
 
         // Confirm that Everlong now has a matured position.
         assertTrue(everlong.hasMaturedPositions());
@@ -104,7 +104,7 @@ contract TestEverlongERC4626 is EverlongTest {
         // 1. Created from Celine's deposit.
         // 2. Created from rebalance on Bob's redemption.
         assertEq(everlong.getPositionCount(), 2);
-        assertGt(everlong.getPosition(0).maturityTime, block.timestamp);
+        assertGt(everlong.getPosition(0).maturity, block.timestamp);
     }
 
     /// @dev Validates that `redeem()` will close all positions when closing
@@ -139,7 +139,7 @@ contract TestEverlongERC4626 is EverlongTest {
         assertEq(everlong.getPositionCount(), 2);
 
         // Advance time to mature only the first position.
-        advanceTime(everlong.getPosition(0).maturityTime - block.timestamp, 0);
+        advanceTime(everlong.getPosition(0).maturity - block.timestamp, 0);
 
         // Confirm that Everlong now has a matured position.
         assertTrue(everlong.hasMaturedPositions());

@@ -6,11 +6,11 @@ import { EverlongPositions } from "../../contracts/internal/EverlongPositions.so
 /// @title EverlongPositionsExposed
 /// @dev Exposes all internal functions for the `EverlongPositions` contract.
 abstract contract EverlongPositionsExposed is EverlongPositions {
-    /// @notice Calculates the amount of excess liquidity that can be spent opening longs.
+    /// @notice Calculates the amount of idle liquidity that can be spent opening longs.
     /// @notice Can be overridden by child contracts.
     /// @return Amount of excess liquidity that can be spent opening longs.
-    function exposed_excessLiquidity() public view virtual returns (uint256) {
-        return _excessLiquidity();
+    function exposed_idle() public view virtual returns (uint256) {
+        return _idle();
     }
 
     /// @notice Calculates the minimum `openLong` output from Hyperdrive
@@ -50,19 +50,19 @@ abstract contract EverlongPositionsExposed is EverlongPositions {
     /// @notice Spend the excess idle liquidity for the Everlong contract.
     /// @notice Can be overridden by implementing contracts to configure
     ///      how much idle to spend and how it is spent.
-    function exposed_spendExcessLiquidity() public {
-        return _spendExcessLiquidity();
+    function exposed_spendIdle() public {
+        return _spendIdle();
     }
 
     /// @notice Account for newly purchased bonds within the `PositionManager`.
     /// @param _maturityTime Maturity time for the newly purchased bonds.
     /// @param _bondAmountPurchased Amount of bonds purchased.
-    function exposed_handleOpenLong(
-        uint128 _maturityTime,
-        uint128 _bondAmountPurchased
-    ) public {
-        return _handleOpenLong(_maturityTime, _bondAmountPurchased);
-    }
+    // function exposed_handleOpenLong(
+    //     uint128 _maturityTime,
+    //     uint128 _bondAmountPurchased
+    // ) public {
+    //     return _handleOpenLong(_maturityTime, _bondAmountPurchased);
+    // }
 
     /// @dev Close positions until sufficient idle liquidity is held.
     /// @dev Reverts if the target is unreachable.
@@ -70,7 +70,7 @@ abstract contract EverlongPositionsExposed is EverlongPositions {
     /// @return idle Amount of idle after the increase.
     function exposed_increaseIdle(
         uint256 _target
-    ) internal returns (uint256 idle) {
+    ) public returns (uint256 idle) {
         return _increaseIdle(_target);
     }
 
@@ -83,7 +83,7 @@ abstract contract EverlongPositionsExposed is EverlongPositions {
     /// @notice Account for closed bonds at the oldest `maturityTime`
     ///      within the `PositionManager`.
     /// @param _bondAmountClosed Amount of bonds closed.
-    function exposed_handleCloseLong(uint128 _bondAmountClosed) public {
-        return _handleCloseLong(_bondAmountClosed);
-    }
+    // function exposed_handleCloseLong(uint128 _bondAmountClosed) public {
+    //     return _handleCloseLong(_bondAmountClosed);
+    // }
 }
