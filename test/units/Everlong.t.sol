@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-import { EVERLONG_KIND, EVERLONG_VERSION } from "../../contracts/libraries/constants.sol";
+import { EVERLONG_KIND, EVERLONG_VERSION } from "../../contracts/libraries/Constants.sol";
 import { EverlongTest } from "../harnesses/EverlongTest.sol";
 
 /// @dev Tests Everlong functionality.
