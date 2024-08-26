@@ -2,6 +2,8 @@
 pragma solidity 0.8.22;
 
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
+import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
+import { HyperdriveMath } from "hyperdrive/contracts/src/libraries/HyperdriveMath.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { ERC4626 } from "solady/tokens/ERC4626.sol";
 import { EverlongBase } from "./EverlongBase.sol";
@@ -13,6 +15,8 @@ import { EverlongBase } from "./EverlongBase.sol";
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
 abstract contract EverlongERC4626 is ERC4626, EverlongBase {
+    using FixedPointMath for uint256;
+
     // ╭─────────────────────────────────────────────────────────╮
     // │ Stateful                                                │
     // ╰─────────────────────────────────────────────────────────╯
@@ -107,6 +111,37 @@ abstract contract EverlongERC4626 is ERC4626, EverlongBase {
     // ╭─────────────────────────────────────────────────────────╮
     // │ Internal                                                │
     // ╰─────────────────────────────────────────────────────────╯
+
+    function estimateLongProceeds(
+        uint256 bondAmount,
+        uint256 normalizedTimeRemaining,
+        uint256 openVaultSharePrice,
+        uint256 closeVaultSharePrice
+    ) internal view returns (uint256) {
+        IHyperdrive.PoolInfo memory poolInfo = IHyperdrive(_hyperdrive)
+            .getPoolInfo();
+        IHyperdrive.PoolConfig memory poolConfig = IHyperdrive(_hyperdrive)
+            .getPoolConfig();
+        (, , uint256 shareProceeds) = HyperdriveMath.calculateCloseLong(
+            HyperdriveMath.calculateEffectiveShareReserves(
+                poolInfo.shareReserves,
+                poolInfo.shareAdjustment
+            ),
+            poolInfo.bondReserves,
+            bondAmount,
+            normalizedTimeRemaining,
+            poolConfig.timeStretch,
+            poolInfo.vaultSharePrice,
+            poolConfig.initialVaultSharePrice
+        );
+        if (closeVaultSharePrice < openVaultSharePrice) {
+            shareProceeds = shareProceeds.mulDivDown(
+                closeVaultSharePrice,
+                openVaultSharePrice
+            );
+        }
+        return shareProceeds.mulDivDown(poolInfo.vaultSharePrice, 1e18);
+    }
 
     /// @dev Returns whether virtual shares will be used to mitigate the inflation attack.
     /// @dev See: https://github.com/OpenZeppelin/openzeppelin-contracts/issues/3706

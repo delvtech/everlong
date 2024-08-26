@@ -8,4 +8,8 @@ struct Position {
     uint128 maturityTime;
     /// @notice Quantity of bonds in the position.
     uint128 bondAmount;
+    /// @notice Cost of the position.
+    uint128 cost;
+    /// @notice Hyperdrive vault share price at position open.
+    uint128 vaultSharePrice;
 }

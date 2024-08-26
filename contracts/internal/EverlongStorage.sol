@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.22;
 
-import { DoubleEndedQueue } from "openzeppelin/utils/structs/DoubleEndedQueue.sol";
+import { Positions } from "../libraries/Positions.sol";
 
 // TODO: Reassess whether centralized configuration management makes sense.
 //       https://github.com/delvtech/everlong/pull/2#discussion_r1703799747
@@ -12,7 +12,7 @@ import { DoubleEndedQueue } from "openzeppelin/utils/structs/DoubleEndedQueue.so
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
 abstract contract EverlongStorage {
-    using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
+    using Positions for Positions.Positions;
     // ── Admin ──────────────────────────────────────────────────
 
     /// @dev Address of the contract admin.
@@ -33,7 +33,7 @@ abstract contract EverlongStorage {
     //
     /// @dev Utility data structure to manage the position queue.
     ///      Supports pushing and popping from both the front and back.
-    DoubleEndedQueue.Bytes32Deque internal _positions;
+    Positions.Positions internal _positions;
 
     // ── ERC4626 ────────────────────────────────────────────────
 

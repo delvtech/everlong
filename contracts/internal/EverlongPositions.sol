@@ -2,10 +2,10 @@
 pragma solidity 0.8.22;
 
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
-import { DoubleEndedQueue } from "openzeppelin/utils/structs/DoubleEndedQueue.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { IEverlong } from "../interfaces/IEverlong.sol";
 import { IEverlongPositions } from "../interfaces/IEverlongPositions.sol";
+import { Positions } from "../libraries/Positions.sol";
 import { Position } from "../types/Position.sol";
 import { EverlongBase } from "./EverlongBase.sol";
 
@@ -16,7 +16,7 @@ import { EverlongBase } from "./EverlongBase.sol";
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
 abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
-    using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
+    using Positions for Positions.Positions;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Stateful                                                │
@@ -101,7 +101,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
     /// @dev Spend the excess idle liquidity for the Everlong contract.
     /// @dev Can be overridden by implementing contracts to configure
     ///      how much idle to spend and how it is spent.
-    function _spendExcessLiquidity() internal {
+    function _spendIdle() internal {
         // Open the long position with the available excess liquidity.
         // TODO: Worry about slippage.
         // TODO: Ensure amount < maxLongAmount
@@ -130,7 +130,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         // Revert if the incoming position's `maturityTime`
         // is sooner than the most recently added position's maturity.
         if (
-            _positions.length() != 0 &&
+            _positions.count() != 0 &&
             _decodePosition(_positions.back()).maturityTime > _maturityTime
         ) {
             revert IEverlong.InconsistentPositionMaturity();
@@ -138,7 +138,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         // A position already exists with the incoming `maturityTime`.
         // The existing position's `bondAmount` is updated.
         else if (
-            _positions.length() != 0 &&
+            _positions.count() != 0 &&
             _decodePosition(_positions.back()).maturityTime == _maturityTime
         ) {
             Position memory _oldPosition = _decodePosition(
