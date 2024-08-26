@@ -21,7 +21,7 @@ abstract contract EverlongBase is EverlongStorage, IEverlongEvents {
     // ╰─────────────────────────────────────────────────────────╯
 
     /// @dev Rebalances the Everlong bond portfolio if needed.
-    function _rebalance() public virtual;
+    function _rebalance() internal virtual;
 
     /// @dev Close positions until sufficient idle liquidity is held.
     /// @dev Reverts if the target is unreachable.
