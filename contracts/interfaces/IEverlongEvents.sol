@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 interface IEverlongEvents {
-    // Admin //
+    // ── Admin ──────────────────────────────────────────────────
 
     /// @notice Emitted when admin is transferred.
     event AdminUpdated(address indexed admin);
 
-    // Positions //
+    // ── Positions ──────────────────────────────────────────────
 
     /// @notice Emitted when a new position is added to the bond portfolio.
     /// @dev This event will only be emitted with new `maturityTime`s in the portfolio.

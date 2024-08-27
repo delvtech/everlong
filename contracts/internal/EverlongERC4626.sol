@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.20;
+pragma solidity 0.8.22;
 
+import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
+import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { ERC4626 } from "solady/tokens/ERC4626.sol";
+import { EverlongBase } from "./EverlongBase.sol";
 
 /// @author DELV
 /// @title EverlongERC4626
@@ -9,49 +12,96 @@ import { ERC4626 } from "solady/tokens/ERC4626.sol";
 /// @custom:disclaimer The language used in this code is for coding convenience
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
-abstract contract EverlongERC4626 is ERC4626 {
+abstract contract EverlongERC4626 is ERC4626, EverlongBase {
     // ╭─────────────────────────────────────────────────────────╮
-    // │ Storage                                                 │
+    // │ Stateful                                                │
     // ╰─────────────────────────────────────────────────────────╯
 
-    /// @notice Virtual shares are used to mitigate inflation attacks.
-    bool public constant useVirtualShares = true;
+    /// @inheritdoc ERC4626
+    function redeem(
+        uint256 shares,
+        address to,
+        address owner
+    ) public override returns (uint256 assets) {
+        // Execute the original ERC4626 `redeem(...)` logic which includes
+        // calling the `_beforeWithdraw(...)` hook to ensure there is
+        // sufficient idle liquidity to service the redemption.
+        assets = super.redeem(shares, to, owner);
 
-    /// @notice Used to reduce the feasibility of an inflation attack.
-    /// TODO: Determine the appropriate value for our case. Current value
-    ///       was picked arbitrarily.
-    uint8 public constant decimalsOffset = 3;
+        // Rebalance Everlong's positions by closing any matured positions
+        // and reinvesting the proceeds in new bonds.
+        _rebalance();
+    }
 
-    /// @dev Address of the token to use for Hyperdrive bond purchase/close.
-    address internal immutable _asset;
+    // TODO: Implement.
+    /// @inheritdoc ERC4626
+    function mint(uint256, address) public override returns (uint256 assets) {
+        revert("mint not implemented, please use deposit");
+    }
 
-    /// @dev Decimals used by the `_asset`.
-    uint8 internal immutable _decimals;
-
-    /// @dev Name of the Everlong token.
-    string internal _name;
-
-    /// @dev Symbol of the Everlong token.
-    string internal _symbol;
+    // TODO: Implement.
+    /// @inheritdoc ERC4626
+    function withdraw(
+        uint256,
+        address,
+        address
+    ) public override returns (uint256 shares) {
+        revert("withdraw not implemented, please use redeem");
+    }
 
     // ╭─────────────────────────────────────────────────────────╮
-    // │ Constructor                                             │
+    // │ Overrides                                               │
     // ╰─────────────────────────────────────────────────────────╯
 
-    /// @notice Initial configuration paramters for EverlongERC4626.
-    /// @param __name Name of the ERC20 token managed by Everlong.
-    /// @param __symbol Symbol of the ERC20 token managed by Everlong.
-    /// @param __asset Base token used by Everlong for deposits/withdrawals.
-    constructor(string memory __name, string memory __symbol, address __asset) {
-        // Store constructor parameters.
-        _name = __name;
-        _symbol = __symbol;
-        _asset = __asset;
+    // TODO: Actually estimate this based on current position contents.
+    //       Currently, this is obtained from tracking deposits - withdrawals
+    //       which results in Everlong taking all profit and users receiving
+    //       exactly what they put in.
+    /// @notice Returns the total value of assets managed by Everlong.
+    /// @return Total managed asset value.
+    function totalAssets() public view override returns (uint256) {
+        return _virtualAssets;
+    }
 
-        // Attempt to retrieve the decimals from the {_asset} contract.
-        // If it does not implement `decimals() (uint256)`, use the default.
-        (bool success, uint8 result) = _tryGetAssetDecimals(__asset);
-        _decimals = success ? result : _DEFAULT_UNDERLYING_DECIMALS;
+    /// @inheritdoc ERC4626
+    function maxDeposit(
+        address
+    ) public view override returns (uint256 maxAssets) {
+        maxAssets = HyperdriveUtils.calculateMaxLong(IHyperdrive(_hyperdrive));
+    }
+
+    /// @dev Decrement the virtual assets and close sufficient positions to
+    ///      service the withdrawal.
+    /// @param _assets Amount of assets owed to the withdrawer.
+    function _beforeWithdraw(
+        uint256 _assets,
+        uint256
+    ) internal virtual override {
+        // TODO: Re-evaluate this accounting logic after discussing
+        //       withdrawal shares and whether to close immature positions.
+        //
+        // Increase the virtual value of Everlong controlled assets by the
+        // amount deposited.
+        _virtualAssets -= _assets;
+
+        // Close remaining positions until Everlong's balance is enough to
+        // meet the withdrawal.
+        _increaseIdle(_assets);
+    }
+
+    /// @dev Increment the virtual assets and rebalance positions to use
+    ///      the newly-deposited liquidity.
+    /// @param _assets Amount of assets deposited.
+    function _afterDeposit(uint256 _assets, uint256) internal virtual override {
+        // TODO: Re-evaluate this accounting logic after discussing
+        //       withdrawal shares and whether to close immature positions.
+        //
+        // Increase the virtual value of Everlong controlled assets by the
+        // amount deposited.
+        _virtualAssets += _assets;
+
+        // Rebalance the Everlong portfolio.
+        _rebalance();
     }
 
     // ╭─────────────────────────────────────────────────────────╮
@@ -81,16 +131,6 @@ abstract contract EverlongERC4626 is ERC4626 {
     /// @dev MUST NOT revert.
     function _decimalsOffset() internal view virtual override returns (uint8) {
         return decimalsOffset;
-    }
-
-    // TODO: Might not need this but including for convenience.
-    function _beforeWithdraw(uint256, uint256) internal override {
-        // revert("TODO");
-    }
-
-    // TODO: Might not need this but including for convenience.
-    function _afterDeposit(uint256, uint256) internal override {
-        // revert("TODO");
     }
 
     // ╭─────────────────────────────────────────────────────────╮

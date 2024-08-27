@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.20;
+pragma solidity 0.8.22;
 
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { DoubleEndedQueue } from "openzeppelin/utils/structs/DoubleEndedQueue.sol";
@@ -23,7 +23,12 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
     // ╰─────────────────────────────────────────────────────────╯
 
     /// @inheritdoc IEverlongPositions
-    function rebalance() public {
+    function rebalance() external {
+        _rebalance();
+    }
+
+    /// @dev Rebalances the Everlong bond portfolio if needed.
+    function _rebalance() internal override {
         // Close all mature positions (if present) so that the proceeds can be
         // used to purchase longs.
         if (hasMaturedPositions()) {
@@ -102,8 +107,8 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         // TODO: Ensure amount < maxLongAmount
         // TODO: Idle liquidity implementation
         uint256 _amount = _excessLiquidity();
-        IERC20(_asset).approve(hyperdrive, _amount);
-        (uint256 _maturityTime, uint256 _bondAmount) = IHyperdrive(hyperdrive)
+        IERC20(_asset).approve(_hyperdrive, _amount);
+        (uint256 _maturityTime, uint256 _bondAmount) = IHyperdrive(_hyperdrive)
             .openLong(
                 _amount,
                 _minOpenLongOutput(_amount),
@@ -122,21 +127,20 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         uint128 _maturityTime,
         uint128 _bondAmountPurchased
     ) internal {
-        // Compare the maturity time of the purchased bonds
-        // to the most recent position's `maturityTime`.
+        // Revert if the incoming position's `maturityTime`
+        // is sooner than the most recently added position's maturity.
         if (
             _positions.length() != 0 &&
             _decodePosition(_positions.back()).maturityTime > _maturityTime
         ) {
-            // Revert because the incoming position's `maturityTime`
-            // is sooner than the most recently added position's maturity.
             revert IEverlong.InconsistentPositionMaturity();
-        } else if (
+        }
+        // A position already exists with the incoming `maturityTime`.
+        // The existing position's `bondAmount` is updated.
+        else if (
             _positions.length() != 0 &&
             _decodePosition(_positions.back()).maturityTime == _maturityTime
         ) {
-            // A position already exists with the incoming `maturityTime`.
-            // The existing position's `bondAmount` is updated.
             Position memory _oldPosition = _decodePosition(
                 _positions.popBack()
             );
@@ -151,9 +155,10 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
                 _oldPosition.bondAmount + _bondAmountPurchased,
                 _positions.length() - 1
             );
-        } else {
-            // No position exists with the incoming `maturityTime`.
-            // Push a new position to the end of the queue.
+        }
+        // No position exists with the incoming `maturityTime`.
+        // Push a new position to the end of the queue.
+        else {
             _positions.pushBack(
                 _encodePosition(_maturityTime, _bondAmountPurchased)
             );
@@ -169,17 +174,67 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
     // │ Position Closing (Internal)                             │
     // ╰─────────────────────────────────────────────────────────╯
 
+    /// @inheritdoc EverlongBase
+    function _increaseIdle(
+        uint256 _target
+    ) internal override returns (uint256 idle) {
+        // Obtain the current amount of idle held by Everlong and return if
+        // it is above the target.
+        idle = IERC20(_asset).balanceOf(address(this));
+        if (idle >= _target) {
+            return idle;
+        }
+
+        // Close all matured positions and return if updated idle is above
+        // the target.
+        idle += _closeMaturedPositions();
+        if (idle >= _target) {
+            return idle;
+        }
+
+        // Close immature positions from oldest to newest until idle is
+        // above the target.
+        uint256 positionCount = _positions.length();
+        Position memory position;
+        while (positionCount > 0) {
+            position = getPosition(0);
+
+            // Close the position and add output to the current idle.
+            idle += IHyperdrive(_hyperdrive).closeLong(
+                position.maturityTime,
+                position.bondAmount,
+                _minCloseLongOutput(position.maturityTime, position.bondAmount),
+                IHyperdrive.Options(address(this), _asBase, "")
+            );
+
+            // Update accounting for the closed position.
+            _handleCloseLong(uint128(position.bondAmount));
+
+            // Return if the updated idle is above the target.
+            if (idle >= _target) {
+                return idle;
+            }
+
+            positionCount--;
+        }
+
+        // Revert since all positions are closed and the target idle is
+        // has not been met;
+        revert IEverlong.TargetIdleTooHigh();
+    }
+
     /// @dev Close all matured positions.
-    function _closeMaturedPositions() internal {
+    /// @return output Output received from closing the positions.
+    function _closeMaturedPositions() internal returns (uint256 output) {
         // Loop through mature positions and close them all.
-        Position memory _position;
         // TODO: Enable closing of mature positions incrementally to avoid
         //       the case where the # of mature positions exceeds the max
         //       gas per block.
+        Position memory _position;
         while (hasMaturedPositions()) {
             // Retrieve the oldest matured position and close it.
             _position = getPosition(0);
-            IHyperdrive(hyperdrive).closeLong(
+            output += IHyperdrive(_hyperdrive).closeLong(
                 _position.maturityTime,
                 _position.bondAmount,
                 _minCloseLongOutput(
@@ -288,7 +343,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         // Hyperdrive's minimum transaction amount.
         return
             _excessLiquidity() >=
-            IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount;
+            IHyperdrive(_hyperdrive).getPoolConfig().minimumTransactionAmount;
     }
 
     // TODO: Consider storing hyperdrive's minimumTransactionAmount.

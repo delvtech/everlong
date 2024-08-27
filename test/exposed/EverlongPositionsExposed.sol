@@ -1,23 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 import { EverlongPositions } from "../../contracts/internal/EverlongPositions.sol";
 
 /// @title EverlongPositionsExposed
 /// @dev Exposes all internal functions for the `EverlongPositions` contract.
 abstract contract EverlongPositionsExposed is EverlongPositions {
-    /// @notice Initial configuration paramters for Everlong.
-    /// @param hyperdrive_ Address of the Hyperdrive instance wrapped by Everlong.
-    /// @param name_ Name of the ERC20 token managed by Everlong.
-    /// @param symbol_ Symbol of the ERC20 token managed by Everlong.
-    /// @param asBase_ Whether to use Hyperdrive's base token for bond purchases.
-    // constructor(
-    //     string memory name_,
-    //     string memory symbol_,
-    //     address hyperdrive_,
-    //     bool asBase_
-    // ) EverlongBase(name_, symbol_, hyperdrive_, asBase_) {}
-
     /// @notice Calculates the amount of excess liquidity that can be spent opening longs.
     /// @notice Can be overridden by child contracts.
     /// @return Amount of excess liquidity that can be spent opening longs.
@@ -76,9 +64,20 @@ abstract contract EverlongPositionsExposed is EverlongPositions {
         return _handleOpenLong(_maturityTime, _bondAmountPurchased);
     }
 
+    /// @dev Close positions until sufficient idle liquidity is held.
+    /// @dev Reverts if the target is unreachable.
+    /// @param _target Target amount of idle liquidity to reach.
+    /// @return idle Amount of idle after the increase.
+    function exposed_increaseIdle(
+        uint256 _target
+    ) internal returns (uint256 idle) {
+        return _increaseIdle(_target);
+    }
+
     /// @notice Close all matured positions.
-    function exposed_closeMaturedPositions() public {
-        return _closeMaturedPositions();
+    /// @return output Output received from closing the positions.
+    function exposed_closeMaturedPositions() public returns (uint256 output) {
+        output = _closeMaturedPositions();
     }
 
     /// @notice Account for closed bonds at the oldest `maturityTime`

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 // solhint-disable-next-line no-console, no-unused-import
 import { console2 as console } from "forge-std/console2.sol";
@@ -17,11 +17,11 @@ contract TestEverlongAdmin is EverlongTest {
 
     /// @dev Validates successful `setAdmin` call by current `admin`.
     function test_setAdmin_success_deployer() external {
-        // Ensure that the deployer can set the admin address.
-        vm.expectEmit(true, false, false, true);
-        emit AdminUpdated(address(0));
         vm.startPrank(deployer);
-        everlong.setAdmin(address(0));
-        assertEq(everlong.admin(), address(0), "admin address not updated");
+        // Ensure that the deployer can set the admin address.
+        vm.expectEmit(true, true, true, true);
+        emit AdminUpdated(alice);
+        everlong.setAdmin(alice);
+        assertEq(everlong.admin(), alice, "admin address not updated");
     }
 }
