@@ -196,22 +196,13 @@ contract Playground is EverlongTest {
         advanceTime(POSITION_DURATION / 2, variableInterest);
 
         // Estimate the proceeds.
-        poolInfo = hyperdrive.getPoolInfo();
-        console.log("hello");
-        uint256 estimatedProceeds = everlong.totalAssets();
-        console.log("total assets before: %s", estimatedProceeds);
-        everlong.exposed_increaseIdle(estimatedProceeds);
-        uint256 during = ERC20Mintable(everlong.asset()).balanceOf(
-            address(everlong)
-        );
-        console.log("total assets during: %s", during);
-        uint256 actual = everlong.previewRedeem(shares);
-        console.log("total assets actual: %s", actual);
-        console.log("estimate - actual: %s", (estimatedProceeds - actual));
+        uint256 estimatedProceeds = everlong.previewRedeem(shares);
 
         // Close the long.
         uint256 baseProceeds = everlong.redeem(shares, bob, bob);
+
         console.log("total assets after: %s", baseProceeds);
+        assertGe(baseProceeds, estimatedProceeds);
         assertApproxEqAbs(
             baseProceeds,
             estimatedProceeds,

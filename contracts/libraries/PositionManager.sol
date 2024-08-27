@@ -5,7 +5,7 @@ import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMat
 import { IEverlong } from "../interfaces/IEverlong.sol";
 import { Position } from "../types/Position.sol";
 
-library Positions {
+library PositionManager {
     using FixedPointMath for uint256;
 
     // FIXME: Add Comment

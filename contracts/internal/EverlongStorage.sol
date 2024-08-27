@@ -27,6 +27,10 @@ abstract contract EverlongStorage {
     //          If false, use the Hyperdrive's `vaultSharesToken`.
     bool internal immutable _asBase;
 
+    /// @notice Maximum amount of slippage to allow when closing unmatured
+    ///         positions.
+    uint256 public maxSlippage = 0.005e18;
+
     // ── Positions ──────────────────────────────────────────────
 
     // TODO: Reassess using a more tailored data structure.

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.22;
 
+import { console2 as console } from "forge-std/console2.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
+import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { IEverlong } from "../interfaces/IEverlong.sol";
@@ -18,6 +20,7 @@ import { EverlongBase } from "./EverlongBase.sol";
 ///                    particular legal or regulatory significance.
 abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
     using Positions for Positions.PositionQueue;
+    using FixedPointMath for uint256;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Stateful                                                │
@@ -219,12 +222,17 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
             uint256 proceeds = IHyperdrive(_hyperdrive).closeLong(
                 position.maturity,
                 position.quantity,
-                _minCloseLongOutput(position.maturity, position.quantity),
+                estimatedProceeds.mulUp(1e18 - maxSlippage),
                 IHyperdrive.Options(address(this), _asBase, "")
             );
 
-            if (estimatedProceeds < proceeds) {
-                _target -= proceeds - estimatedProceeds;
+            if (proceeds < estimatedProceeds) {
+                console.log(
+                    "actual < estimated: %s < %s",
+                    proceeds,
+                    estimatedProceeds
+                );
+                _target -= estimatedProceeds - proceeds;
             }
             idle += proceeds;
 

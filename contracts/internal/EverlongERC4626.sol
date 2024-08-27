@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.22;
 
+import { console2 as console } from "forge-std/console2.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { HyperdriveMath } from "hyperdrive/contracts/src/libraries/HyperdriveMath.sol";
@@ -8,6 +9,8 @@ import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { ERC4626 } from "solady/tokens/ERC4626.sol";
 import { EverlongBase } from "./EverlongBase.sol";
+import { Positions } from "../libraries/Positions.sol";
+import { Position } from "../types/Position.sol";
 
 /// @author DELV
 /// @title EverlongERC4626
@@ -17,6 +20,7 @@ import { EverlongBase } from "./EverlongBase.sol";
 ///                    particular legal or regulatory significance.
 abstract contract EverlongERC4626 is ERC4626, EverlongBase {
     using FixedPointMath for uint256;
+    using Positions for Positions.PositionQueue;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Stateful                                                │
@@ -75,8 +79,65 @@ abstract contract EverlongERC4626 is ERC4626, EverlongBase {
                 ),
                 _positions._avgVaultSharePrice,
                 IHyperdrive(_hyperdrive).getPoolInfo().vaultSharePrice
-            );
+            ).mulUp(1e18 - maxSlippage);
     }
+
+    // FIXME: Add Comment
+    // function previewRedeem(
+    //     uint256 shares
+    // ) public view override returns (uint256 assets) {
+    //     // TODO: Fix off-by-one error
+    //     assets = convertToAssets(shares) - 1;
+    //
+    //     uint256 idle = IERC20(_asset).balanceOf(address(this));
+    //     if (idle >= assets) return assets;
+    //
+    //     // Close immature positions from oldest to newest until idle is
+    //     // above the target.
+    //     uint256 positionCount = _positions.count();
+    //     Position memory position;
+    //     uint256 i = 0;
+    //     while (idle < assets) {
+    //         position = _positions.at(i);
+    //
+    //         uint256 estimatedProceeds = estimateLongProceeds(
+    //             position.quantity,
+    //             HyperdriveUtils.calculateTimeRemaining(
+    //                 IHyperdrive(_hyperdrive),
+    //                 position.maturity
+    //             ),
+    //             position.vaultSharePrice,
+    //             IHyperdrive(_hyperdrive).getPoolInfo().vaultSharePrice
+    //         );
+    //
+    //         console.log("quantity: %s", position.quantity);
+    //         console.log("vsp: %s", position.vaultSharePrice);
+    //         console.log("maturity: %s", position.maturity);
+    //
+    //         uint256 avgProceeds = estimateLongProceeds(
+    //             position.quantity,
+    //             HyperdriveUtils.calculateTimeRemaining(
+    //                 IHyperdrive(_hyperdrive),
+    //                 _positions._avgMaturity
+    //             ),
+    //             _positions._avgVaultSharePrice,
+    //             IHyperdrive(_hyperdrive).getPoolInfo().vaultSharePrice
+    //         );
+    //
+    //         console.log("estimated: %s", estimatedProceeds);
+    //         console.log("avg: %s", avgProceeds);
+    //         console.log("diff: %s", avgProceeds - estimatedProceeds);
+    //
+    //         if (estimatedProceeds < avgProceeds) {
+    //             assets -= avgProceeds - estimatedProceeds;
+    //         }
+    //         idle += estimatedProceeds;
+    //
+    //         i++;
+    //     }
+    //
+    //     return assets;
+    // }
 
     /// @inheritdoc ERC4626
     function maxDeposit(
