@@ -186,7 +186,9 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         // Close all matured positions and return if updated idle is above
         // the target.
         idle += _closeMaturedPositions();
-        if (idle >= _target) return idle;
+        if (idle >= _target) {
+            return idle;
+        }
 
         // Close immature positions from oldest to newest until idle is
         // above the target.
