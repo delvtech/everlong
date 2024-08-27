@@ -9,6 +9,7 @@ abstract contract EverlongERC4626Exposed is EverlongERC4626 {
     function exposed_beforeWithdraw(uint256 _assets, uint256 _shares) public {
         return _beforeWithdraw(_assets, _shares);
     }
+    
     function exposed_afterDeposit(uint256 _assets, uint256 _shares) public {
         return _afterDeposit(_assets, _shares);
     }
