@@ -116,8 +116,14 @@ contract Everlong is EverlongAdmin, EverlongPositions, EverlongERC4626 {
         return EVERLONG_VERSION;
     }
 
-    /// @notice Gets the address of the underlying Hyperdrive Instance
+    /// @notice Gets the address of the underlying Hyperdrive Instance.
     function hyperdrive() external view returns (address) {
         return _hyperdrive;
+    }
+
+    /// @notice Gets whether Everlong uses Hyperdrive's base token to
+    ///         transact.
+    function asBase() external view returns (bool) {
+        return _asBase;
     }
 }
