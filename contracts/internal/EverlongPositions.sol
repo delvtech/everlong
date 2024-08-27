@@ -181,7 +181,9 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         // Obtain the current amount of idle held by Everlong and return if
         // it is above the target.
         idle = IERC20(_asset).balanceOf(address(this));
-        if (idle >= _target) return idle;
+        if (idle >= _target) {
+            return idle;
+        }
 
         // Close all matured positions and return if updated idle is above
         // the target.
