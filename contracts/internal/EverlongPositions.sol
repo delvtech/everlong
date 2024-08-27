@@ -207,7 +207,9 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
             _handleCloseLong(uint128(position.bondAmount));
 
             // Return if the updated idle is above the target.
-            if (idle >= _target) return idle;
+            if (idle >= _target) {
+                return idle;
+            }
 
             positionCount--;
         }
