@@ -2,11 +2,10 @@
 pragma solidity 0.8.22;
 
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
-import { DoubleEndedQueue } from "openzeppelin/utils/structs/DoubleEndedQueue.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { IEverlong } from "../interfaces/IEverlong.sol";
 import { IEverlongPositions } from "../interfaces/IEverlongPositions.sol";
-import { Position } from "../types/Position.sol";
+import { Portfolio } from "../libraries/Portfolio.sol";
 import { EverlongBase } from "./EverlongBase.sol";
 
 /// @author DELV
@@ -16,7 +15,7 @@ import { EverlongBase } from "./EverlongBase.sol";
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
 abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
-    using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
+    using Portfolio for Portfolio.State;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Stateful                                                │
@@ -108,7 +107,8 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         // TODO: Idle liquidity implementation
         uint256 _amount = _excessLiquidity();
         IERC20(_asset).approve(_hyperdrive, _amount);
-        (uint256 _maturityTime, uint256 _bondAmount) = IHyperdrive(_hyperdrive)
+        uint256 vaultSharePrice = _hyperdriveVaultSharePrice();
+        (uint256 maturityTime, uint256 bondAmount) = IHyperdrive(_hyperdrive)
             .openLong(
                 _amount,
                 _minOpenLongOutput(_amount),
@@ -116,58 +116,12 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
                 IHyperdrive.Options(address(this), _asBase, "")
             );
 
-        // Update positions to reflect the newly opened long.
-        _handleOpenLong(uint128(_maturityTime), uint128(_bondAmount));
-    }
-
-    /// @dev Account for newly purchased bonds within the `PositionManager`.
-    /// @param _maturityTime Maturity time for the newly purchased bonds.
-    /// @param _bondAmountPurchased Amount of bonds purchased.
-    function _handleOpenLong(
-        uint128 _maturityTime,
-        uint128 _bondAmountPurchased
-    ) internal {
-        // Revert if the incoming position's `maturityTime`
-        // is sooner than the most recently added position's maturity.
-        if (
-            _positions.length() != 0 &&
-            _decodePosition(_positions.back()).maturityTime > _maturityTime
-        ) {
-            revert IEverlong.InconsistentPositionMaturity();
-        }
-        // A position already exists with the incoming `maturityTime`.
-        // The existing position's `bondAmount` is updated.
-        else if (
-            _positions.length() != 0 &&
-            _decodePosition(_positions.back()).maturityTime == _maturityTime
-        ) {
-            Position memory _oldPosition = _decodePosition(
-                _positions.popBack()
-            );
-            _positions.pushBack(
-                _encodePosition(
-                    _maturityTime,
-                    _oldPosition.bondAmount + _bondAmountPurchased
-                )
-            );
-            emit PositionUpdated(
-                _maturityTime,
-                _oldPosition.bondAmount + _bondAmountPurchased,
-                _positions.length() - 1
-            );
-        }
-        // No position exists with the incoming `maturityTime`.
-        // Push a new position to the end of the queue.
-        else {
-            _positions.pushBack(
-                _encodePosition(_maturityTime, _bondAmountPurchased)
-            );
-            emit PositionOpened(
-                _maturityTime,
-                _bondAmountPurchased,
-                _positions.length() - 1
-            );
-        }
+        // Update accounting to reflect the newly opened long.
+        _portfolio.handleOpenPosition(
+            maturityTime,
+            bondAmount,
+            vaultSharePrice
+        );
     }
 
     // ╭─────────────────────────────────────────────────────────╮
@@ -194,10 +148,10 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
 
         // Close immature positions from oldest to newest until idle is
         // above the target.
-        uint256 positionCount = _positions.length();
-        Position memory position;
+        uint256 positionCount = _portfolio.positionCount();
+        IEverlong.Position memory position;
         while (positionCount > 0) {
-            position = getPosition(0);
+            position = _portfolio.head();
 
             // Close the position and add output to the current idle.
             idle += IHyperdrive(_hyperdrive).closeLong(
@@ -208,7 +162,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
             );
 
             // Update accounting for the closed position.
-            _handleCloseLong(uint128(position.bondAmount));
+            _portfolio.handleClosePosition();
 
             // Return if the updated idle is above the target.
             if (idle >= _target) {
@@ -230,7 +184,7 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
         // TODO: Enable closing of mature positions incrementally to avoid
         //       the case where the # of mature positions exceeds the max
         //       gas per block.
-        Position memory _position;
+        IEverlong.Position memory _position;
         while (hasMaturedPositions()) {
             // Retrieve the oldest matured position and close it.
             _position = getPosition(0);
@@ -245,69 +199,8 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
             );
 
             // Update positions to reflect the newly closed long.
-            _handleCloseLong(uint128(_position.bondAmount));
+            _portfolio.handleClosePosition();
         }
-    }
-
-    // PERF: Popping then pushing the same position is inefficient.
-    /// @dev Account for closed bonds at the oldest `maturityTime`
-    ///      within the `PositionManager`.
-    /// @param _bondAmountClosed Amount of bonds closed.
-    function _handleCloseLong(uint128 _bondAmountClosed) internal {
-        // Remove the oldest position from the front queue.
-        Position memory _position = _decodePosition(_positions.popFront());
-
-        // Compare the input bond amount to the most mature position's
-        // `bondAmount`.
-        if (_bondAmountClosed > _position.bondAmount) {
-            revert IEverlong.InconsistentPositionBondAmount();
-        }
-        // The amount to close equals the position size.
-        // Nothing further needs to be done.
-        else if (_bondAmountClosed == _position.bondAmount) {
-            emit PositionClosed(_position.maturityTime);
-        } else {
-            // The amount to close is not equal to the position size.
-            // Push the position less the amount of longs closed to the front.
-            _positions.pushFront(
-                _encodePosition(
-                    _position.maturityTime,
-                    _position.bondAmount - _bondAmountClosed
-                )
-            );
-            emit PositionUpdated(
-                _position.maturityTime,
-                _position.bondAmount - _bondAmountClosed,
-                0
-            );
-        }
-    }
-
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ Position Encoding/Decoding                              │
-    // ╰─────────────────────────────────────────────────────────╯
-
-    /// @dev Encodes the `_maturityTime` and `_bondAmount` into bytes32
-    ///      to store in the queue.
-    /// @param _maturityTime Timestamp the position matures.
-    /// @param _bondAmount Amount of bonds in the position.
-    /// @return The bytes32 encoded `Position`.
-    function _encodePosition(
-        uint128 _maturityTime,
-        uint128 _bondAmount
-    ) public pure returns (bytes32) {
-        return bytes32((uint256(_maturityTime) << 128) | uint256(_bondAmount));
-    }
-
-    /// @dev Decodes the bytes32 data into a `Position` struct.
-    /// @param _position The bytes32 encoded data.
-    /// @return The decoded `Position`.
-    function _decodePosition(
-        bytes32 _position
-    ) public pure returns (Position memory) {
-        uint128 _maturityTime = uint128(uint256(_position) >> 128);
-        uint128 _bondAmount = uint128(uint256(_position));
-        return Position(_maturityTime, _bondAmount);
     }
 
     // ╭─────────────────────────────────────────────────────────╮
@@ -316,25 +209,24 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
 
     /// @inheritdoc IEverlongPositions
     function getPositionCount() public view returns (uint256) {
-        return _positions.length();
+        return _portfolio.positionCount();
     }
 
     /// @inheritdoc IEverlongPositions
     function getPosition(
         uint256 _index
-    ) public view returns (Position memory position) {
-        position = _decodePosition(_positions.at(_index));
+    ) public view returns (IEverlong.Position memory position) {
+        position = _portfolio.at(_index);
     }
 
     /// @inheritdoc IEverlongPositions
     function hasMaturedPositions() public view returns (bool) {
         // Return false if there are no positions.
-        if (_positions.length() == 0) return false;
+        if (_portfolio.isEmpty()) return false;
 
         // Return true if the current block timestamp is after
         // the oldest position's `maturityTime`.
-        return (_decodePosition(_positions.at(0)).maturityTime <=
-            block.timestamp);
+        return (_portfolio.head()).maturityTime <= block.timestamp;
     }
 
     /// @inheritdoc IEverlongPositions
@@ -350,5 +242,11 @@ abstract contract EverlongPositions is EverlongBase, IEverlongPositions {
     /// @inheritdoc IEverlongPositions
     function canRebalance() public view returns (bool) {
         return hasMaturedPositions() || hasSufficientExcessLiquidity();
+    }
+
+    /// @dev Returns the current vaultSharePrice of the hyperdrive instance.
+    /// @return The hyperdrive's vaultSharePrice.
+    function _hyperdriveVaultSharePrice() internal view returns (uint256) {
+        return IHyperdrive(_hyperdrive).convertToBase(1e18);
     }
 }

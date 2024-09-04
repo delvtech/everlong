@@ -5,6 +5,7 @@ import { Test } from "forge-std/Test.sol";
 import { Everlong } from "../../contracts/Everlong.sol";
 import { EverlongAdminExposed } from "./EverlongAdminExposed.sol";
 import { EverlongERC4626Exposed } from "./EverlongERC4626Exposed.sol";
+import { EverlongPortfolioExposed } from "./EverlongPortfolioExposed.sol";
 import { EverlongPositionsExposed } from "./EverlongPositionsExposed.sol";
 
 /// @title EverlongExposed
@@ -13,6 +14,7 @@ contract EverlongExposed is
     EverlongAdminExposed,
     EverlongERC4626Exposed,
     EverlongPositionsExposed,
+    EverlongPortfolioExposed,
     Everlong,
     Test
 {

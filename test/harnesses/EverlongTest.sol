@@ -6,7 +6,7 @@ import { console2 as console } from "forge-std/console2.sol";
 import { HyperdriveTest } from "hyperdrive/test/utils/HyperdriveTest.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol";
-import { Position } from "../../contracts/types/Position.sol";
+import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
 import { EverlongExposed } from "../exposed/EverlongExposed.sol";
 
 // TODO: Refactor this to include an instance of `Everlong` with exposed internal functions.
@@ -101,7 +101,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         /* solhint-disable no-console */
         console.log("-- POSITIONS -------------------------------");
         for (uint128 i = 0; i < everlong.getPositionCount(); ++i) {
-            Position memory p = everlong.getPosition(i);
+            IEverlong.Position memory p = everlong.getPosition(i);
             console.log(
                 "index: %s - maturityTime: %s - bondAmount: %s",
                 i,
@@ -120,10 +120,10 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     /// @param _error Message to display for failing assertions.
     function assertPosition(
         uint256 _index,
-        Position memory _position,
+        IEverlong.Position memory _position,
         string memory _error
-    ) public view {
-        Position memory p = everlong.getPosition(_index);
+    ) public view virtual {
+        IEverlong.Position memory p = everlong.getPosition(_index);
         assertEq(_position.maturityTime, p.maturityTime, _error);
         assertEq(_position.bondAmount, p.bondAmount, _error);
     }

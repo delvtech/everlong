@@ -13,6 +13,21 @@ interface IEverlong is
     IEverlongPositions
 {
     // ╭─────────────────────────────────────────────────────────╮
+    // │ Structs                                                 │
+    // ╰─────────────────────────────────────────────────────────╯
+
+    /// @notice Tracks the total amount of bonds managed by Everlong
+    ///         with the same maturity.
+    struct Position {
+        /// @notice Time when the position matures.
+        uint128 maturityTime;
+        /// @notice Quantity of bonds in the position.
+        uint128 bondAmount;
+        /// @notice Vault share price at time of purchase.
+        uint128 vaultSharePrice;
+    }
+
+    // ╭─────────────────────────────────────────────────────────╮
     // │ Getters                                                 │
     // ╰─────────────────────────────────────────────────────────╯
 

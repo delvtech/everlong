@@ -54,16 +54,6 @@ abstract contract EverlongPositionsExposed is EverlongPositions {
         return _spendExcessLiquidity();
     }
 
-    /// @notice Account for newly purchased bonds within the `PositionManager`.
-    /// @param _maturityTime Maturity time for the newly purchased bonds.
-    /// @param _bondAmountPurchased Amount of bonds purchased.
-    function exposed_handleOpenLong(
-        uint128 _maturityTime,
-        uint128 _bondAmountPurchased
-    ) public {
-        return _handleOpenLong(_maturityTime, _bondAmountPurchased);
-    }
-
     /// @dev Close positions until sufficient idle liquidity is held.
     /// @dev Reverts if the target is unreachable.
     /// @param _target Target amount of idle liquidity to reach.
@@ -78,12 +68,5 @@ abstract contract EverlongPositionsExposed is EverlongPositions {
     /// @return output Output received from closing the positions.
     function exposed_closeMaturedPositions() public returns (uint256 output) {
         output = _closeMaturedPositions();
-    }
-
-    /// @notice Account for closed bonds at the oldest `maturityTime`
-    ///      within the `PositionManager`.
-    /// @param _bondAmountClosed Amount of bonds closed.
-    function exposed_handleCloseLong(uint128 _bondAmountClosed) public {
-        return _handleCloseLong(_bondAmountClosed);
     }
 }

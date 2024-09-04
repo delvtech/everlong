@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-import { Position } from "../types/Position.sol";
+import { IEverlong } from "./IEverlong.sol";
 
 interface IEverlongPositions {
     // ╭─────────────────────────────────────────────────────────╮
@@ -25,7 +25,7 @@ interface IEverlongPositions {
     /// @return The position.
     function getPosition(
         uint256 _index
-    ) external view returns (Position memory);
+    ) external view returns (IEverlong.Position memory);
 
     /// @notice Determines whether any positions are matured.
     /// @return True if any positions are matured, false otherwise.
