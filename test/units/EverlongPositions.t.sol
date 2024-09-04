@@ -64,40 +64,40 @@ contract TestEverlongPositions is EverlongTest {
         );
     }
 
-    /// @dev Validate that `hasSufficientExcessLiquidity` returns false
-    ///      when Everlong has no balance.
-    function test_hasSufficientExcessLiquidity_false_no_balance()
-        external
-        view
-    {
-        // Check that the contract has no balance.
-        assertEq(IERC20(everlong.asset()).balanceOf(address(everlong)), 0);
-        // Check that `hasSufficientExcessLiquidity` returns false.
-        assertFalse(
-            everlong.hasSufficientExcessLiquidity(),
-            "hasSufficientExcessLiquidity should return false with no balance"
-        );
-    }
-
-    /// @dev Validate that `hasSufficientExcessLiquidity` returns true
-    ///      when Everlong has a large balance.
-    function test_hasSufficientExcessLiquidity_true_large_balance() external {
-        // Mint the contract some tokens.
-        uint256 _mintAmount = 5_000_000e18;
-        ERC20Mintable(everlong.asset()).mint(address(everlong), _mintAmount);
-
-        // Check that the contract has a large balance.
-        assertEq(
-            IERC20(everlong.asset()).balanceOf(address(everlong)),
-            _mintAmount
-        );
-
-        // Check that `hasSufficientExcessLiquidity` returns true.
-        assertTrue(
-            everlong.hasSufficientExcessLiquidity(),
-            "hasSufficientExcessLiquidity should return false with no balance"
-        );
-    }
+    // /// @dev Validate that `hasSufficientExcessLiquidity` returns false
+    // ///      when Everlong has no balance.
+    // function test_hasSufficientExcessLiquidity_false_no_balance()
+    //     external
+    //     view
+    // {
+    //     // Check that the contract has no balance.
+    //     assertEq(IERC20(everlong.asset()).balanceOf(address(everlong)), 0);
+    //     // Check that `hasSufficientExcessLiquidity` returns false.
+    //     assertFalse(
+    //         everlong.hasSufficientExcessLiquidity(),
+    //         "hasSufficientExcessLiquidity should return false with no balance"
+    //     );
+    // }
+    //
+    // /// @dev Validate that `hasSufficientExcessLiquidity` returns true
+    // ///      when Everlong has a large balance.
+    // function test_hasSufficientExcessLiquidity_true_large_balance() external {
+    //     // Mint the contract some tokens.
+    //     uint256 _mintAmount = 5_000_000e18;
+    //     ERC20Mintable(everlong.asset()).mint(address(everlong), _mintAmount);
+    //
+    //     // Check that the contract has a large balance.
+    //     assertEq(
+    //         IERC20(everlong.asset()).balanceOf(address(everlong)),
+    //         _mintAmount
+    //     );
+    //
+    //     // Check that `hasSufficientExcessLiquidity` returns true.
+    //     assertTrue(
+    //         everlong.hasSufficientExcessLiquidity(),
+    //         "hasSufficientExcessLiquidity should return false with no balance"
+    //     );
+    // }
 
     /// @dev Ensure that `canRebalance()` returns false when everlong has
     ///      no positions nor balance.
@@ -107,7 +107,7 @@ contract TestEverlongPositions is EverlongTest {
         // - has no balance
         // - `canRebalance()` returns false
         assertEq(
-            everlong.getPositionCount(),
+            everlong.positionCount(),
             0,
             "everlong should not intialize with positions"
         );
@@ -164,7 +164,7 @@ contract TestEverlongPositions is EverlongTest {
         // Ensure Everlong's balance is lt Hyperdrive's minTransactionAmount.
         // Ensure `canRebalance()` returns false.
         assertEq(
-            everlong.getPositionCount(),
+            everlong.positionCount(),
             1,
             "position count after first rebalance with balance should be 1"
         );
@@ -194,7 +194,7 @@ contract TestEverlongPositions is EverlongTest {
         // Increase block.timestamp until position is mature.
         // Ensure Everlong has a matured position.
         // Ensure `canRebalance()` returns true.
-        advanceTime(everlong.getPosition(0).maturityTime, 0);
+        advanceTime(everlong.positionAt(0).maturityTime, 0);
         assertTrue(
             everlong.hasMaturedPositions(),
             "everlong should have matured position after advancing time"

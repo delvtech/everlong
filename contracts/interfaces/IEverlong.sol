@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-import { IERC4626 } from "openzeppelin/interfaces/IERC4626.sol";
+import { ERC4626 } from "solady/tokens/ERC4626.sol";
 import { IEverlongAdmin } from "./IEverlongAdmin.sol";
 import { IEverlongEvents } from "./IEverlongEvents.sol";
-import { IEverlongPositions } from "./IEverlongPositions.sol";
+import { IEverlongPortfolio } from "./IEverlongPortfolio.sol";
 
-interface IEverlong is
+abstract contract IEverlong is
+    ERC4626,
     IEverlongAdmin,
-    IERC4626,
     IEverlongEvents,
-    IEverlongPositions
+    IEverlongPortfolio
 {
     // ╭─────────────────────────────────────────────────────────╮
     // │ Structs                                                 │
@@ -32,15 +32,15 @@ interface IEverlong is
     // ╰─────────────────────────────────────────────────────────╯
 
     /// @notice Gets the address of the underlying Hyperdrive Instance
-    function hyperdrive() external view returns (address);
+    function hyperdrive() external view virtual returns (address);
 
     /// @notice Gets the Everlong instance's kind.
     /// @return The Everlong instance's kind.
-    function kind() external pure returns (string memory);
+    function kind() external pure virtual returns (string memory);
 
     /// @notice Gets the Everlong instance's version.
     /// @return The Everlong instance's version.
-    function version() external pure returns (string memory);
+    function version() external pure virtual returns (string memory);
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Errors                                                  │

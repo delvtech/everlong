@@ -56,6 +56,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         everlong = new EverlongExposed(
             EVERLONG_NAME,
             EVERLONG_SYMBOL,
+            18,
             address(hyperdrive),
             true
         );
@@ -65,12 +66,14 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     function deploy(
         string memory _name,
         string memory _symbol,
+        uint8 _decimals,
         address _underlying,
         bool _asBase
     ) internal {
         everlong = new EverlongExposed(
             _name,
             _symbol,
+            _decimals,
             address(_underlying),
             _asBase
         );
@@ -100,8 +103,8 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     function logPositions() public view {
         /* solhint-disable no-console */
         console.log("-- POSITIONS -------------------------------");
-        for (uint128 i = 0; i < everlong.getPositionCount(); ++i) {
-            IEverlong.Position memory p = everlong.getPosition(i);
+        for (uint128 i = 0; i < everlong.positionCount(); ++i) {
+            IEverlong.Position memory p = everlong.positionAt(i);
             console.log(
                 "index: %s - maturityTime: %s - bondAmount: %s",
                 i,
@@ -123,7 +126,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         IEverlong.Position memory _position,
         string memory _error
     ) public view virtual {
-        IEverlong.Position memory p = everlong.getPosition(_index);
+        IEverlong.Position memory p = everlong.positionAt(_index);
         assertEq(_position.maturityTime, p.maturityTime, _error);
         assertEq(_position.bondAmount, p.bondAmount, _error);
     }

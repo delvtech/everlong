@@ -27,7 +27,7 @@ library Portfolio {
         ///      double-ended queue structure.
         mapping(uint256 index => IEverlong.Position) _q;
         /// @dev Weighted average maturity time for the portfolio.
-        uint128 avgMaturity;
+        uint128 avgMaturityTime;
         /// @dev Weighted average vaultSharePrice for bonds in the portfolio.
         uint128 avgVaultSharePrice;
         /// @dev Total bond count of the portfolio.
@@ -65,7 +65,7 @@ library Portfolio {
         }
 
         // Update the portfolio's weighted averages.
-        self.avgMaturity = uint256(self.avgMaturity)
+        self.avgMaturityTime = uint256(self.avgMaturityTime)
             .updateWeightedAverage(
                 self.totalBonds,
                 _maturityTime,
@@ -95,7 +95,7 @@ library Portfolio {
             revert("ahhhh");
         }
         IEverlong.Position memory position = _removePosition(self);
-        self.avgMaturity = uint256(self.avgMaturity)
+        self.avgMaturityTime = uint256(self.avgMaturityTime)
             .updateWeightedAverage(
                 self.totalBonds,
                 position.maturityTime,
@@ -118,7 +118,7 @@ library Portfolio {
     ///         This is the oldest position in the portfolio.
     function head(
         State storage self
-    ) internal view returns (IEverlong.Position storage) {
+    ) internal view returns (IEverlong.Position memory) {
         if (isEmpty(self)) revert IndexOutOfBounds();
         return self._q[self._begin];
     }

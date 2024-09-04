@@ -2,12 +2,12 @@
 pragma solidity ^0.8.20;
 
 import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
-import { EverlongStorage } from "../../contracts/internal/EverlongStorage.sol";
+import { Everlong } from "../../contracts/Everlong.sol";
 import { Portfolio } from "../../contracts/libraries/Portfolio.sol";
 
 /// @title EverlongPortfolioExposed
 /// @dev Exposes all internal functions for the `EverlongPositions` contract.
-abstract contract EverlongPortfolioExposed is EverlongStorage {
+abstract contract EverlongPortfolioExposed is Everlong {
     using Portfolio for Portfolio.State;
 
     function exposed_handleOpenPosition(
@@ -30,5 +30,9 @@ abstract contract EverlongPortfolioExposed is EverlongStorage {
             _bondAmount,
             _vaultSharePrice
         );
+    }
+
+    function exposed_handleClosePosition() public {
+        _portfolio.handleClosePosition();
     }
 }

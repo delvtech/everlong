@@ -87,10 +87,10 @@ contract TestEverlongERC4626 is EverlongTest {
         vm.stopPrank();
 
         // Confirm that Everlong now has two positions.
-        assertEq(everlong.getPositionCount(), 2);
+        assertEq(everlong.positionCount(), 2);
 
         // Advance time to mature Bob's position but not Celine's.
-        advanceTime(everlong.getPosition(0).maturityTime - block.timestamp, 0);
+        advanceTime(everlong.positionAt(0).maturityTime - block.timestamp, 0);
 
         // Confirm that Everlong now has a matured position.
         assertTrue(everlong.hasMaturedPositions());
@@ -103,8 +103,8 @@ contract TestEverlongERC4626 is EverlongTest {
         // Confirm that Everlong has two immature positions:
         // 1. Created from Celine's deposit.
         // 2. Created from rebalance on Bob's redemption.
-        assertEq(everlong.getPositionCount(), 2);
-        assertGt(everlong.getPosition(0).maturityTime, block.timestamp);
+        assertEq(everlong.positionCount(), 2);
+        assertGt(everlong.positionAt(0).maturityTime, block.timestamp);
     }
 
     /// @dev Validates that `redeem()` will close all positions when closing
@@ -136,10 +136,10 @@ contract TestEverlongERC4626 is EverlongTest {
         vm.stopPrank();
 
         // Confirm that Everlong now has two positions.
-        assertEq(everlong.getPositionCount(), 2);
+        assertEq(everlong.positionCount(), 2);
 
         // Advance time to mature only the first position.
-        advanceTime(everlong.getPosition(0).maturityTime - block.timestamp, 0);
+        advanceTime(everlong.positionAt(0).maturityTime - block.timestamp, 0);
 
         // Confirm that Everlong now has a matured position.
         assertTrue(everlong.hasMaturedPositions());
@@ -151,7 +151,7 @@ contract TestEverlongERC4626 is EverlongTest {
 
         // Confirm that Everlong now has only the position created from
         // rebalancing on Bob's redemption.
-        assertEq(everlong.getPositionCount(), 1);
+        assertEq(everlong.positionCount(), 1);
     }
 
     /// @dev Ensure that the `asset()` view function is implemented.

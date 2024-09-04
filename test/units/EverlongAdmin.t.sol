@@ -6,7 +6,7 @@ import { console2 as console } from "forge-std/console2.sol";
 import { EverlongTest } from "../harnesses/EverlongTest.sol";
 import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
 
-/// @dev Tests EverlongAdmin functionality.
+/// @dev Tests Everlong Admin functionality.
 contract TestEverlongAdmin is EverlongTest {
     /// @dev Validates revert when `setAdmin` called by non-admin.
     function test_setAdmin_failure_unauthorized() external {
