@@ -289,7 +289,7 @@ contract Everlong is IEverlong {
             if (!_hyperdrive.isMature(position)) {
                 return output;
             }
-            output += _hyperdrive.closeLongRaw(position, _closeLongParams);
+            output += _hyperdrive.closeLong(position, _closeLongParams);
             _portfolio.handleClosePosition();
         }
         return output;
@@ -317,7 +317,7 @@ contract Everlong is IEverlong {
         uint256 _targetOutput
     ) internal returns (uint256 output) {
         while (!_portfolio.isEmpty() && output < _targetOutput) {
-            output += _hyperdrive.closeLongRaw(
+            output += _hyperdrive.closeLong(
                 _portfolio.head(),
                 _closeLongParams
             );

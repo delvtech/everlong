@@ -34,7 +34,7 @@ library Portfolio {
         uint128 totalBonds;
     }
 
-    /// @notice Update portfolio accounting for the opened position.
+    /// @notice Update portfolio accounting a newly-opened position.
     /// @param _maturityTime Maturity of the opened position.
     /// @param _bondAmount Amount of bonds in the opened position.
     /// @param _vaultSharePrice VaultSharePrice immediately before opening
@@ -86,9 +86,9 @@ library Portfolio {
         self.totalBonds += uint128(_bondAmount);
     }
 
-    /// @notice Update portfolio accounting for closing a position. Since the
-    ///         portfolio is a queue, the position being closed is always the
-    ///         oldest position at the head.
+    /// @notice Update portfolio accounting for a newly-closed position.
+    ///         Since the portfolio handles positions via a queue, the
+    ///         position being closed always the oldest at the head.
     function handleClosePosition(State storage self) internal {
         if (isEmpty(self)) {
             // FIXME: custom error

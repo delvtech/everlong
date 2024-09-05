@@ -15,8 +15,8 @@ uint256 constant HYPERDRIVE_SHARE_RESERVES_BOND_RESERVES_SLOT = 2;
 uint256 constant HYPERDRIVE_LONG_EXPOSURE_LONGS_OUTSTANDING_SLOT = 3;
 uint256 constant HYPERDRIVE_SHARE_ADJUSTMENT_SHORTS_OUTSTANDING_SLOT = 4;
 
-/// @dev Tests Playground functionality.
-contract Playground is EverlongTest {
+/// @dev Tests pricing functionality for the portfolio and unmatured positions.
+contract PricingTest is EverlongTest {
     using Packing for bytes32;
     using FixedPointMath for uint128;
     using FixedPointMath for uint256;
