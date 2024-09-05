@@ -20,6 +20,10 @@ library HyperdriveExecutionLibrary {
     using SafeCast for *;
     using Packing for bytes32;
 
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Open Long                                               │
+    // ╰─────────────────────────────────────────────────────────╯
+
     struct OpenLongParams {
         uint256 maxSlippage;
         bool asBase;
@@ -45,12 +49,127 @@ library HyperdriveExecutionLibrary {
         OpenLongParams memory _params,
         uint256 _amount
     ) internal view returns (uint256) {
-        uint256 estimate = estimateOpenLong(
-            self,
-            self.convertToShares(_amount)
-        );
-        return estimate.mulDivUp(1e18 - _params.maxSlippage, 1e18);
+        return _calculateOpenLong(self, self.convertToShares(_amount));
     }
+
+    /// @dev Calculates the number of bonds a user will receive when opening a
+    ///      long position.
+    /// @param _shareAmount Amount of shares being exchanged for bonds.
+    /// @return Amount of bonds received.
+    function _calculateOpenLong(
+        IHyperdrive self,
+        uint256 _shareAmount
+    ) internal view returns (uint256) {
+        // We must load the entire PoolConfig since it contains values from
+        // immutables without public accessors.
+        IHyperdrive.PoolConfig memory poolConfig = self.getPoolConfig();
+
+        // Save gas by reading storage directly instead of retrieving entire
+        // PoolInfo and PoolConfig structs.
+        uint256[] memory slots = new uint256[](2);
+        slots[0] = HYPERDRIVE_SHARE_RESERVES_BOND_RESERVES_SLOT;
+        slots[1] = HYPERDRIVE_SHARE_ADJUSTMENT_SHORTS_OUTSTANDING_SLOT;
+        bytes32[] memory values = self.load(slots);
+        uint256 effectiveShareReserves = HyperdriveMath
+            .calculateEffectiveShareReserves(
+                uint128(values[0].extract_32_16(16)), // shareReserves
+                uint256(uint128(values[1].extract_32_16(16))).toInt256() // shareAdjustment
+            );
+        uint256 bondReserves = uint128(values[0].extract_32_16(0));
+        uint256 _vaultSharePrice = vaultSharePrice(self);
+        uint256 bondReservesDelta = YieldSpaceMath
+            .calculateBondsOutGivenSharesInDown(
+                effectiveShareReserves,
+                bondReserves,
+                _shareAmount,
+                // NOTE: Since the bonds traded on the curve are newly minted,
+                // we use a time remaining of 1. This means that we can use
+                // `_timeStretch = t * _timeStretch`.
+                1e18 - poolConfig.timeStretch,
+                _vaultSharePrice,
+                poolConfig.initialVaultSharePrice
+            );
+
+        uint256 spotPrice = HyperdriveMath.calculateSpotPrice(
+            effectiveShareReserves,
+            bondReserves,
+            poolConfig.initialVaultSharePrice,
+            poolConfig.timeStretch
+        );
+
+        (, bondReservesDelta, ) = _calculateOpenLongFees(
+            _shareAmount,
+            bondReservesDelta,
+            _vaultSharePrice,
+            spotPrice,
+            poolConfig.fees.curve,
+            poolConfig.fees.governanceLP
+        );
+        return bondReservesDelta;
+    }
+
+    /// @dev Calculate the fees involved with opening the long and apply them.
+    /// @param _shareReservesDelta The change in the share reserves without fees.
+    /// @param _bondReservesDelta The change in the bond reserves without fees.
+    /// @param _vaultSharePrice The current vault share price.
+    /// @param _spotPrice The current spot price.
+    /// @return The change in the share reserves with fees.
+    /// @return The change in the bond reserves with fees.
+    /// @return The governance fee in shares.
+    function _calculateOpenLongFees(
+        uint256 _shareReservesDelta,
+        uint256 _bondReservesDelta,
+        uint256 _vaultSharePrice,
+        uint256 _spotPrice,
+        uint256 _curveFee,
+        uint256 _governanceLPFee
+    ) internal pure returns (uint256, uint256, uint256) {
+        // Calculate the fees charged to the user (curveFee) and the portion
+        // of those fees that are paid to governance (governanceCurveFee).
+        (
+            uint256 curveFee, // bonds
+            uint256 governanceCurveFee // bonds
+        ) = _calculateFeesGivenShares(
+                _shareReservesDelta,
+                _spotPrice,
+                _vaultSharePrice,
+                _curveFee,
+                _governanceLPFee
+            );
+
+        // Calculate the impact of the curve fee on the bond reserves. The curve
+        // fee benefits the LPs by causing less bonds to be deducted from the
+        // bond reserves.
+        _bondReservesDelta -= curveFee;
+
+        // NOTE: Round down to underestimate the governance fee.
+        //
+        // Calculate the fees owed to governance in shares. Open longs are
+        // calculated entirely on the curve so the curve fee is the total
+        // governance fee. In order to convert it to shares we need to multiply
+        // it by the spot price and divide it by the vault share price:
+        //
+        // shares = (bonds * base/bonds) / (base/shares)
+        // shares = bonds * shares/bonds
+        // shares = shares
+        uint256 totalGovernanceFee = governanceCurveFee.mulDivDown(
+            _spotPrice,
+            _vaultSharePrice
+        );
+
+        // Calculate the number of shares to add to the shareReserves.
+        // shareReservesDelta, _shareAmount and totalGovernanceFee
+        // are all denominated in shares:
+        //
+        // shares = shares - shares
+        _shareReservesDelta -= totalGovernanceFee;
+
+        return (_shareReservesDelta, _bondReservesDelta, totalGovernanceFee);
+    }
+
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Close Long                                              │
+    // ╰─────────────────────────────────────────────────────────╯
 
     struct CloseLongParams {
         uint256 maxSlippage;
@@ -85,6 +204,96 @@ library HyperdriveExecutionLibrary {
         if (_params.asBase) {
             return self.convertToBase(shareProceeds);
         }
+        return shareProceeds;
+    }
+
+    function _calculateCloseLong(
+        IHyperdrive self,
+        uint256 _maturityTime,
+        uint256 _bondAmount,
+        uint256 _vaultSharePrice
+    ) internal view returns (uint256) {
+        // gather params
+        IHyperdrive.PoolConfig memory poolConfig = self.getPoolConfig();
+        CalcCloseLongTempParams memory params = _buildCalcCloseLongParams(
+            self,
+            _maturityTime,
+            _bondAmount,
+            _vaultSharePrice
+        );
+
+        // calc reserves
+        (
+            uint256 shareCurveDelta,
+            uint256 bondReservesDelta,
+            uint256 shareProceeds
+        ) = _calculateCloseLongReserves(poolConfig, params);
+        uint256 totalGovernanceFee;
+        uint256 shareReservesDelta;
+        int256 shareAdjustmentDelta;
+        uint256 closeVaultSharePrice = block.timestamp < params.maturityTime
+            ? params.currentVaultSharePrice
+            : getNearestCheckpointDown(self, params.maturityTime)
+                .vaultSharePrice;
+
+        uint256 curveFee;
+        uint256 flatFee;
+        uint256 governanceCurveFee;
+        (
+            curveFee,
+            flatFee,
+            governanceCurveFee,
+            totalGovernanceFee
+        ) = _calculateCloseLongFees(poolConfig, params);
+
+        // The curve fee (shares) is paid to the LPs, so we subtract it from
+        // the share curve delta (shares) to prevent it from being debited
+        // from the reserves when the state is updated. The governance curve
+        // fee (shares) is paid to governance, so we add it back to the
+        // share curve delta (shares) to ensure that the governance fee
+        // isn't included in the share adjustment.
+        shareCurveDelta -= (curveFee - governanceCurveFee);
+
+        // The trader pays the curve fee (shares) and flat fee (shares) to
+        // the pool, so we debit them from the trader's share proceeds
+        // (shares).
+        shareProceeds -= curveFee + flatFee;
+
+        // We applied the full curve and flat fees to the share proceeds,
+        // which reduce the trader's proceeds. To calculate the payment that
+        // is applied to the share reserves (and is effectively paid by the
+        // LPs), we need to add governance's portion of these fees to the
+        // share proceeds.
+        shareReservesDelta = shareProceeds + totalGovernanceFee;
+
+        // Adjust the computed proceeds and delta for negative interest.
+        // We also compute the share adjustment delta at this step to ensure
+        // that we don't break our AMM invariant when we account for negative
+        // interest and flat adjustments.
+        console.log("share proceeds before: %s", shareProceeds);
+        (
+            shareProceeds,
+            shareReservesDelta,
+            shareCurveDelta,
+            shareAdjustmentDelta,
+            totalGovernanceFee
+        ) = HyperdriveMath.calculateNegativeInterestOnClose(
+            shareProceeds,
+            shareReservesDelta,
+            shareCurveDelta,
+            totalGovernanceFee,
+            // NOTE: We use the vault share price from the beginning of the
+            // checkpoint as the open vault share price. This means that a
+            // trader that opens a long in a checkpoint that has negative
+            // interest accrued will be penalized for the negative interest when
+            // they try to close their position. The `_minVaultSharePrice`
+            // parameter allows traders to protect themselves from this edge
+            // case.
+            params.openVaultSharePrice, // open vault share price
+            closeVaultSharePrice, // close vault share price
+            true
+        );
+        console.log("share proceeds after:  %s", shareProceeds);
         return shareProceeds;
     }
 
@@ -131,103 +340,14 @@ library HyperdriveExecutionLibrary {
                     _maturityTime
                 ),
                 currentVaultSharePrice: vaultSharePrice(self),
-                openVaultSharePrice: _vaultSharePrice,
+                // openVaultSharePrice: _vaultSharePrice,
+                openVaultSharePrice: getNearestCheckpointDown(
+                    self,
+                    _maturityTime - poolConfig.positionDuration
+                ).vaultSharePrice,
                 maturityTime: _maturityTime,
                 bondAmount: _bondAmount
             });
-    }
-
-    function _calculateCloseLong(
-        IHyperdrive self,
-        uint256 _maturityTime,
-        uint256 _bondAmount,
-        uint256 _vaultSharePrice
-    ) internal view returns (uint256) {
-        // gather params
-        IHyperdrive.PoolConfig memory poolConfig = self.getPoolConfig();
-        CalcCloseLongTempParams memory params = _buildCalcCloseLongParams(
-            self,
-            _maturityTime,
-            _bondAmount,
-            _vaultSharePrice
-        );
-
-        // calc reserves
-        (
-            uint256 shareCurveDelta,
-            uint256 bondReservesDelta,
-            uint256 shareProceeds
-        ) = _calculateCloseLongReserves(poolConfig, params);
-        uint256 totalGovernanceFee;
-        uint256 shareReservesDelta;
-        int256 shareAdjustmentDelta;
-        uint256 openVaultSharePrice = params.openVaultSharePrice;
-        uint256 closeVaultSharePrice = block.timestamp < params.maturityTime
-            ? params.currentVaultSharePrice
-            : getNearestCheckpointDown(self, params.maturityTime)
-                .vaultSharePrice;
-
-        uint256 curveFee;
-        uint256 flatFee;
-        uint256 governanceCurveFee;
-        (
-            curveFee,
-            flatFee,
-            governanceCurveFee,
-            totalGovernanceFee
-        ) = _calculateCloseLongFees(poolConfig, params);
-
-        // The curve fee (shares) is paid to the LPs, so we subtract it from
-        // the share curve delta (shares) to prevent it from being debited
-        // from the reserves when the state is updated. The governance curve
-        // fee (shares) is paid to governance, so we add it back to the
-        // share curve delta (shares) to ensure that the governance fee
-        // isn't included in the share adjustment.
-        shareCurveDelta -= (curveFee - governanceCurveFee);
-
-        // The trader pays the curve fee (shares) and flat fee (shares) to
-        // the pool, so we debit them from the trader's share proceeds
-        // (shares).
-        shareProceeds -= curveFee + flatFee;
-
-        // We applied the full curve and flat fees to the share proceeds,
-        // which reduce the trader's proceeds. To calculate the payment that
-        // is applied to the share reserves (and is effectively paid by the
-        // LPs), we need to add governance's portion of these fees to the
-        // share proceeds.
-        shareReservesDelta = shareProceeds + totalGovernanceFee;
-
-        // Adjust the computed proceeds and delta for negative interest.
-        // We also compute the share adjustment delta at this step to ensure
-        // that we don't break our AMM invariant when we account for negative
-        // interest and flat adjustments.
-        console.log("share proceeds before: %s", shareProceeds);
-        console.log("open vaultshareprice:  %s", openVaultSharePrice);
-        console.log("close vaultshareprice: %s", closeVaultSharePrice);
-        (
-            shareProceeds,
-            shareReservesDelta,
-            shareCurveDelta,
-            shareAdjustmentDelta,
-            totalGovernanceFee
-        ) = HyperdriveMath.calculateNegativeInterestOnClose(
-            shareProceeds,
-            shareReservesDelta,
-            shareCurveDelta,
-            totalGovernanceFee,
-            // NOTE: We use the vault share price from the beginning of the
-            // checkpoint as the open vault share price. This means that a
-            // trader that opens a long in a checkpoint that has negative
-            // interest accrued will be penalized for the negative interest when
-            // they try to close their position. The `_minVaultSharePrice`
-            // parameter allows traders to protect themselves from this edge
-            // case.
-            openVaultSharePrice, // open vault share price
-            closeVaultSharePrice, // close vault share price
-            true
-        );
-        console.log("share proceeds after:  %s", shareProceeds);
-        return shareProceeds;
     }
 
     /// @dev  Calculate the effect that closing the long should have on the
@@ -386,120 +506,6 @@ library HyperdriveExecutionLibrary {
         totalGovernanceFee =
             governanceCurveFee +
             flatFee.mulDown(_governanceLPFee);
-    }
-
-    /// @dev Calculates the number of bonds a user will receive when opening a
-    ///      long position.
-    function estimateOpenLong(
-        IHyperdrive self,
-        uint256 _shareAmount
-    ) internal view returns (uint256) {
-        // We must load the entire PoolConfig since it contains values from
-        // immutables without public accessors.
-        IHyperdrive.PoolConfig memory poolConfig = self.getPoolConfig();
-
-        // Save gas by reading storage directly instead of retrieving entire
-        // PoolInfo and PoolConfig structs.
-        uint256[] memory slots = new uint256[](2);
-        slots[0] = HYPERDRIVE_SHARE_RESERVES_BOND_RESERVES_SLOT;
-        slots[1] = HYPERDRIVE_SHARE_ADJUSTMENT_SHORTS_OUTSTANDING_SLOT;
-        bytes32[] memory values = self.load(slots);
-        uint256 effectiveShareReserves = HyperdriveMath
-            .calculateEffectiveShareReserves(
-                uint128(values[0].extract_32_16(16)), // shareReserves
-                uint256(uint128(values[1].extract_32_16(16))).toInt256() // shareAdjustment
-            );
-        uint256 bondReserves = uint128(values[0].extract_32_16(0));
-        uint256 _vaultSharePrice = vaultSharePrice(self);
-        uint256 bondReservesDelta = YieldSpaceMath
-            .calculateBondsOutGivenSharesInDown(
-                effectiveShareReserves,
-                bondReserves,
-                _shareAmount,
-                // NOTE: Since the bonds traded on the curve are newly minted,
-                // we use a time remaining of 1. This means that we can use
-                // `_timeStretch = t * _timeStretch`.
-                1e18 - poolConfig.timeStretch,
-                _vaultSharePrice,
-                poolConfig.initialVaultSharePrice
-            );
-
-        uint256 spotPrice = HyperdriveMath.calculateSpotPrice(
-            effectiveShareReserves,
-            bondReserves,
-            poolConfig.initialVaultSharePrice,
-            poolConfig.timeStretch
-        );
-
-        (, bondReservesDelta, ) = _calculateOpenLongFees(
-            _shareAmount,
-            bondReservesDelta,
-            _vaultSharePrice,
-            spotPrice,
-            poolConfig.fees.curve,
-            poolConfig.fees.governanceLP
-        );
-        return bondReservesDelta;
-    }
-
-    /// @dev Calculates the share reserves delta, the bond reserves delta, and
-    ///      the total governance fee after opening a long.
-    /// @param _shareReservesDelta The change in the share reserves without fees.
-    /// @param _bondReservesDelta The change in the bond reserves without fees.
-    /// @param _vaultSharePrice The current vault share price.
-    /// @param _spotPrice The current spot price.
-    /// @return The change in the share reserves with fees.
-    /// @return The change in the bond reserves with fees.
-    /// @return The governance fee in shares.
-    function _calculateOpenLongFees(
-        uint256 _shareReservesDelta,
-        uint256 _bondReservesDelta,
-        uint256 _vaultSharePrice,
-        uint256 _spotPrice,
-        uint256 _curveFee,
-        uint256 _governanceLPFee
-    ) internal pure returns (uint256, uint256, uint256) {
-        // Calculate the fees charged to the user (curveFee) and the portion
-        // of those fees that are paid to governance (governanceCurveFee).
-        (
-            uint256 curveFee, // bonds
-            uint256 governanceCurveFee // bonds
-        ) = _calculateFeesGivenShares(
-                _shareReservesDelta,
-                _spotPrice,
-                _vaultSharePrice,
-                _curveFee,
-                _governanceLPFee
-            );
-
-        // Calculate the impact of the curve fee on the bond reserves. The curve
-        // fee benefits the LPs by causing less bonds to be deducted from the
-        // bond reserves.
-        _bondReservesDelta -= curveFee;
-
-        // NOTE: Round down to underestimate the governance fee.
-        //
-        // Calculate the fees owed to governance in shares. Open longs are
-        // calculated entirely on the curve so the curve fee is the total
-        // governance fee. In order to convert it to shares we need to multiply
-        // it by the spot price and divide it by the vault share price:
-        //
-        // shares = (bonds * base/bonds) / (base/shares)
-        // shares = bonds * shares/bonds
-        // shares = shares
-        uint256 totalGovernanceFee = governanceCurveFee.mulDivDown(
-            _spotPrice,
-            _vaultSharePrice
-        );
-
-        // Calculate the number of shares to add to the shareReserves.
-        // shareReservesDelta, _shareAmount and totalGovernanceFee
-        // are all denominated in shares:
-        //
-        // shares = shares - shares
-        _shareReservesDelta -= totalGovernanceFee;
-
-        return (_shareReservesDelta, _bondReservesDelta, totalGovernanceFee);
     }
 
     /// @dev Calculates the fees that go to the LPs and governance.

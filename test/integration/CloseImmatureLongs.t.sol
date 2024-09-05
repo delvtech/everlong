@@ -157,6 +157,10 @@ contract PricingTest is EverlongTest {
         // half term passes
         advanceTime(POSITION_DURATION / 2, variableInterest);
 
+        console.log("avg maturity time: %s", everlong.avgMaturityTime());
+        console.log("avg price        : %s", everlong.avgVaultSharePrice());
+        console.log("total bonds      : %s", everlong.totalBonds());
+
         // Estimate the proceeds.
         uint256 estimatedProceeds = everlong.previewRedeem(shares);
         console.log("previewRedeem: %s", estimatedProceeds);

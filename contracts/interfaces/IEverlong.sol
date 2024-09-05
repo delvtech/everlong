@@ -24,6 +24,8 @@ abstract contract IEverlong is
         /// @notice Quantity of bonds in the position.
         uint128 bondAmount;
         /// @notice Vault share price at time of purchase.
+        //
+        // FIXME: Re-evaluate whether we need to store this.
         uint128 vaultSharePrice;
     }
 

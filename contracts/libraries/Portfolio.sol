@@ -65,22 +65,20 @@ library Portfolio {
         }
 
         // Update the portfolio's weighted averages.
-        self.avgMaturityTime = uint256(self.avgMaturityTime)
-            .updateWeightedAverage(
-                self.totalBonds,
-                _maturityTime,
-                _bondAmount,
-                true
-            )
-            .toUint128();
-        self.avgVaultSharePrice = uint256(self.avgVaultSharePrice)
-            .updateWeightedAverage(
-                self.totalBonds,
-                _vaultSharePrice,
-                _bondAmount,
-                true
-            )
-            .toUint128();
+        self.avgMaturityTime = _updateWeightedAverageDown(
+            uint256(self.avgMaturityTime),
+            self.totalBonds,
+            _maturityTime,
+            _bondAmount,
+            true
+        ).toUint128();
+        self.avgVaultSharePrice = _updateWeightedAverageDown(
+            uint256(self.avgVaultSharePrice),
+            self.totalBonds,
+            _vaultSharePrice,
+            _bondAmount,
+            true
+        ).toUint128();
 
         // Update the portfolio's total bond count.
         self.totalBonds += uint128(_bondAmount);
@@ -95,22 +93,20 @@ library Portfolio {
             revert("ahhhh");
         }
         IEverlong.Position memory position = _removePosition(self);
-        self.avgMaturityTime = uint256(self.avgMaturityTime)
-            .updateWeightedAverage(
-                self.totalBonds,
-                position.maturityTime,
-                position.bondAmount,
-                false
-            )
-            .toUint128();
-        self.avgVaultSharePrice = uint256(self.avgVaultSharePrice)
-            .updateWeightedAverage(
-                self.totalBonds,
-                position.vaultSharePrice,
-                position.bondAmount,
-                false
-            )
-            .toUint128();
+        self.avgMaturityTime = _updateWeightedAverageDown(
+            uint256(self.avgMaturityTime),
+            self.totalBonds,
+            position.maturityTime,
+            position.bondAmount,
+            false
+        ).toUint128();
+        self.avgVaultSharePrice = _updateWeightedAverageDown(
+            uint256(self.avgVaultSharePrice),
+            self.totalBonds,
+            position.vaultSharePrice,
+            position.bondAmount,
+            false
+        ).toUint128();
         self.totalBonds -= position.bondAmount;
     }
 
@@ -193,5 +189,126 @@ library Portfolio {
     function _clear(State storage self) internal {
         self._begin = 0;
         self._end = 0;
+    }
+
+    /// @dev Updates a weighted average by adding or removing a weighted delta.
+    /// @param _totalWeight The total weight before the update.
+    /// @param _deltaWeight The weight of the new value.
+    /// @param _average The weighted average before the update.
+    /// @param _delta The new value.
+    /// @return average The new weighted average.
+    function _updateWeightedAverageDown(
+        uint256 _average,
+        uint256 _totalWeight,
+        uint256 _delta,
+        uint256 _deltaWeight,
+        bool _isAdding
+    ) internal pure returns (uint256 average) {
+        // If the delta weight is zero, the average does not change.
+        if (_deltaWeight == 0) {
+            return _average;
+        }
+
+        // If the delta weight should be added to the total weight, we compute
+        // the weighted average as:
+        //
+        // average = (totalWeight * average + deltaWeight * delta) /
+        //           (totalWeight + deltaWeight)
+        if (_isAdding) {
+            // NOTE: Round down to underestimate the average.
+            average = (_totalWeight.mulDown(_average) +
+                _deltaWeight.mulDown(_delta)).divDown(
+                    _totalWeight + _deltaWeight
+                );
+
+            // An important property that should always hold when we are adding
+            // to the average is:
+            //
+            // min(_delta, _average) <= average <= max(_delta, _average)
+            //
+            // To ensure that this is always the case, we clamp the weighted
+            // average to this range. We don't have to worry about the
+            // case where average > _delta.max(average) because rounding down when
+            // computing this average makes this case infeasible.
+            uint256 minAverage = _delta.min(_average);
+            if (average < minAverage) {
+                average = minAverage;
+            }
+        }
+        // If the delta weight should be subtracted from the total weight, we
+        // compute the weighted average as:
+        //
+        // average = (totalWeight * average - deltaWeight * delta) /
+        //           (totalWeight - deltaWeight)
+        else {
+            if (_totalWeight == _deltaWeight) {
+                return 0;
+            }
+
+            // NOTE: Round down to underestimate the average.
+            average = (_totalWeight.mulDown(_average) -
+                _deltaWeight.mulUp(_delta)).divDown(
+                    _totalWeight - _deltaWeight
+                );
+        }
+    }
+    /// @dev Updates a weighted average by adding or removing a weighted delta.
+    /// @param _totalWeight The total weight before the update.
+    /// @param _deltaWeight The weight of the new value.
+    /// @param _average The weighted average before the update.
+    /// @param _delta The new value.
+    /// @return average The new weighted average.
+    function _updateWeightedAverageUp(
+        uint256 _average,
+        uint256 _totalWeight,
+        uint256 _delta,
+        uint256 _deltaWeight,
+        bool _isAdding
+    ) internal pure returns (uint256 average) {
+        // If the delta weight is zero, the average does not change.
+        if (_deltaWeight == 0) {
+            return _average;
+        }
+
+        // If the delta weight should be added to the total weight, we compute
+        // the weighted average as:
+        //
+        // average = (totalWeight * average + deltaWeight * delta) /
+        //           (totalWeight + deltaWeight)
+        if (_isAdding) {
+            // NOTE: Round up to underestimate the average.
+            average = (_totalWeight.mulUp(_average) +
+                _deltaWeight.mulUp(_delta)).divUp(_totalWeight + _deltaWeight);
+
+            // An important property that should always hold when we are adding
+            // to the average is:
+            //
+            // min(_delta, _average) <= average <= max(_delta, _average)
+            //
+            // To ensure that this is always the case, we clamp the weighted
+            // average to this range. We don't have to worry about the
+            // case where average > _delta.max(average) because rounding down when
+            // computing this average makes this case infeasible.
+            uint256 minAverage = _delta.min(_average);
+            if (average < minAverage) {
+                average = minAverage;
+            }
+        }
+        // If the delta weight should be subtracted from the total weight, we
+        // compute the weighted average as:
+        //
+        // average = (totalWeight * average - deltaWeight * delta) /
+        //           (totalWeight - deltaWeight)
+        else {
+            if (_totalWeight == _deltaWeight) {
+                return 0;
+            }
+
+            // NOTE: Round up to overestimate the average.
+            average = (_totalWeight.mulUp(_average) -
+                _deltaWeight.mulDown(_delta)).divUp(
+                    _totalWeight - _deltaWeight
+                );
+        }
     }
 }

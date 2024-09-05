@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import { console2 as console } from "forge-std/console2.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
+import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { IEverlong } from "./interfaces/IEverlong.sol";
 import { EVERLONG_KIND, EVERLONG_VERSION } from "./libraries/Constants.sol";
@@ -71,6 +72,7 @@ contract Everlong is IEverlong {
     using FixedPointMath for uint256;
     using HyperdriveExecutionLibrary for IHyperdrive;
     using Portfolio for Portfolio.State;
+    using SafeCast for *;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Storage                                                 │
@@ -221,7 +223,6 @@ contract Everlong is IEverlong {
         while (balance < assets && i < count) {
             position = _portfolio.at(i);
             output = _hyperdrive.previewCloseLong(position, _closeLongParams);
-            // assets -= output.mulDivDown(_closeLongParams.maxSlippage, 1e18);
             balance += output;
             i++;
         }
