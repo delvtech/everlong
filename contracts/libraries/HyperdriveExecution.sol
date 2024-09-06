@@ -35,10 +35,11 @@ library HyperdriveExecutionLibrary {
         uint256 _amount
     ) internal returns (uint256 maturity, uint256 quantity, uint256 price) {
         price = vaultSharePrice(self);
+        // TODO: minVaultSharePrice
         (maturity, quantity) = self.openLong(
             _amount,
             previewOpenLong(self, _params, _amount),
-            0, // TODO: minVaultSharePrice
+            0,
             IHyperdrive.Options(address(this), _params.asBase, "")
         );
         return (maturity, quantity, price);
@@ -185,7 +186,8 @@ library HyperdriveExecutionLibrary {
             self.closeLong(
                 _position.maturityTime,
                 _position.bondAmount,
-                previewCloseLong(self, _position, _params),
+                // previewCloseLong(self, _position, _params),
+                0,
                 IHyperdrive.Options(address(this), _params.asBase, "")
             );
     }
@@ -213,108 +215,6 @@ library HyperdriveExecutionLibrary {
         uint256 _bondAmount,
         uint256 _vaultSharePrice
     ) internal view returns (uint256) {
-        // gather params
-        IHyperdrive.PoolConfig memory poolConfig = self.getPoolConfig();
-        CalcCloseLongTempParams memory params = _buildCalcCloseLongParams(
-            self,
-            _maturityTime,
-            _bondAmount,
-            _vaultSharePrice
-        );
-
-        // calc reserves
-        (
-            uint256 shareCurveDelta,
-            uint256 bondReservesDelta,
-            uint256 shareProceeds
-        ) = _calculateCloseLongReserves(poolConfig, params);
-        uint256 totalGovernanceFee;
-        uint256 shareReservesDelta;
-        int256 shareAdjustmentDelta;
-        uint256 closeVaultSharePrice = block.timestamp < params.maturityTime
-            ? params.currentVaultSharePrice
-            : getNearestCheckpointDown(self, params.maturityTime)
-                .vaultSharePrice;
-
-        uint256 curveFee;
-        uint256 flatFee;
-        uint256 governanceCurveFee;
-        (
-            curveFee,
-            flatFee,
-            governanceCurveFee,
-            totalGovernanceFee
-        ) = _calculateCloseLongFees(poolConfig, params);
-
-        // The curve fee (shares) is paid to the LPs, so we subtract it from
-        // the share curve delta (shares) to prevent it from being debited
-        // from the reserves when the state is updated. The governance curve
-        // fee (shares) is paid to governance, so we add it back to the
-        // share curve delta (shares) to ensure that the governance fee
-        // isn't included in the share adjustment.
-        shareCurveDelta -= (curveFee - governanceCurveFee);
-
-        // The trader pays the curve fee (shares) and flat fee (shares) to
-        // the pool, so we debit them from the trader's share proceeds
-        // (shares).
-        shareProceeds -= curveFee + flatFee;
-
-        // We applied the full curve and flat fees to the share proceeds,
-        // which reduce the trader's proceeds. To calculate the payment that
-        // is applied to the share reserves (and is effectively paid by the
-        // LPs), we need to add governance's portion of these fees to the
-        // share proceeds.
-        shareReservesDelta = shareProceeds + totalGovernanceFee;
-
-        // Adjust the computed proceeds and delta for negative interest.
-        // We also compute the share adjustment delta at this step to ensure
-        // that we don't break our AMM invariant when we account for negative
-        // interest and flat adjustments.
-        console.log("share proceeds before: %s", shareProceeds);
-        (
-            shareProceeds,
-            shareReservesDelta,
-            shareCurveDelta,
-            shareAdjustmentDelta,
-            totalGovernanceFee
-        ) = HyperdriveMath.calculateNegativeInterestOnClose(
-            shareProceeds,
-            shareReservesDelta,
-            shareCurveDelta,
-            totalGovernanceFee,
-            // NOTE: We use the vault share price from the beginning of the
-            // checkpoint as the open vault share price. This means that a
-            // trader that opens a long in a checkpoint that has negative
-            // interest accrued will be penalized for the negative interest when
-            // they try to close their position. The `_minVaultSharePrice`
-            // parameter allows traders to protect themselves from this edge
-            // case.
-            params.openVaultSharePrice, // open vault share price
-            closeVaultSharePrice, // close vault share price
-            true
-        );
-        console.log("share proceeds after:  %s", shareProceeds);
-        return shareProceeds;
-    }
-
-    // @dev Used to avoid stack-too-deep errors.
-    struct CalcCloseLongTempParams {
-        uint256 effectiveShareReserves;
-        uint256 bondReserves;
-        uint256 spotPrice;
-        uint256 normalizedTimeRemaining;
-        uint256 currentVaultSharePrice;
-        uint256 openVaultSharePrice;
-        uint256 maturityTime;
-        uint256 bondAmount;
-    }
-
-    function _buildCalcCloseLongParams(
-        IHyperdrive self,
-        uint256 _maturityTime,
-        uint256 _bondAmount,
-        uint256 _vaultSharePrice
-    ) internal view returns (CalcCloseLongTempParams memory) {
         IHyperdrive.PoolConfig memory poolConfig = self.getPoolConfig();
         uint256[] memory slots = new uint256[](2);
         slots[0] = HYPERDRIVE_SHARE_RESERVES_BOND_RESERVES_SLOT;
@@ -325,100 +225,62 @@ library HyperdriveExecutionLibrary {
                 uint128(values[0].extract_32_16(16)), // shareReserves
                 uint256(uint128(values[1].extract_32_16(16))).toInt256() // shareAdjustment
             );
-        return
-            CalcCloseLongTempParams({
-                effectiveShareReserves: effectiveShareReserves,
-                bondReserves: uint128(values[0].extract_32_16(0)), // bondReserves
-                spotPrice: HyperdriveMath.calculateSpotPrice(
-                    effectiveShareReserves,
-                    uint128(values[0].extract_32_16(0)), // bondReserves
-                    poolConfig.initialVaultSharePrice,
-                    poolConfig.timeStretch
-                ),
-                normalizedTimeRemaining: normalizedTimeRemaining(
-                    self,
-                    _maturityTime
-                ),
-                currentVaultSharePrice: vaultSharePrice(self),
-                // openVaultSharePrice: _vaultSharePrice,
-                openVaultSharePrice: getNearestCheckpointDown(
-                    self,
-                    _maturityTime - poolConfig.positionDuration
-                ).vaultSharePrice,
-                maturityTime: _maturityTime,
-                bondAmount: _bondAmount
-            });
-    }
+        uint256 _normalizedTimeRemaining = normalizedTimeRemaining(
+            self,
+            _maturityTime
+        );
+        uint256 closeVaultSharePrice = vaultSharePrice(self);
+        uint256 openVaultSharePrice = getNearestCheckpointUp(
+            self,
+            _maturityTime - poolConfig.positionDuration
+        ).vaultSharePrice;
+        (, , uint256 shareProceeds) = HyperdriveMath.calculateCloseLong(
+            effectiveShareReserves,
+            uint128(values[0].extract_32_16(0)), // bondReserves
+            _bondAmount,
+            _normalizedTimeRemaining,
+            poolConfig.timeStretch,
+            closeVaultSharePrice,
+            poolConfig.initialVaultSharePrice
+        );
 
-    /// @dev  Calculate the effect that closing the long should have on the
-    ///       pool's reserves as well as the amount of shares the trader
-    ///       receives for selling the bonds at the market price.
-    /// @param _poolConfig The Hyperdrive PoolConfig.
-    /// @param _params Information on the long being closed + current
-    ///                hyperdrive market state.
-    function _calculateCloseLongReserves(
-        IHyperdrive.PoolConfig memory _poolConfig,
-        CalcCloseLongTempParams memory _params
-    )
-        internal
-        pure
-        returns (
-            uint256 shareCurveDelta,
-            uint256 bondReservesDelta,
-            uint256 shareProceeds
-        )
-    {
-        // NOTE: We calculate the time remaining from the latest checkpoint
-        // to ensure that opening/closing a position doesn't result in
-        // immediate profit.
-        (shareCurveDelta, bondReservesDelta, shareProceeds) = HyperdriveMath
-            .calculateCloseLong(
-                _params.effectiveShareReserves,
-                _params.bondReserves,
-                _params.bondAmount,
-                _params.normalizedTimeRemaining,
-                _poolConfig.timeStretch,
-                _params.currentVaultSharePrice,
-                _poolConfig.initialVaultSharePrice
-            );
-    }
-
-    function _calculateCloseLongFees(
-        IHyperdrive.PoolConfig memory _poolConfig,
-        CalcCloseLongTempParams memory _params
-    )
-        internal
-        pure
-        returns (
-            uint256 curveFee,
-            uint256 flatFee,
-            uint256 governanceCurveFee,
-            uint256 totalGovernanceFee
-        )
-    {
         // Calculate the fees that should be paid by the trader. The trader
         // pays a fee on the curve and flat parts of the trade. Most of the
         // fees go the LPs, but a portion goes to governance.
-        _params.spotPrice = HyperdriveMath.calculateSpotPrice(
-            _params.effectiveShareReserves,
-            _params.bondReserves, // bondReserves
-            _poolConfig.initialVaultSharePrice,
-            _poolConfig.timeStretch
+        uint256 spotPrice = HyperdriveMath.calculateSpotPrice(
+            effectiveShareReserves,
+            uint128(values[0].extract_32_16(0)), // bondReserves
+            poolConfig.initialVaultSharePrice,
+            poolConfig.timeStretch
         );
+
+        IHyperdrive.Fees memory fees = poolConfig.fees;
         (
-            curveFee, // shares
-            flatFee, // shares
-            governanceCurveFee, // shares
-            totalGovernanceFee // shares
-        ) = _calculateFeesGivenBonds(
-            _params.bondAmount,
-            _params.normalizedTimeRemaining,
-            _params.spotPrice,
-            _params.currentVaultSharePrice,
-            _poolConfig.fees.curve,
-            _poolConfig.fees.flat,
-            _poolConfig.fees.governanceLP
-        );
+            uint256 curveFee, // shares
+            uint256 flatFee, // shares
+            // shares
+            ,
+
+        ) = // shares
+            _calculateFeesGivenBonds(
+                _bondAmount,
+                _normalizedTimeRemaining,
+                spotPrice,
+                closeVaultSharePrice,
+                fees.curve,
+                fees.flat,
+                fees.governanceLP
+            );
+        shareProceeds -= curveFee + flatFee;
+
+        if (closeVaultSharePrice < openVaultSharePrice) {
+            shareProceeds = shareProceeds.mulDivDown(
+                closeVaultSharePrice,
+                openVaultSharePrice
+            );
+        }
+
+        return shareProceeds;
     }
 
     /// @dev Calculates the fees that go to the LPs and governance.
@@ -620,6 +482,7 @@ library HyperdriveExecutionLibrary {
             _timestamp +
             (_checkpointDuration - (_timestamp % _checkpointDuration));
     }
+
     function getNearestCheckpointUp(
         IHyperdrive self,
         uint256 _timestamp
