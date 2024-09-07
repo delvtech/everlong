@@ -222,7 +222,6 @@ library HyperdriveExecutionLibrary {
             self,
             _position.maturityTime - poolConfig.positionDuration
         ).vaultSharePrice;
-        console.log(openVaultSharePrice);
         (, , uint256 shareProceeds) = HyperdriveMath.calculateCloseLong(
             effectiveShareReserves,
             uint128(values[0].extract_32_16(0)), // bondReserves
@@ -262,18 +261,19 @@ library HyperdriveExecutionLibrary {
             );
         shareProceeds -= curveFee + flatFee;
 
+        // Adjust the proceeds to account for negative interest.
         if (closeVaultSharePrice < openVaultSharePrice) {
             shareProceeds = shareProceeds.mulDivDown(
                 closeVaultSharePrice,
                 openVaultSharePrice
             );
-        } else {
-            // Correct for any error that crept into the calculation of the share
-            // amount by converting the shares to base and then back to shares
-            // using the vault's share conversion logic.
-            uint256 baseAmount = shareProceeds.mulDown(closeVaultSharePrice);
-            shareProceeds = _self.convertToShares(baseAmount);
         }
+
+        // Correct for any error that crept into the calculation of the share
+        // amount by converting the shares to base and then back to shares
+        // using the vault's share conversion logic.
+        uint256 baseAmount = shareProceeds.mulDown(closeVaultSharePrice);
+        shareProceeds = _self.convertToShares(baseAmount);
 
         return shareProceeds;
     }

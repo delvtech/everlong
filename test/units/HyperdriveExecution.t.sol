@@ -22,10 +22,12 @@ contract TestHyperdriveExecution is EverlongTest {
 
     function setUp() public virtual override {
         super.setUp();
-        deployEverlong();
     }
 
     function test_previewOpenLong() external {
+        // Deploy the everlong instance.
+        deployEverlong();
+
         // With no longs, ensure the estimated and actual bond amounts are
         // the same.
         uint256 longAmount = 10e18;
@@ -48,6 +50,33 @@ contract TestHyperdriveExecution is EverlongTest {
     }
 
     function test_previewCloseLong_immediate_close() external {
+        // Deploy the everlong instance.
+        deployEverlong();
+
+        // Open a long.
+        uint256 amount = 100e18;
+        (uint256 maturityTime, uint256 bondAmount) = openLong(alice, amount);
+
+        // Ensure the preview amount underestimates the actual and is
+        // within the tolerance.
+        uint256 previewAssets = hyperdrive.previewCloseLong(
+            everlong.asBase(),
+            IEverlong.Position({
+                maturityTime: maturityTime.toUint128(),
+                bondAmount: bondAmount.toUint128()
+            })
+        );
+        uint256 actualAssets = closeLong(alice, maturityTime, bondAmount);
+        assertEq(actualAssets, previewAssets);
+    }
+
+    function test_previewCloseLong_immediate_close_negative_interest()
+        external
+    {
+        // Deploy the everlong instance with a negative interest rate.
+        VARIABLE_RATE = -0.05e18;
+        deployEverlong();
+
         // Open a long.
         uint256 amount = 100e18;
         (uint256 maturityTime, uint256 bondAmount) = openLong(alice, amount);
@@ -66,12 +95,15 @@ contract TestHyperdriveExecution is EverlongTest {
     }
 
     function test_previewCloseLong_partial_maturity() external {
+        // Deploy the everlong instance.
+        deployEverlong();
+
         // Open a long.
         uint256 amount = 100e18;
         (uint256 maturityTime, uint256 bondAmount) = openLong(alice, amount);
 
         // Advance halfway through the term.
-        advanceTimeWithCheckpoints(POSITION_DURATION / 2, 0.05e18);
+        advanceTimeWithCheckpoints(POSITION_DURATION / 2, VARIABLE_RATE);
 
         // Ensure the preview amount underestimates the actual and is
         // within the tolerance.
@@ -86,44 +118,79 @@ contract TestHyperdriveExecution is EverlongTest {
         assertEq(actualAssets, previewAssets);
     }
 
-    function test_previewCloseLong_portfolio_averages() external {
-        // Bob makes the first deposit.
-        uint256 bobAmount = 100e18;
-        uint256 bobShares = depositEverlong(bobAmount, bob);
-        everlong.rebalance();
+    function test_previewCloseLong_partial_maturity_negative_interest()
+        external
+    {
+        // Deploy the everlong instance with a negative interest rate.
+        VARIABLE_RATE = -0.05e18;
+        deployEverlong();
 
-        // Advance time 1/6th of the way through the term.
-        advanceTime(POSITION_DURATION / 6, 0.05e18);
+        // Open a long.
+        uint256 amount = 100e18;
+        (uint256 maturityTime, uint256 bondAmount) = openLong(alice, amount);
 
-        // Celine makes the second deposit.
-        uint256 celineAmount = 100e18;
-        uint256 celineShares = depositEverlong(celineAmount, celine);
-        everlong.rebalance();
+        // Advance halfway through the term.
+        advanceTimeWithCheckpoints(POSITION_DURATION / 2, VARIABLE_RATE);
 
-        // Advance time 1/6th of the way through the term.
-        advanceTime(POSITION_DURATION / 6, 0.05e18);
-
-        // Dan makes the third deposit.
-        uint256 danAmount = 100e18;
-        uint256 danShares = depositEverlong(danAmount, dan);
-        everlong.rebalance();
-
-        // Advance time 1/6th of the way through the term.
-        advanceTime(POSITION_DURATION / 6, 0.05e18);
-
-        // Estimate the portfolio value.
-        uint256 estimatedOutput = hyperdrive.previewCloseLong(
+        // Ensure the preview amount underestimates the actual and is
+        // within the tolerance.
+        uint256 previewAssets = hyperdrive.previewCloseLong(
             everlong.asBase(),
             IEverlong.Position({
-                maturityTime: everlong.avgMaturityTime(),
-                bondAmount: everlong.totalBonds()
+                maturityTime: maturityTime.toUint128(),
+                bondAmount: bondAmount.toUint128()
             })
         );
+        uint256 actualAssets = closeLong(alice, maturityTime, bondAmount);
+        assertEq(actualAssets, previewAssets);
+    }
 
-        // Get the previewRedeem output.
-        uint256 redeemOutput = everlong.previewRedeem(
-            bobShares + celineShares + danShares
+    function test_previewCloseLong_full_maturity() external {
+        // Deploy the everlong instance.
+        deployEverlong();
+
+        // Open a long.
+        uint256 amount = 100e18;
+        (uint256 maturityTime, uint256 bondAmount) = openLong(alice, amount);
+
+        // Advance halfway through the term.
+        advanceTimeWithCheckpoints(POSITION_DURATION, VARIABLE_RATE);
+
+        // Ensure the preview amount underestimates the actual and is
+        // within the tolerance.
+        uint256 previewAssets = hyperdrive.previewCloseLong(
+            everlong.asBase(),
+            IEverlong.Position({
+                maturityTime: maturityTime.toUint128(),
+                bondAmount: bondAmount.toUint128()
+            })
         );
-        console.log("redeem output:   %s", redeemOutput);
+        uint256 actualAssets = closeLong(alice, maturityTime, bondAmount);
+        assertEq(actualAssets, previewAssets);
+    }
+
+    function test_previewCloseLong_full_maturity_negative_interest() external {
+        // Deploy the everlong instance.
+        VARIABLE_RATE = -0.05e18;
+        deployEverlong();
+
+        // Open a long.
+        uint256 amount = 100e18;
+        (uint256 maturityTime, uint256 bondAmount) = openLong(alice, amount);
+
+        // Advance halfway through the term.
+        advanceTimeWithCheckpoints(POSITION_DURATION, VARIABLE_RATE);
+
+        // Ensure the preview amount underestimates the actual and is
+        // within the tolerance.
+        uint256 previewAssets = hyperdrive.previewCloseLong(
+            everlong.asBase(),
+            IEverlong.Position({
+                maturityTime: maturityTime.toUint128(),
+                bondAmount: bondAmount.toUint128()
+            })
+        );
+        uint256 actualAssets = closeLong(alice, maturityTime, bondAmount);
+        assertEq(actualAssets, previewAssets);
     }
 }

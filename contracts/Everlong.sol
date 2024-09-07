@@ -192,7 +192,9 @@ contract Everlong is IEverlong {
             _hyperdrive.previewCloseLong(
                 _asBase,
                 IEverlong.Position({
-                    maturityTime: _portfolio.avgMaturityTime,
+                    maturityTime: _hyperdrive
+                        .getNearestCheckpointIdUp(_portfolio.avgMaturityTime)
+                        .toUint128(),
                     bondAmount: _portfolio.totalBonds
                 })
             );
