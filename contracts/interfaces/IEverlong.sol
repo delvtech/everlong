@@ -17,7 +17,7 @@ abstract contract IEverlong is
     // ╰─────────────────────────────────────────────────────────╯
 
     /**
-     * @notice Tracks the total amount of things with stuff.
+     * @notice Contains the information needed to identify an open Hyperdrive position.
      */
     struct Position {
         /// @notice Time when the position matures.
