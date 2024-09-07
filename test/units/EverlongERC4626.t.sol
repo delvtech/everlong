@@ -42,7 +42,7 @@ contract TestEverlongERC4626 is EverlongTest {
 
     /// @dev Tests that previewRedeem does not overestimate proceeds for a
     ///      single shareholder immediately redeeming part of their shares.
-    function test_previewRedeem_single_partial() external {
+    function test_previewRedeem_single_instant_partial() external {
         // Deploy the everlong instance.
         deployEverlong();
 
@@ -52,6 +52,44 @@ contract TestEverlongERC4626 is EverlongTest {
 
         // Ensure that previewRedeem output is at most equal to actual output
         // and within margins.
-        assertRedemption(shares - 1, alice);
+        assertRedemption(shares / 2, alice);
+    }
+
+    /// @dev Tests that previewRedeem does not overestimate proceeds for a
+    ///      single shareholder waiting half the position duration and
+    ///      redeeming all their shares.
+    function test_previewRedeem_single_unmatured_full() external {
+        // Deploy the everlong instance.
+        deployEverlong();
+
+        // Deposit into everlong.
+        uint256 amount = 250e18;
+        uint256 shares = depositEverlong(amount, alice);
+
+        // Fast forward to halfway through maturity.
+        advanceTime(POSITION_DURATION / 2, VARIABLE_RATE);
+
+        // Ensure that previewRedeem output is at most equal to actual output
+        // and within margins.
+        assertRedemption(shares, alice);
+    }
+
+    /// @dev Tests that previewRedeem does not overestimate proceeds for a
+    ///      single shareholder waiting half the position duration and
+    ///      redeeming some of their shares.
+    function test_previewRedeem_single_unmatured_partial() external {
+        // Deploy the everlong instance.
+        deployEverlong();
+
+        // Deposit into everlong.
+        uint256 amount = 250e18;
+        uint256 shares = depositEverlong(amount, alice);
+
+        // Fast forward to halfway through maturity.
+        advanceTime(POSITION_DURATION / 2, VARIABLE_RATE);
+
+        // Ensure that previewRedeem output is at most equal to actual output
+        // and within margins.
+        assertRedemption(shares / 3, alice);
     }
 }
