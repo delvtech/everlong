@@ -5,6 +5,12 @@ import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMat
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { IEverlong } from "../interfaces/IEverlong.sol";
 
+/// @author DELV
+/// @title PositionLibrary
+/// @notice Library for interacting with {IEverlong.Position}s.
+/// @custom:disclaimer The language used in this code is for coding convenience
+///                    only, and is not intended to, and does not, have any
+///                    particular legal or regulatory significance.
 library PositionLibrary {
     using FixedPointMath for uint256;
     using SafeCast for *;

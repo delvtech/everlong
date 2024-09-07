@@ -6,13 +6,30 @@ import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { IEverlong } from "../interfaces/IEverlong.sol";
 import { PositionLibrary } from "./Position.sol";
 
+/// @author DELV
+/// @title Portfolio
+/// @notice Library to handle storage and accounting for a bond portfolio.
+/// @custom:disclaimer The language used in this code is for coding convenience
+///                    only, and is not intended to, and does not, have any
+///                    particular legal or regulatory significance.
 library Portfolio {
     using FixedPointMath for uint256;
     using SafeCast for *;
     using PositionLibrary for IEverlong.Position;
 
+    // TODO: Rename me.
+    //
+    /// @notice Thrown on attempting to access either end of an empty queue.
     error IndexOutOfBounds();
+
+    // TODO: Rename me.
+    //
+    /// @notice Thrown on attempting to remove a position from an empty queue.
     error QueueEmpty();
+
+    // TODO: Rename me.
+    //
+    /// @notice Thrown on attempting to add a position to a full queue.
     error QueueFull();
 
     /// @dev The state of the portfolio which contains a double-ended queue
@@ -56,13 +73,14 @@ library Portfolio {
         }
 
         // Update the portfolio's weighted averages.
-        self.avgMaturityTime = _updateWeightedAverageDown(
-            uint256(self.avgMaturityTime),
-            self.totalBonds,
-            _maturityTime,
-            _bondAmount,
-            true
-        ).toUint128();
+        self.avgMaturityTime = uint256(self.avgMaturityTime)
+            .updateWeightedAverage(
+                self.totalBonds,
+                _maturityTime,
+                _bondAmount,
+                true
+            )
+            .toUint128();
 
         // Update the portfolio's total bond count.
         self.totalBonds += uint128(_bondAmount);
@@ -72,36 +90,41 @@ library Portfolio {
     ///         Since the portfolio handles positions via a queue, the
     ///         position being closed always the oldest at the head.
     function handleClosePosition(State storage self) internal {
-        if (isEmpty(self)) {
-            // FIXME: custom error
-            revert("ahhhh");
-        }
         IEverlong.Position memory position = _removePosition(self);
-        self.avgMaturityTime = _updateWeightedAverageDown(
-            uint256(self.avgMaturityTime),
-            self.totalBonds,
-            position.maturityTime,
-            position.bondAmount,
-            false
-        ).toUint128();
+        self.avgMaturityTime = uint256(self.avgMaturityTime)
+            .updateWeightedAverage(
+                self.totalBonds,
+                position.maturityTime,
+                position.bondAmount,
+                false
+            )
+            .toUint128();
         self.totalBonds -= position.bondAmount;
     }
 
     /// @notice Obtain the position at the head of the queue.
     ///         This is the oldest position in the portfolio.
+    /// @return Position at the head of the queue.
     function head(
         State storage self
     ) internal view returns (IEverlong.Position memory) {
+        // Revert if the queue is empty.
         if (isEmpty(self)) revert IndexOutOfBounds();
+
+        // Return the item at the start index.
         return self._q[self._begin];
     }
 
     /// @notice Obtain the position at the tail of the queue.
     ///         This is the most recent position in the portfolio.
+    /// @return Position at the tail of the queue.
     function tail(
         State storage self
     ) internal view returns (IEverlong.Position storage) {
+        // Revert if the queue is empty.
         if (isEmpty(self)) revert IndexOutOfBounds();
+
+        // Return the item at the end index.
         unchecked {
             return self._q[self._end - 1];
         }
@@ -114,7 +137,10 @@ library Portfolio {
         State storage self,
         uint256 _index
     ) internal view returns (IEverlong.Position memory) {
+        // Ensure the requested index is within range.
         if (_index >= positionCount(self)) revert IndexOutOfBounds();
+
+        // Return the position at the specified index.
         unchecked {
             return self._q[self._begin + uint256(_index)];
         }
@@ -142,7 +168,11 @@ library Portfolio {
     ) internal {
         unchecked {
             uint128 backIndex = self._end;
+
+            // Ensure we haven't run out of indices.
             if (backIndex + 1 == self._begin) revert QueueFull();
+
+            // Update indices to extend the queue.
             self._q[backIndex] = value;
             self._end = backIndex + 1;
         }
@@ -155,7 +185,13 @@ library Portfolio {
     ) internal returns (IEverlong.Position memory value) {
         unchecked {
             uint128 frontIndex = self._begin;
+
+            // Ensure there are items in the queue.
             if (frontIndex == self._end) revert QueueEmpty();
+
+            // TODO: Ensure that we're safe to not fully clear storage here.
+            //
+            // Update indices to shrink the queue.
             value = self._q[frontIndex];
             delete self._q[frontIndex];
             self._begin = frontIndex + 1;
@@ -166,126 +202,5 @@ library Portfolio {
     function _clear(State storage self) internal {
         self._begin = 0;
         self._end = 0;
-    }
-
-    /// @dev Updates a weighted average by adding or removing a weighted delta.
-    /// @param _totalWeight The total weight before the update.
-    /// @param _deltaWeight The weight of the new value.
-    /// @param _average The weighted average before the update.
-    /// @param _delta The new value.
-    /// @return average The new weighted average.
-    function _updateWeightedAverageDown(
-        uint256 _average,
-        uint256 _totalWeight,
-        uint256 _delta,
-        uint256 _deltaWeight,
-        bool _isAdding
-    ) internal pure returns (uint256 average) {
-        // If the delta weight is zero, the average does not change.
-        if (_deltaWeight == 0) {
-            return _average;
-        }
-
-        // If the delta weight should be added to the total weight, we compute
-        // the weighted average as:
-        //
-        // average = (totalWeight * average + deltaWeight * delta) /
-        //           (totalWeight + deltaWeight)
-        if (_isAdding) {
-            // NOTE: Round down to underestimate the average.
-            average = (_totalWeight.mulDown(_average) +
-                _deltaWeight.mulDown(_delta)).divDown(
-                    _totalWeight + _deltaWeight
-                );
-
-            // An important property that should always hold when we are adding
-            // to the average is:
-            //
-            // min(_delta, _average) <= average <= max(_delta, _average)
-            //
-            // To ensure that this is always the case, we clamp the weighted
-            // average to this range. We don't have to worry about the
-            // case where average > _delta.max(average) because rounding down when
-            // computing this average makes this case infeasible.
-            uint256 minAverage = _delta.min(_average);
-            if (average < minAverage) {
-                average = minAverage;
-            }
-        }
-        // If the delta weight should be subtracted from the total weight, we
-        // compute the weighted average as:
-        //
-        // average = (totalWeight * average - deltaWeight * delta) /
-        //           (totalWeight - deltaWeight)
-        else {
-            if (_totalWeight == _deltaWeight) {
-                return 0;
-            }
-
-            // NOTE: Round down to underestimate the average.
-            average = (_totalWeight.mulDown(_average) -
-                _deltaWeight.mulUp(_delta)).divDown(
-                    _totalWeight - _deltaWeight
-                );
-        }
-    }
-    /// @dev Updates a weighted average by adding or removing a weighted delta.
-    /// @param _totalWeight The total weight before the update.
-    /// @param _deltaWeight The weight of the new value.
-    /// @param _average The weighted average before the update.
-    /// @param _delta The new value.
-    /// @return average The new weighted average.
-    function _updateWeightedAverageUp(
-        uint256 _average,
-        uint256 _totalWeight,
-        uint256 _delta,
-        uint256 _deltaWeight,
-        bool _isAdding
-    ) internal pure returns (uint256 average) {
-        // If the delta weight is zero, the average does not change.
-        if (_deltaWeight == 0) {
-            return _average;
-        }
-
-        // If the delta weight should be added to the total weight, we compute
-        // the weighted average as:
-        //
-        // average = (totalWeight * average + deltaWeight * delta) /
-        //           (totalWeight + deltaWeight)
-        if (_isAdding) {
-            // NOTE: Round up to underestimate the average.
-            average = (_totalWeight.mulUp(_average) +
-                _deltaWeight.mulUp(_delta)).divUp(_totalWeight + _deltaWeight);
-
-            // An important property that should always hold when we are adding
-            // to the average is:
-            //
-            // min(_delta, _average) <= average <= max(_delta, _average)
-            //
-            // To ensure that this is always the case, we clamp the weighted
-            // average to this range. We don't have to worry about the
-            // case where average > _delta.max(average) because rounding down when
-            // computing this average makes this case infeasible.
-            uint256 minAverage = _delta.min(_average);
-            if (average < minAverage) {
-                average = minAverage;
-            }
-        }
-        // If the delta weight should be subtracted from the total weight, we
-        // compute the weighted average as:
-        //
-        // average = (totalWeight * average - deltaWeight * delta) /
-        //           (totalWeight - deltaWeight)
-        else {
-            if (_totalWeight == _deltaWeight) {
-                return 0;
-            }
-
-            // NOTE: Round up to overestimate the average.
-            average = (_totalWeight.mulUp(_average) -
-                _deltaWeight.mulDown(_delta)).divUp(
-                    _totalWeight - _deltaWeight
-                );
-        }
     }
 }
