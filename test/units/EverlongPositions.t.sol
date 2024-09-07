@@ -36,7 +36,7 @@ contract TestEverlongPositions is EverlongTest {
         external
     {
         // Open an unmature position.
-        everlong.exposed_handleOpenPosition(block.timestamp + 1, 5, 1);
+        everlong.exposed_handleOpenPosition(block.timestamp + 1, 5);
 
         // Check that `hasMaturedPositions()` returns false.
         assertFalse(
@@ -51,8 +51,8 @@ contract TestEverlongPositions is EverlongTest {
         external
     {
         // Open unmatured positions with different maturity times.
-        everlong.exposed_handleOpenPosition(2, 5, 1);
-        everlong.exposed_handleOpenPosition(3, 5, 1);
+        everlong.exposed_handleOpenPosition(2, 5);
+        everlong.exposed_handleOpenPosition(3, 5);
 
         // Mature the first position (second will be unmature).
         advanceTime(1, 0);
@@ -63,41 +63,6 @@ contract TestEverlongPositions is EverlongTest {
             "should return true with single matured position"
         );
     }
-
-    // /// @dev Validate that `hasSufficientExcessLiquidity` returns false
-    // ///      when Everlong has no balance.
-    // function test_hasSufficientExcessLiquidity_false_no_balance()
-    //     external
-    //     view
-    // {
-    //     // Check that the contract has no balance.
-    //     assertEq(IERC20(everlong.asset()).balanceOf(address(everlong)), 0);
-    //     // Check that `hasSufficientExcessLiquidity` returns false.
-    //     assertFalse(
-    //         everlong.hasSufficientExcessLiquidity(),
-    //         "hasSufficientExcessLiquidity should return false with no balance"
-    //     );
-    // }
-    //
-    // /// @dev Validate that `hasSufficientExcessLiquidity` returns true
-    // ///      when Everlong has a large balance.
-    // function test_hasSufficientExcessLiquidity_true_large_balance() external {
-    //     // Mint the contract some tokens.
-    //     uint256 _mintAmount = 5_000_000e18;
-    //     ERC20Mintable(everlong.asset()).mint(address(everlong), _mintAmount);
-    //
-    //     // Check that the contract has a large balance.
-    //     assertEq(
-    //         IERC20(everlong.asset()).balanceOf(address(everlong)),
-    //         _mintAmount
-    //     );
-    //
-    //     // Check that `hasSufficientExcessLiquidity` returns true.
-    //     assertTrue(
-    //         everlong.hasSufficientExcessLiquidity(),
-    //         "hasSufficientExcessLiquidity should return false with no balance"
-    //     );
-    // }
 
     /// @dev Ensure that `canRebalance()` returns false when everlong has
     ///      no positions nor balance.

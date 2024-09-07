@@ -46,21 +46,15 @@ contract EverlongExposed is Everlong, Test {
     ) public {
         _portfolio.handleOpenPosition(
             _position.maturityTime,
-            _position.bondAmount,
-            _position.vaultSharePrice
+            _position.bondAmount
         );
     }
 
     function exposed_handleOpenPosition(
         uint256 _maturityTime,
-        uint256 _bondAmount,
-        uint256 _vaultSharePrice
+        uint256 _bondAmount
     ) public {
-        _portfolio.handleOpenPosition(
-            _maturityTime,
-            _bondAmount,
-            _vaultSharePrice
-        );
+        _portfolio.handleOpenPosition(_maturityTime, _bondAmount);
     }
 
     function exposed_handleClosePosition() public {

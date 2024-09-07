@@ -22,176 +22,6 @@ contract PricingTest is EverlongTest {
     using FixedPointMath for uint256;
     using Lib for *;
 
-    function test_positive_interest_long_half_term() external {
-        // This tests the following scenario:
-        // - initial_vault_share_price > 1
-        // - positive interest causes the share price to go up
-        // - a long is opened
-        // - positive interest accrues over half term
-        // - long is closed
-        {
-            uint256 initialVaultSharePrice = 1.5e18;
-            int256 preTradeVariableInterest = 0.10e18;
-            int256 variableInterest = 0.05e18;
-            half_term_everlong(
-                initialVaultSharePrice,
-                preTradeVariableInterest,
-                variableInterest
-            );
-        }
-
-        // This tests the following scenario:
-        // - initial_vault_share_price = 1
-        // - positive interest causes the share price to go up
-        // - a long is opened
-        // - positive interest accrues over half term
-        // - long is closed
-        {
-            uint256 initialVaultSharePrice = 1e18;
-            int256 preTradeVariableInterest = 0.10e18;
-            int256 variableInterest = 0.05e18;
-            half_term_everlong(
-                initialVaultSharePrice,
-                preTradeVariableInterest,
-                variableInterest
-            );
-        }
-
-        // This tests the following scenario:
-        // - initial_vault_share_price < 1
-        // - positive interest causes the share price to go up
-        // - a long is opened
-        // - positive interest accrues over half term
-        // - long is closed
-        {
-            uint256 initialVaultSharePrice = 0.95e18;
-            int256 preTradeVariableInterest = 0.10e18;
-            int256 variableInterest = 0.05e18;
-            half_term_everlong(
-                initialVaultSharePrice,
-                preTradeVariableInterest,
-                variableInterest
-            );
-        }
-    }
-
-    function test_negative_interest_long_half_term() external {
-        // This tests the following scenario:
-        // - initial_vault_share_price > 1
-        // - negative interest causes the share price to go down
-        // - a long is opened
-        // - negative interest accrues over half term
-        // - long is closed
-        {
-            uint256 initialVaultSharePrice = 1.5e18;
-            int256 preTradeVariableInterest = -0.10e18;
-            int256 variableInterest = -0.05e18;
-            half_term_everlong(
-                initialVaultSharePrice,
-                preTradeVariableInterest,
-                variableInterest
-            );
-        }
-
-        // This tests the following scenario:
-        // - initial_vault_share_price = 1
-        // - negative interest causes the share price to go down
-        // - a long is opened
-        // - negative interest accrues over half term
-        // - long is closed
-        {
-            uint256 initialVaultSharePrice = 1e18;
-            int256 preTradeVariableInterest = -0.10e18;
-            int256 variableInterest = -0.05e18;
-            half_term_everlong(
-                initialVaultSharePrice,
-                preTradeVariableInterest,
-                variableInterest
-            );
-        }
-
-        // This tests the following scenario:
-        // - initial_vault_share_price < 1
-        // - negative interest causes the share price to go further down
-        // - a long is opened
-        // - negative interest accrues over half term
-        // - long is closed
-        {
-            uint256 initialVaultSharePrice = 0.90e18;
-            int256 preTradeVariableInterest = -0.10e18;
-            int256 variableInterest = -0.05e18;
-            half_term_everlong(
-                initialVaultSharePrice,
-                preTradeVariableInterest,
-                variableInterest
-            );
-        }
-    }
-
-    function half_term_everlong(
-        uint256 initialVaultSharePrice,
-        int256 preTradeVariableInterest,
-        int256 variableInterest
-    ) internal {
-        // Initialize the market
-        uint256 apr = 0.05e18;
-        deploy(alice, apr, initialVaultSharePrice, 0, 0, 0, 0);
-        uint256 contribution = 500_000_000e18;
-        initialize(alice, apr, contribution);
-        vm.startPrank(deployer);
-        deploy();
-        vm.stopPrank();
-
-        // fast forward time and accrue negative interest
-        advanceTime(POSITION_DURATION, preTradeVariableInterest);
-
-        vm.startPrank(bob);
-
-        // Deposit.
-        uint256 basePaid = 10_000e18;
-        ERC20Mintable(everlong.asset()).mint(basePaid);
-        ERC20Mintable(everlong.asset()).approve(address(everlong), basePaid);
-        uint256 shares = everlong.deposit(basePaid, bob);
-        everlong.rebalance();
-
-        // half term passes
-        advanceTime(POSITION_DURATION / 2, variableInterest);
-
-        console.log("avg maturity time: %s", everlong.avgMaturityTime());
-        console.log("avg price        : %s", everlong.avgVaultSharePrice());
-        console.log("total bonds      : %s", everlong.totalBonds());
-
-        // Estimate the proceeds.
-        uint256 estimatedProceeds = everlong.previewRedeem(shares);
-        console.log("previewRedeem: %s", estimatedProceeds);
-        console.log("totalAssets:   %s", everlong.totalAssets());
-
-        // Close the long.
-        uint256 baseProceeds = everlong.redeem(shares, bob, bob);
-        console.log("actual:    %s", baseProceeds);
-        console.log(
-            "assets:    %s",
-            ERC20Mintable(everlong.asset()).balanceOf(address(everlong))
-        );
-        console.log("avg maturity time: %s", everlong.avgMaturityTime());
-        console.log("avg price        : %s", everlong.avgVaultSharePrice());
-        console.log("total bonds      : %s", everlong.totalBonds());
-        if (estimatedProceeds > baseProceeds) {
-            console.log("DIFFERENCE: %s", estimatedProceeds - baseProceeds);
-        }
-
-        // logPortfolioMetrics();
-
-        assertGe(baseProceeds, estimatedProceeds);
-        assertApproxEqAbs(
-            baseProceeds,
-            estimatedProceeds,
-            20,
-            "failed equality"
-        );
-        vm.stopPrank();
-    }
-
     function test_positive_interest_long_half_term_fees() external {
         // This tests the following scenario:
         // - initial_vault_share_price > 1
@@ -303,25 +133,10 @@ contract PricingTest is EverlongTest {
         int256 preTradeVariableInterest,
         int256 variableInterest
     ) internal {
-        // Initialize the market
-        uint256 apr = 0.05e18;
-        deploy(
-            alice,
-            apr,
-            initialVaultSharePrice,
-            0.01e18,
-            0.0005e18,
-            0.15e18,
-            0.03e18
-        );
-        uint256 contribution = 500_000_000e18;
-        initialize(alice, apr, contribution);
-        vm.startPrank(deployer);
-        deploy();
-        vm.stopPrank();
-
-        // fast forward time and accrue negative interest
-        advanceTime(POSITION_DURATION, preTradeVariableInterest);
+        INITIAL_VAULT_SHARE_PRICE = initialVaultSharePrice;
+        VARIABLE_RATE = preTradeVariableInterest;
+        deployEverlong();
+        VARIABLE_RATE = variableInterest;
 
         vm.startPrank(bob);
 
@@ -333,7 +148,7 @@ contract PricingTest is EverlongTest {
         everlong.rebalance();
 
         // half term passes
-        advanceTime(POSITION_DURATION / 2, variableInterest);
+        advanceTimeWithCheckpoints(POSITION_DURATION / 2, variableInterest);
 
         // Estimate the proceeds.
         uint256 estimatedProceeds = everlong.previewRedeem(shares);
@@ -348,7 +163,6 @@ contract PricingTest is EverlongTest {
             ERC20Mintable(everlong.asset()).balanceOf(address(everlong))
         );
         console.log("avg maturity time: %s", everlong.avgMaturityTime());
-        console.log("avg price        : %s", everlong.avgVaultSharePrice());
         console.log("total bonds      : %s", everlong.totalBonds());
         if (estimatedProceeds > baseProceeds) {
             console.log("DIFFERENCE: %s", estimatedProceeds - baseProceeds);

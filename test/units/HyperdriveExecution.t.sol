@@ -5,6 +5,7 @@ pragma solidity ^0.8.20;
 import { console2 as console } from "forge-std/console2.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
+import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
@@ -19,42 +20,92 @@ contract TestHyperdriveExecution is EverlongTest {
 
     Portfolio.State public portfolio;
 
-    function test_previewCloseLong_portfolio_averages() external {
-        // Initialize the market
-        uint256 apr = 0.05e18;
-        deploy(alice, apr, 1.5e18, 0.01e18, 0.0005e18, 0.15e18, 0.03e18);
-        uint256 contribution = 500_000_000e18;
-        initialize(alice, apr, contribution);
-        vm.startPrank(deployer);
-        deploy();
-        vm.stopPrank();
-        advanceTime(POSITION_DURATION * 2, 0.10e18);
+    function setUp() public virtual override {
+        super.setUp();
+        deployEverlong();
+    }
 
+    function test_previewOpenLong() external {
+        // With no longs, ensure the estimated and actual bond amounts are
+        // the same.
+        uint256 longAmount = 10e18;
+        uint256 previewBonds = hyperdrive.previewOpenLong(
+            everlong.asBase(),
+            longAmount
+        );
+        (, uint256 actualBonds) = openLong(alice, longAmount);
+        assertEq(previewBonds, actualBonds);
+
+        // Ensure the estimated and actual bond amounts still match when there
+        // is an existing position in hyperdrive.
+        longAmount = 500e18;
+        previewBonds = hyperdrive.previewOpenLong(
+            everlong.asBase(),
+            longAmount
+        );
+        (, actualBonds) = openLong(bob, longAmount);
+        assertEq(previewBonds, actualBonds);
+    }
+
+    function test_previewCloseLong_immediate_close() external {
+        // Open a long.
+        uint256 amount = 100e18;
+        (uint256 maturityTime, uint256 bondAmount) = openLong(alice, amount);
+
+        // Ensure the preview amount underestimates the actual and is
+        // within the tolerance.
+        uint256 previewAssets = hyperdrive.previewCloseLong(
+            everlong.asBase(),
+            IEverlong.Position({
+                maturityTime: maturityTime.toUint128(),
+                bondAmount: bondAmount.toUint128()
+            })
+        );
+        uint256 actualAssets = closeLong(alice, maturityTime, bondAmount);
+        assertEq(actualAssets, previewAssets);
+    }
+
+    function test_previewCloseLong_partial_maturity() external {
+        // Open a long.
+        uint256 amount = 100e18;
+        (uint256 maturityTime, uint256 bondAmount) = openLong(alice, amount);
+
+        // Advance halfway through the term.
+        advanceTimeWithCheckpoints(POSITION_DURATION / 2, 0.05e18);
+
+        // Ensure the preview amount underestimates the actual and is
+        // within the tolerance.
+        uint256 previewAssets = hyperdrive.previewCloseLong(
+            everlong.asBase(),
+            IEverlong.Position({
+                maturityTime: maturityTime.toUint128(),
+                bondAmount: bondAmount.toUint128()
+            })
+        );
+        uint256 actualAssets = closeLong(alice, maturityTime, bondAmount);
+        assertEq(actualAssets, previewAssets);
+    }
+
+    function test_previewCloseLong_portfolio_averages() external {
         // Bob makes the first deposit.
         uint256 bobAmount = 100e18;
-        mintApproveEverlongBaseAsset(bob, bobAmount);
-        vm.startPrank(bob);
-        uint256 bobShares = everlong.deposit(bobAmount, bob);
+        uint256 bobShares = depositEverlong(bobAmount, bob);
         everlong.rebalance();
 
         // Advance time 1/6th of the way through the term.
         advanceTime(POSITION_DURATION / 6, 0.05e18);
 
         // Celine makes the second deposit.
-        uint256 celineAmount = 10e18;
-        mintApproveEverlongBaseAsset(celine, celineAmount);
-        vm.startPrank(celine);
-        uint256 celineShares = everlong.deposit(celineAmount, celine);
+        uint256 celineAmount = 100e18;
+        uint256 celineShares = depositEverlong(celineAmount, celine);
         everlong.rebalance();
 
         // Advance time 1/6th of the way through the term.
         advanceTime(POSITION_DURATION / 6, 0.05e18);
 
-        // Celine makes the second deposit.
-        uint256 danAmount = 5e18;
-        mintApproveEverlongBaseAsset(dan, danAmount);
-        vm.startPrank(dan);
-        uint256 danShares = everlong.deposit(danAmount, dan);
+        // Dan makes the third deposit.
+        uint256 danAmount = 100e18;
+        uint256 danShares = depositEverlong(danAmount, dan);
         everlong.rebalance();
 
         // Advance time 1/6th of the way through the term.
@@ -62,20 +113,12 @@ contract TestHyperdriveExecution is EverlongTest {
 
         // Estimate the portfolio value.
         uint256 estimatedOutput = hyperdrive.previewCloseLong(
+            everlong.asBase(),
             IEverlong.Position({
-                maturityTime: hyperdrive
-                    .getNearestCheckpointIdUp(everlong.avgMaturityTime())
-                    .toUint128(),
-                bondAmount: everlong.totalBonds(),
-                vaultSharePrice: everlong.avgVaultSharePrice()
-            }),
-            HyperdriveExecutionLibrary.CloseLongParams({
-                asBase: true,
-                maxSlippage: 1e18
+                maturityTime: everlong.avgMaturityTime(),
+                bondAmount: everlong.totalBonds()
             })
         );
-
-        console.log("estimate output: %s", estimatedOutput);
 
         // Get the previewRedeem output.
         uint256 redeemOutput = everlong.previewRedeem(

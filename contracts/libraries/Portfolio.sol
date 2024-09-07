@@ -23,27 +23,22 @@ library Portfolio {
         uint128 _begin;
         /// @dev Ending index for the double-ended queue structure.
         uint128 _end;
+        /// @dev Weighted average maturity time for the portfolio.
+        uint128 avgMaturityTime;
+        /// @dev Total bond count of the portfolio.
+        uint128 totalBonds;
         /// @dev Mapping of indices to {IEverlong.Position} for the
         ///      double-ended queue structure.
         mapping(uint256 index => IEverlong.Position) _q;
-        /// @dev Weighted average maturity time for the portfolio.
-        uint128 avgMaturityTime;
-        /// @dev Weighted average vaultSharePrice for bonds in the portfolio.
-        uint128 avgVaultSharePrice;
-        /// @dev Total bond count of the portfolio.
-        uint128 totalBonds;
     }
 
     /// @notice Update portfolio accounting a newly-opened position.
     /// @param _maturityTime Maturity of the opened position.
     /// @param _bondAmount Amount of bonds in the opened position.
-    /// @param _vaultSharePrice VaultSharePrice immediately before opening
-    ///        the position.
     function handleOpenPosition(
         State storage self,
         uint256 _maturityTime,
-        uint256 _bondAmount,
-        uint256 _vaultSharePrice
+        uint256 _bondAmount
     ) internal {
         // Check whether the incoming maturity is already in the portfolio.
         // Since the portfolio's positions are stored as a queue (old -> new),
@@ -51,16 +46,12 @@ library Portfolio {
         if (!isEmpty(self) && tail(self).maturityTime == _maturityTime) {
             // The maturity is already present in the portfolio, so update it
             // with the additional bonds and the price of those bonds.
-            tail(self).increase(_bondAmount, _vaultSharePrice);
+            tail(self).increase(_bondAmount);
         } else {
             // The maturity is not in the portfolio, so add a new position.
             _addPosition(
                 self,
-                IEverlong.Position(
-                    uint128(_maturityTime),
-                    uint128(_bondAmount),
-                    uint128(_vaultSharePrice)
-                )
+                IEverlong.Position(uint128(_maturityTime), uint128(_bondAmount))
             );
         }
 
@@ -69,13 +60,6 @@ library Portfolio {
             uint256(self.avgMaturityTime),
             self.totalBonds,
             _maturityTime,
-            _bondAmount,
-            true
-        ).toUint128();
-        self.avgVaultSharePrice = _updateWeightedAverageDown(
-            uint256(self.avgVaultSharePrice),
-            self.totalBonds,
-            _vaultSharePrice,
             _bondAmount,
             true
         ).toUint128();
@@ -97,13 +81,6 @@ library Portfolio {
             uint256(self.avgMaturityTime),
             self.totalBonds,
             position.maturityTime,
-            position.bondAmount,
-            false
-        ).toUint128();
-        self.avgVaultSharePrice = _updateWeightedAverageDown(
-            uint256(self.avgVaultSharePrice),
-            self.totalBonds,
-            position.vaultSharePrice,
             position.bondAmount,
             false
         ).toUint128();

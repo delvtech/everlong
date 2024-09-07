@@ -44,39 +44,93 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     /// @dev Everlong token symbol.
     string internal EVERLONG_SYMBOL = "evTest";
 
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Hyperdrive Configuration                                │
+    // ╰─────────────────────────────────────────────────────────╯
+
+    address internal HYPERDRIVE_INITIALIZER = address(0);
+
+    uint256 internal FIXED_RATE = 0.05e18;
+    int256 internal VARIABLE_RATE = 0.10e18;
+
+    uint256 internal INITIAL_VAULT_SHARE_PRICE = 1e18;
+    uint256 internal INITIAL_CONTRIBUTION = 500_000_000e18;
+
+    uint256 internal CURVE_FEE = 0.01e18;
+    uint256 internal FLAT_FEE = 0.0005e18;
+    uint256 internal GOVERNANCE_LP_FEE = 0.15e18;
+    uint256 internal GOVERNANCE_ZOMBIE_FEE = 0.03e18;
+
     function setUp() public virtual override {
         super.setUp();
-        vm.startPrank(deployer);
-        deploy();
-        vm.stopPrank();
     }
 
-    /// @dev Deploy the Everlong instance with default underlying, name, and symbol.
-    function deploy() internal {
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Deploy Helpers                                          │
+    // ╰─────────────────────────────────────────────────────────╯
+
+    /// @dev Deploy the Everlong instance with default underlying, name,
+    ///      and symbol.
+    function deployEverlong() internal {
+        // Deploy the hyperdrive instance.
+        deploy(
+            deployer,
+            FIXED_RATE,
+            INITIAL_VAULT_SHARE_PRICE,
+            CURVE_FEE,
+            FLAT_FEE,
+            GOVERNANCE_LP_FEE,
+            GOVERNANCE_ZOMBIE_FEE
+        );
+
+        // Seed liquidity for the hyperdrive instance.
+        if (HYPERDRIVE_INITIALIZER == address(0)) {
+            HYPERDRIVE_INITIALIZER = deployer;
+        }
+        initialize(HYPERDRIVE_INITIALIZER, FIXED_RATE, INITIAL_CONTRIBUTION);
+
+        vm.startPrank(deployer);
         everlong = new EverlongExposed(
             EVERLONG_NAME,
             EVERLONG_SYMBOL,
-            18,
+            hyperdrive.decimals(),
             address(hyperdrive),
             true
         );
+        vm.stopPrank();
+
+        // Fast forward and accrue some interest.
+        advanceTimeWithCheckpoints(POSITION_DURATION * 2, VARIABLE_RATE);
     }
 
-    /// @dev Deploy the Everlong instance with custom underlying, name, and symbol.
-    function deploy(
-        string memory _name,
-        string memory _symbol,
-        uint8 _decimals,
-        address _underlying,
-        bool _asBase
-    ) internal {
-        everlong = new EverlongExposed(
-            _name,
-            _symbol,
-            _decimals,
-            address(_underlying),
-            _asBase
-        );
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Deposit Helpers                                         │
+    // ╰─────────────────────────────────────────────────────────╯
+
+    function depositEverlong(
+        uint256 _amount,
+        address _depositor
+    ) internal returns (uint256 shares) {
+        // Resolve the appropriate token.
+        ERC20Mintable token = ERC20Mintable(everlong.asset());
+
+        // Mint sufficient tokens to _depositor.
+        vm.startPrank(_depositor);
+        token.mint(_amount);
+        vm.stopPrank();
+
+        // Approve everlong as _depositor.
+        vm.startPrank(_depositor);
+        token.approve(address(everlong), _amount);
+        vm.stopPrank();
+
+        // Make the deposit.
+        vm.startPrank(_depositor);
+        shares = everlong.deposit(_amount, _depositor);
+        vm.stopPrank();
+
+        // Return the amount of shares issued to _depositor for the deposit.
+        return shares;
     }
 
     // TODO: This is gross, will refactor

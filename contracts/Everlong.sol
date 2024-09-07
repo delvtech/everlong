@@ -5,6 +5,7 @@ import { console2 as console } from "forge-std/console2.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
+import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { IEverlong } from "./interfaces/IEverlong.sol";
 import { EVERLONG_KIND, EVERLONG_VERSION } from "./libraries/Constants.sol";
@@ -124,10 +125,6 @@ contract Everlong is IEverlong {
     /// @dev Address of the contract admin.
     address internal _admin;
 
-    HyperdriveExecutionLibrary.OpenLongParams internal _openLongParams;
-
-    HyperdriveExecutionLibrary.CloseLongParams internal _closeLongParams;
-
     // ╭─────────────────────────────────────────────────────────╮
     // │ Modifiers                                               │
     // ╰─────────────────────────────────────────────────────────╯
@@ -163,16 +160,11 @@ contract Everlong is IEverlong {
         _decimals = __decimals;
         _hyperdrive = IHyperdrive(__hyperdrive);
         _asBase = __asBase;
-        _openLongParams.asBase = __asBase;
-        _openLongParams.maxSlippage = 1e12;
-        _closeLongParams.asBase = __asBase;
-        _closeLongParams.maxSlippage = 1e12;
         _asset = IERC20(
             __asBase
                 ? IHyperdrive(__hyperdrive).baseToken()
                 : IHyperdrive(__hyperdrive).vaultSharesToken()
         );
-
         // Set the admin to the contract deployer.
         _admin = msg.sender;
     }
@@ -198,12 +190,11 @@ contract Everlong is IEverlong {
         return
             balance +
             _hyperdrive.previewCloseLong(
+                _asBase,
                 IEverlong.Position({
                     maturityTime: _portfolio.avgMaturityTime,
-                    bondAmount: _portfolio.totalBonds,
-                    vaultSharePrice: _portfolio.avgVaultSharePrice
-                }),
-                _closeLongParams
+                    bondAmount: _portfolio.totalBonds
+                })
             );
     }
 
@@ -222,30 +213,25 @@ contract Everlong is IEverlong {
         uint256 count = _portfolio.positionCount();
         while (balance < assets && i < count) {
             position = _portfolio.at(i);
-            output = _hyperdrive.previewCloseLong(position, _closeLongParams);
+            output = _hyperdrive.previewCloseLong(_asBase, position);
             balance += output;
             i++;
         }
     }
 
-    // function maxDeposit(
-    //     address _depositor
-    // ) public view override returns (uint256) {
-    //     // Silence the voices.
-    //     _depositor = _depositor;
-    //     return HyperdriveUtils.calculateMaxLong(_hyperdrive);
-    // }
+    function maxDeposit(
+        address _depositor
+    ) public view override returns (uint256) {
+        // HACK: Silence the voices.
+        _depositor = _depositor;
+        return HyperdriveUtils.calculateMaxLong(_hyperdrive);
+    }
 
     function maxMint(address _minter) public view override returns (uint256) {
         // Silence the voices.
         _minter = _minter;
         return convertToShares(maxDeposit(_minter));
     }
-
-    // function _afterDeposit(uint256 _assets, uint256) internal virtual override {
-    //     _asset.approve(address(_hyperdrive), _assets);
-    //     _hyperdrive.openLong(_portfolio, _openLongParams, _assets);
-    // }
 
     function _beforeWithdraw(
         uint256 _assets,
@@ -274,9 +260,11 @@ contract Everlong is IEverlong {
         // Spend idle.
         uint256 toSpend = _asset.balanceOf(address(this));
         IERC20(_asset).approve(address(_hyperdrive), toSpend);
-        (uint256 maturityTime, uint256 bondAmount, uint256 price) = _hyperdrive
-            .openLong(_openLongParams, toSpend);
-        _portfolio.handleOpenPosition(maturityTime, bondAmount, price);
+        (uint256 maturityTime, uint256 bondAmount) = _hyperdrive.openLong(
+            _asBase,
+            toSpend
+        );
+        _portfolio.handleOpenPosition(maturityTime, bondAmount);
     }
 
     // ╭─────────────────────────────────────────────────────────╮
@@ -290,7 +278,7 @@ contract Everlong is IEverlong {
             if (!_hyperdrive.isMature(position)) {
                 return output;
             }
-            output += _hyperdrive.closeLong(position, _closeLongParams);
+            output += _hyperdrive.closeLong(_asBase, position);
             _portfolio.handleClosePosition();
         }
         return output;
@@ -309,7 +297,7 @@ contract Everlong is IEverlong {
             if (!_hyperdrive.isMature(position)) {
                 return output;
             }
-            output += _hyperdrive.previewCloseLong(position, _closeLongParams);
+            output += _hyperdrive.previewCloseLong(_asBase, position);
             i++;
         }
     }
@@ -318,10 +306,7 @@ contract Everlong is IEverlong {
         uint256 _targetOutput
     ) internal returns (uint256 output) {
         while (!_portfolio.isEmpty() && output < _targetOutput) {
-            output += _hyperdrive.closeLong(
-                _portfolio.head(),
-                _closeLongParams
-            );
+            output += _hyperdrive.closeLong(_asBase, _portfolio.head());
             _portfolio.handleClosePosition();
         }
         return output;
@@ -333,10 +318,7 @@ contract Everlong is IEverlong {
         uint256 i;
         uint256 count = _portfolio.positionCount();
         while (i < count && output < _targetOutput) {
-            output += _hyperdrive.previewCloseLong(
-                _portfolio.at(i),
-                _closeLongParams
-            );
+            output += _hyperdrive.previewCloseLong(_asBase, _portfolio.at(i));
             i++;
         }
     }
@@ -402,19 +384,11 @@ contract Everlong is IEverlong {
     }
 
     function positionValue(uint256 _index) external view returns (uint256) {
-        return
-            _hyperdrive.previewCloseLong(
-                _portfolio.at(_index),
-                _closeLongParams
-            );
+        return _hyperdrive.previewCloseLong(_asBase, _portfolio.at(_index));
     }
 
     function avgMaturityTime() external view returns (uint128) {
         return _portfolio.avgMaturityTime;
-    }
-
-    function avgVaultSharePrice() external view returns (uint128) {
-        return _portfolio.avgVaultSharePrice;
     }
 
     function totalBonds() external view returns (uint128) {

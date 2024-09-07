@@ -28,7 +28,6 @@ contract TestEverlongPositions is EverlongTest {
         IEverlong.Position memory p = portfolio.at(_index);
         assertEq(_position.maturityTime, p.maturityTime, _error);
         assertEq(_position.bondAmount, p.bondAmount, _error);
-        assertEq(_position.vaultSharePrice, p.vaultSharePrice, _error);
     }
 
     function setUp() public virtual override {
@@ -50,7 +49,7 @@ contract TestEverlongPositions is EverlongTest {
         // - `PositionOpened` event is emitted
         // - Position count is increased
         vm.expectEmit(true, true, true, true);
-        portfolio.handleOpenPosition(1, 1, 1);
+        portfolio.handleOpenPosition(1, 1);
         assertEq(
             portfolio.positionCount(),
             1,
@@ -62,8 +61,8 @@ contract TestEverlongPositions is EverlongTest {
     ///      with multiple positions having distinct maturity times.
     function test_handleOpenLong_distinct_maturity() external {
         // Record two opened positions with distinct maturity times.
-        portfolio.handleOpenPosition(1, 1, 1);
-        portfolio.handleOpenPosition(2, 2, 1);
+        portfolio.handleOpenPosition(1, 1);
+        portfolio.handleOpenPosition(2, 2);
 
         // Check position count is 2.
         assertEq(
@@ -75,21 +74,13 @@ contract TestEverlongPositions is EverlongTest {
         // Check position order is [(1,1),(2,2)].
         assertPosition(
             0,
-            IEverlong.Position({
-                maturityTime: 1,
-                bondAmount: 1,
-                vaultSharePrice: 1
-            }),
-            "position at index 0 should be (1,1,1) after opening 2 longs with distinct maturities"
+            IEverlong.Position({ maturityTime: 1, bondAmount: 1 }),
+            "position at index 0 should be (1,1) after opening 2 longs with distinct maturities"
         );
         assertPosition(
             1,
-            IEverlong.Position({
-                maturityTime: 2,
-                bondAmount: 2,
-                vaultSharePrice: 1
-            }),
-            "position at index 1 should be (2,2,1) after opening 2 longs with distinct maturities"
+            IEverlong.Position({ maturityTime: 2, bondAmount: 2 }),
+            "position at index 1 should be (2,2) after opening 2 longs with distinct maturities"
         );
     }
 
@@ -98,8 +89,8 @@ contract TestEverlongPositions is EverlongTest {
     function test_handleOpenLong_same_maturity() external {
         // Record two opened positions with same maturity times.
         // Check that `PositionUpdated` event is emitted.
-        portfolio.handleOpenPosition(1, 1, 1);
-        portfolio.handleOpenPosition(1, 1, 3);
+        portfolio.handleOpenPosition(1, 1);
+        portfolio.handleOpenPosition(1, 1);
 
         // Check position count is 1.
         assertEq(
@@ -111,8 +102,8 @@ contract TestEverlongPositions is EverlongTest {
         // Check position is now (1,2).
         assertPosition(
             0,
-            IEverlong.Position(uint128(1), uint128(2), uint128(2)),
-            "position at index 0 should be (1,2,2) after opening two longs with same maturity"
+            IEverlong.Position(uint128(1), uint128(2)),
+            "position at index 0 should be (1,2) after opening two longs with same maturity"
         );
     }
 
@@ -121,7 +112,7 @@ contract TestEverlongPositions is EverlongTest {
     function test_handleCloseLong_full_amount() external {
         // Record opening and fully closing a long.
         // Check that `PositionClosed` event is emitted.
-        portfolio.handleOpenPosition(1, 1, 1);
+        portfolio.handleOpenPosition(1, 1);
         portfolio.handleClosePosition();
 
         // Check position count is 0.

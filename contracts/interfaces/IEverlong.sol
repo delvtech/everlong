@@ -16,17 +16,14 @@ abstract contract IEverlong is
     // │ Structs                                                 │
     // ╰─────────────────────────────────────────────────────────╯
 
-    /// @notice Tracks the total amount of bonds managed by Everlong
-    ///         with the same maturity.
+    /**
+     * @notice Tracks the total amount of things with stuff.
+     */
     struct Position {
         /// @notice Time when the position matures.
         uint128 maturityTime;
-        /// @notice Quantity of bonds in the position.
+        /// @notice Amount of bonds in the position.
         uint128 bondAmount;
-        /// @notice Vault share price at time of purchase.
-        //
-        // FIXME: Re-evaluate whether we need to store this.
-        uint128 vaultSharePrice;
     }
 
     // ╭─────────────────────────────────────────────────────────╮

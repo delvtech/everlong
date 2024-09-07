@@ -24,33 +24,34 @@ library HyperdriveExecutionLibrary {
     // │ Open Long                                               │
     // ╰─────────────────────────────────────────────────────────╯
 
-    struct OpenLongParams {
-        uint256 maxSlippage;
-        bool asBase;
-    }
-
     function openLong(
         IHyperdrive self,
-        OpenLongParams memory _params,
+        bool _asBase,
         uint256 _amount
-    ) internal returns (uint256 maturity, uint256 quantity, uint256 price) {
-        price = vaultSharePrice(self);
-        // TODO: minVaultSharePrice
+    ) internal returns (uint256 maturity, uint256 quantity) {
         (maturity, quantity) = self.openLong(
             _amount,
-            previewOpenLong(self, _params, _amount),
             0,
-            IHyperdrive.Options(address(this), _params.asBase, "")
+            0,
+            IHyperdrive.Options(address(this), _asBase, "")
         );
-        return (maturity, quantity, price);
+        return (maturity, quantity);
     }
 
+    /**
+     * @dev Calculates the amount of bonds received from opening a long with
+     *      the input amount.
+     */
     function previewOpenLong(
         IHyperdrive self,
-        OpenLongParams memory _params,
+        bool _asBase,
         uint256 _amount
     ) internal view returns (uint256) {
-        return _calculateOpenLong(self, self.convertToShares(_amount));
+        return
+            _calculateOpenLong(
+                self,
+                _asBase ? self.convertToShares(_amount) : _amount
+            );
     }
 
     /// @dev Calculates the number of bonds a user will receive when opening a
@@ -172,38 +173,27 @@ library HyperdriveExecutionLibrary {
     // │ Close Long                                              │
     // ╰─────────────────────────────────────────────────────────╯
 
-    struct CloseLongParams {
-        uint256 maxSlippage;
-        bool asBase;
-    }
-
     function closeLong(
         IHyperdrive self,
-        IEverlong.Position memory _position,
-        CloseLongParams memory _params
+        bool _asBase,
+        IEverlong.Position memory _position
     ) internal returns (uint256) {
         return
             self.closeLong(
                 _position.maturityTime,
                 _position.bondAmount,
-                // previewCloseLong(self, _position, _params),
                 0,
-                IHyperdrive.Options(address(this), _params.asBase, "")
+                IHyperdrive.Options(address(this), _asBase, "")
             );
     }
 
     function previewCloseLong(
         IHyperdrive self,
-        IEverlong.Position memory _position,
-        CloseLongParams memory _params
+        bool _asBase,
+        IEverlong.Position memory _position
     ) internal view returns (uint256) {
-        uint256 shareProceeds = _calculateCloseLong(
-            self,
-            _position.maturityTime,
-            _position.bondAmount,
-            _position.vaultSharePrice
-        );
-        if (_params.asBase) {
+        uint256 shareProceeds = _calculateCloseLong(self, _position);
+        if (_asBase) {
             return self.convertToBase(shareProceeds);
         }
         return shareProceeds;
@@ -211,9 +201,7 @@ library HyperdriveExecutionLibrary {
 
     function _calculateCloseLong(
         IHyperdrive self,
-        uint256 _maturityTime,
-        uint256 _bondAmount,
-        uint256 _vaultSharePrice
+        IEverlong.Position memory _position
     ) internal view returns (uint256) {
         IHyperdrive.PoolConfig memory poolConfig = self.getPoolConfig();
         uint256[] memory slots = new uint256[](2);
@@ -227,22 +215,25 @@ library HyperdriveExecutionLibrary {
             );
         uint256 _normalizedTimeRemaining = normalizedTimeRemaining(
             self,
-            _maturityTime
+            _position.maturityTime
         );
         uint256 closeVaultSharePrice = vaultSharePrice(self);
-        uint256 openVaultSharePrice = getNearestCheckpointUp(
+        uint256 openVaultSharePrice = getNearestCheckpointDown(
             self,
-            _maturityTime - poolConfig.positionDuration
+            _position.maturityTime - poolConfig.positionDuration
         ).vaultSharePrice;
+        console.log(openVaultSharePrice);
         (, , uint256 shareProceeds) = HyperdriveMath.calculateCloseLong(
             effectiveShareReserves,
             uint128(values[0].extract_32_16(0)), // bondReserves
-            _bondAmount,
+            _position.bondAmount,
             _normalizedTimeRemaining,
             poolConfig.timeStretch,
             closeVaultSharePrice,
             poolConfig.initialVaultSharePrice
         );
+
+        IHyperdrive _self = self;
 
         // Calculate the fees that should be paid by the trader. The trader
         // pays a fee on the curve and flat parts of the trade. Most of the
@@ -258,12 +249,10 @@ library HyperdriveExecutionLibrary {
         (
             uint256 curveFee, // shares
             uint256 flatFee, // shares
-            // shares
             ,
 
-        ) = // shares
-            _calculateFeesGivenBonds(
-                _bondAmount,
+        ) = _calculateFeesGivenBonds(
+                _position.bondAmount,
                 _normalizedTimeRemaining,
                 spotPrice,
                 closeVaultSharePrice,
@@ -278,6 +267,12 @@ library HyperdriveExecutionLibrary {
                 closeVaultSharePrice,
                 openVaultSharePrice
             );
+        } else {
+            // Correct for any error that crept into the calculation of the share
+            // amount by converting the shares to base and then back to shares
+            // using the vault's share conversion logic.
+            uint256 baseAmount = shareProceeds.mulDown(closeVaultSharePrice);
+            shareProceeds = _self.convertToShares(baseAmount);
         }
 
         return shareProceeds;
@@ -441,11 +436,17 @@ library HyperdriveExecutionLibrary {
         IHyperdrive self,
         uint256 _maturity
     ) internal view returns (uint256 _duration) {
-        _maturity = getNearestCheckpointIdUp(self, _maturity);
         _duration = _maturity > latestCheckpoint(self)
             ? _maturity - latestCheckpoint(self)
             : 0;
-        _duration = _duration.divUp(self.getPoolConfig().positionDuration);
+        _duration = _duration.divDown(self.getPoolConfig().positionDuration);
+        // Since we overestimate the time remaining to underestimate the
+        // proceeds, there is an edge case where _normalizedTimeRemaining > 1
+        // if the position was opened in the same checkpoint. For this case,
+        // we can just set it to 1e18.
+        if (_duration > 1e18) {
+            _duration = 1e18;
+        }
     }
 
     function latestCheckpoint(
