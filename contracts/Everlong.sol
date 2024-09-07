@@ -318,7 +318,8 @@ contract Everlong is IEverlong {
         return _asBase;
     }
 
-    /// @notice Address of the token used to interact with the Hyperdrive instance.
+    /// @notice Returns the address of the token used to interact with the Hyperdrive 
+    ///         instance.
     /// @return Address of the token used to interact with the Hyperdrive instance.
     function asset() public view override returns (address) {
         return address(_asset);
