@@ -16,9 +16,7 @@ abstract contract IEverlong is
     // │ Structs                                                 │
     // ╰─────────────────────────────────────────────────────────╯
 
-    /**
-     * @notice Contains the information needed to identify an open Hyperdrive position.
-     */
+    /// @notice Contains the information needed to identify an open Hyperdrive position.
     struct Position {
         /// @notice Time when the position matures.
         uint128 maturityTime;
