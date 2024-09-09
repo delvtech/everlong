@@ -6,9 +6,12 @@ import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMat
 import { HyperdriveMath } from "hyperdrive/contracts/src/libraries/HyperdriveMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { YieldSpaceMath } from "hyperdrive/contracts/src/libraries/YieldSpaceMath.sol";
+import { ERC20 } from "openzeppelin/token/ERC20/ERC20.sol";
+import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { Packing } from "openzeppelin/utils/Packing.sol";
 import { IEverlong } from "../interfaces/IEverlong.sol";
 import { IEverlongEvents } from "../interfaces/IEverlongEvents.sol";
+import { ONE } from "./Constants.sol";
 
 // TODO: Extract into its own library.
 uint256 constant HYPERDRIVE_SHARE_RESERVES_BOND_RESERVES_SLOT = 2;
@@ -24,13 +27,14 @@ uint256 constant HYPERDRIVE_SHARE_ADJUSTMENT_SHORTS_OUTSTANDING_SLOT = 4;
 library HyperdriveExecutionLibrary {
     using FixedPointMath for uint256;
     using SafeCast for *;
+    using SafeERC20 for ERC20;
     using Packing for bytes32;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Open Long                                               │
     // ╰─────────────────────────────────────────────────────────╯
 
-    /// @notice Opens a long with hyperdrive using amount.
+    /// @dev Opens a long with hyperdrive using amount.
     /// @param _asBase Whether to use hyperdrive's base asset.
     /// @param _amount Amount of assets to spend.
     /// @return maturityTime Maturity timestamp of the opened position.
@@ -38,8 +42,10 @@ library HyperdriveExecutionLibrary {
     function openLong(
         IHyperdrive self,
         bool _asBase,
-        uint256 _amount
+        uint256 _amount,
+        bytes memory // unused extra data
     ) internal returns (uint256 maturityTime, uint256 bondAmount) {
+        // TODO: Slippage
         (maturityTime, bondAmount) = self.openLong(
             _amount,
             0,
@@ -59,7 +65,8 @@ library HyperdriveExecutionLibrary {
     function previewOpenLong(
         IHyperdrive self,
         bool _asBase,
-        uint256 _amount
+        uint256 _amount,
+        bytes memory // unused extra data
     ) internal view returns (uint256) {
         return
             _calculateOpenLong(
@@ -106,7 +113,7 @@ library HyperdriveExecutionLibrary {
                 // NOTE: Since the bonds traded on the curve are newly minted,
                 // we use a time remaining of 1. This means that we can use
                 // `_timeStretch = t * _timeStretch`.
-                1e18 - poolConfig.timeStretch,
+                ONE - poolConfig.timeStretch,
                 _vaultSharePrice,
                 poolConfig.initialVaultSharePrice
             );
@@ -118,9 +125,9 @@ library HyperdriveExecutionLibrary {
             poolConfig.initialVaultSharePrice,
             poolConfig.timeStretch
         );
-        (, bondReservesDelta, ) = _calculateOpenLongFees(
-            _shareAmount,
+        bondReservesDelta = _calculateOpenLongFees(
             bondReservesDelta,
+            _shareAmount,
             _vaultSharePrice,
             spotPrice,
             poolConfig.fees.curve,
@@ -134,9 +141,7 @@ library HyperdriveExecutionLibrary {
     /// @param _bondReservesDelta The change in the bond reserves without fees.
     /// @param _vaultSharePrice The current vault share price.
     /// @param _spotPrice The current spot price.
-    /// @return The change in the share reserves with fees.
     /// @return The change in the bond reserves with fees.
-    /// @return The governance fee in shares.
     function _calculateOpenLongFees(
         uint256 _shareReservesDelta,
         uint256 _bondReservesDelta,
@@ -144,63 +149,38 @@ library HyperdriveExecutionLibrary {
         uint256 _spotPrice,
         uint256 _curveFee,
         uint256 _governanceLPFee
-    ) internal pure returns (uint256, uint256, uint256) {
-        // Calculate the fees charged to the user (curveFee) and the portion
-        // of those fees that are paid to governance (governanceCurveFee).
-        (
-            uint256 curveFee, // bonds
-            uint256 governanceCurveFee // bonds
-        ) = _calculateFeesGivenShares(
-                _shareReservesDelta,
-                _spotPrice,
-                _vaultSharePrice,
-                _curveFee,
-                _governanceLPFee
-            );
+    ) internal pure returns (uint256) {
+        // Calculate the fees charged to the user (curveFee).
+        uint256 curveFee = _calculateFeesGivenShares(
+            _shareReservesDelta,
+            _spotPrice,
+            _vaultSharePrice,
+            _curveFee
+        );
 
         // Calculate the impact of the curve fee on the bond reserves. The curve
         // fee benefits the LPs by causing less bonds to be deducted from the
         // bond reserves.
         _bondReservesDelta -= curveFee;
 
-        // NOTE: Round down to underestimate the governance fee.
-        //
-        // Calculate the fees owed to governance in shares. Open longs are
-        // calculated entirely on the curve so the curve fee is the total
-        // governance fee. In order to convert it to shares we need to multiply
-        // it by the spot price and divide it by the vault share price:
-        //
-        // shares = (bonds * base/bonds) / (base/shares)
-        // shares = bonds * shares/bonds
-        // shares = shares
-        uint256 totalGovernanceFee = governanceCurveFee.mulDivDown(
-            _spotPrice,
-            _vaultSharePrice
-        );
-
-        // Calculate the number of shares to add to the shareReserves.
-        // shareReservesDelta, _shareAmount and totalGovernanceFee
-        // are all denominated in shares:
-        //
-        // shares = shares - shares
-        _shareReservesDelta -= totalGovernanceFee;
-
-        return (_shareReservesDelta, _bondReservesDelta, totalGovernanceFee);
+        return (_bondReservesDelta);
     }
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Close Long                                              │
     // ╰─────────────────────────────────────────────────────────╯
 
-    /// @notice Close a long with the input position's bond amount and maturity.
+    /// @dev Close a long with the input position's bond amount and maturity.
     /// @param _asBase Whether to receive hyperdrive's base token as output.
     /// @param _position Position information used to specify the long to close.
     /// @return proceeds The amount of output assets received from closing the long.
     function closeLong(
         IHyperdrive self,
         bool _asBase,
-        IEverlong.Position memory _position
+        IEverlong.Position memory _position,
+        bytes memory // unused extradata
     ) internal returns (uint256 proceeds) {
+        // TODO: Slippage
         proceeds = self.closeLong(
             _position.maturityTime,
             _position.bondAmount,
@@ -213,7 +193,7 @@ library HyperdriveExecutionLibrary {
         );
     }
 
-    /// @notice Calculate the amount of output assets received from closing a
+    /// @dev Calculate the amount of output assets received from closing a
     ///         long.
     /// @dev Always less than or equal to the actual amount of assets received.
     /// @param _asBase Whether to receive hyperdrive's base token as output.
@@ -222,7 +202,8 @@ library HyperdriveExecutionLibrary {
     function previewCloseLong(
         IHyperdrive self,
         bool _asBase,
-        IEverlong.Position memory _position
+        IEverlong.Position memory _position,
+        bytes memory // unused extradata
     ) internal view returns (uint256) {
         uint256 shareProceeds = _calculateCloseLong(self, _position);
         if (_asBase) {
@@ -296,17 +277,14 @@ library HyperdriveExecutionLibrary {
         IHyperdrive.Fees memory fees = poolConfig.fees;
         (
             uint256 curveFee, // shares
-            uint256 flatFee, // shares
-            ,
-
+            uint256 flatFee // shares
         ) = _calculateFeesGivenBonds(
                 _position.bondAmount,
                 _normalizedTimeRemaining,
                 spotPrice,
                 closeVaultSharePrice,
                 fees.curve,
-                fees.flat,
-                fees.governanceLP
+                fees.flat
             );
 
         // Subtract fees from the proceeds.
@@ -338,28 +316,14 @@ library HyperdriveExecutionLibrary {
     /// @param _vaultSharePrice The current vault share price (base/shares).
     /// @return curveFee The curve fee. The fee is in terms of shares.
     /// @return flatFee The flat fee. The fee is in terms of shares.
-    /// @return governanceCurveFee The curve fee that goes to governance. The
-    ///         fee is in terms of shares.
-    /// @return totalGovernanceFee The total fee that goes to governance. The
-    ///         fee is in terms of shares.
     function _calculateFeesGivenBonds(
         uint256 _bondAmount,
         uint256 _normalizedTimeRemaining,
         uint256 _spotPrice,
         uint256 _vaultSharePrice,
         uint256 _curveFee,
-        uint256 _flatFee,
-        uint256 _governanceLPFee
-    )
-        internal
-        pure
-        returns (
-            uint256 curveFee,
-            uint256 flatFee,
-            uint256 governanceCurveFee,
-            uint256 totalGovernanceFee
-        )
-    {
+        uint256 _flatFee
+    ) internal pure returns (uint256 curveFee, uint256 flatFee) {
         // NOTE: Round up to overestimate the curve fee.
         //
         // p (spot price) tells us how many base a bond is worth -> p = base/bonds
@@ -375,17 +339,9 @@ library HyperdriveExecutionLibrary {
         //           = (base * phi_curve * t) * (shares/base)
         //           = phi_curve * t * shares
         curveFee = _curveFee
-            .mulUp(1e18 - _spotPrice)
+            .mulUp(ONE - _spotPrice)
             .mulUp(_bondAmount)
             .mulDivUp(_normalizedTimeRemaining, _vaultSharePrice);
-
-        // NOTE: Round down to underestimate the governance curve fee.
-        //
-        // Calculate the curve portion of the governance fee:
-        //
-        // governanceCurveFee = curve_fee * phi_gov
-        //                    = shares * phi_gov
-        governanceCurveFee = curveFee.mulDown(_governanceLPFee);
 
         // NOTE: Round up to overestimate the flat fee.
         //
@@ -398,22 +354,10 @@ library HyperdriveExecutionLibrary {
         //          = (base * (1 - t) * phi_flat) * (shares/base)
         //          = shares * (1 - t) * phi_flat
         uint256 flat = _bondAmount.mulDivUp(
-            1e18 - _normalizedTimeRemaining,
+            ONE - _normalizedTimeRemaining,
             _vaultSharePrice
         );
         flatFee = flat.mulUp(_flatFee);
-
-        // NOTE: Round down to underestimate the total governance fee.
-        //
-        // We calculate the flat portion of the governance fee as:
-        //
-        // governance_flat_fee = flat_fee * phi_gov
-        //                     = shares * phi_gov
-        //
-        // The totalGovernanceFee is the sum of the curve and flat governance fees.
-        totalGovernanceFee =
-            governanceCurveFee +
-            flatFee.mulDown(_governanceLPFee);
     }
 
     /// @dev Calculates the fees that go to the LPs and governance.
@@ -424,15 +368,12 @@ library HyperdriveExecutionLibrary {
     ///         (base/bonds).
     /// @param _vaultSharePrice The current vault share price (base/shares).
     /// @return curveFee The curve fee. The fee is in terms of bonds.
-    /// @return governanceCurveFee The curve fee that goes to governance. The
-    ///         fee is in terms of bonds.
     function _calculateFeesGivenShares(
         uint256 _shareAmount,
         uint256 _spotPrice,
         uint256 _vaultSharePrice,
-        uint256 _curveFee,
-        uint256 _governanceLPFee
-    ) internal pure returns (uint256 curveFee, uint256 governanceCurveFee) {
+        uint256 _curveFee
+    ) internal pure returns (uint256 curveFee) {
         // NOTE: Round up to overestimate the curve fee.
         //
         // Fixed Rate (r) = (value at maturity - purchase price)/(purchase price)
@@ -454,26 +395,19 @@ library HyperdriveExecutionLibrary {
         //           = r * phi_curve * base/shares * shares
         //           = bonds/base * phi_curve * base
         //           = bonds * phi_curve
-        curveFee = (uint256(1e18).divUp(_spotPrice) - 1e18)
+        curveFee = (uint256(ONE).divUp(_spotPrice) - ONE)
             .mulUp(_curveFee)
             .mulUp(_vaultSharePrice)
             .mulUp(_shareAmount);
-
-        // NOTE: Round down to underestimate the governance curve fee.
-        //
-        // We leave the governance fee in terms of bonds:
-        // governanceCurveFee = curve_fee * phi_gov
-        //                    = bonds * phi_gov
-        governanceCurveFee = curveFee.mulDown(_governanceLPFee);
     }
 
-    /// @notice Obtains the vaultSharePrice from the hyperdrive instance.
+    /// @dev Obtains the vaultSharePrice from the hyperdrive instance.
     /// @return The current vaultSharePrice.
     function vaultSharePrice(IHyperdrive self) internal view returns (uint256) {
-        return self.convertToBase(1e18);
+        return self.convertToBase(ONE);
     }
 
-    /// @notice Returns whether a position is mature.
+    /// @dev Returns whether a position is mature.
     /// @param _position Position to evaluate.
     /// @return True if the position is mature false otherwise.
     function isMature(
@@ -483,7 +417,7 @@ library HyperdriveExecutionLibrary {
         return isMature(self, _position.maturityTime);
     }
 
-    /// @notice Returns whether a position is mature.
+    /// @dev Returns whether a position is mature.
     /// @param _maturity Maturity to evaluate.
     /// @return True if the position is mature false otherwise.
     function isMature(
@@ -493,7 +427,7 @@ library HyperdriveExecutionLibrary {
         return normalizedTimeRemaining(self, _maturity) == 0;
     }
 
-    /// @notice Converts the duration of the bond to a value between 0 and 1.
+    /// @dev Converts the duration of the bond to a value between 0 and 1.
     /// @param _maturity Maturity time to evaluate.
     /// @return timeRemaining The normalized duration of the bond.
     function normalizedTimeRemaining(
@@ -514,13 +448,13 @@ library HyperdriveExecutionLibrary {
         // Since we overestimate the time remaining to underestimate the
         // proceeds, there is an edge case where _normalizedTimeRemaining > 1
         // if the position was opened in the same checkpoint. For this case,
-        // we can just set it to 1e18.
-        if (timeRemaining > 1e18) {
-            timeRemaining = 1e18;
+        // we can just set it to ONE.
+        if (timeRemaining > ONE) {
+            timeRemaining = ONE;
         }
     }
 
-    /// @notice Retrieve the latest checkpoint time from the hyperdrive instance.
+    /// @dev Retrieve the latest checkpoint time from the hyperdrive instance.
     /// @return The latest checkpoint time.
     function latestCheckpoint(
         IHyperdrive self
@@ -532,7 +466,7 @@ library HyperdriveExecutionLibrary {
             );
     }
 
-    /// @notice Returns the closest checkpoint timestamp before _timestamp.
+    /// @dev Returns the closest checkpoint timestamp before _timestamp.
     /// @param _timestamp The timestamp to search for checkpoints.
     /// @return The closest checkpoint timestamp.
     function getCheckpointIdDown(
@@ -543,7 +477,7 @@ library HyperdriveExecutionLibrary {
             _timestamp - (_timestamp % self.getPoolConfig().checkpointDuration);
     }
 
-    /// @notice Returns the closest checkpoint before _timestamp.
+    /// @dev Returns the closest checkpoint before _timestamp.
     /// @param _timestamp The timestamp to search for checkpoints.
     /// @return The closest checkpoint.
     function getCheckpointDown(
@@ -553,7 +487,7 @@ library HyperdriveExecutionLibrary {
         return self.getCheckpoint(getCheckpointIdDown(self, _timestamp));
     }
 
-    /// @notice Returns the closest checkpoint timestamp after _timestamp.
+    /// @dev Returns the closest checkpoint timestamp after _timestamp.
     /// @param _timestamp The timestamp to search for checkpoints.
     /// @return The closest checkpoint timestamp.
     function getCheckpointIdUp(
@@ -566,7 +500,7 @@ library HyperdriveExecutionLibrary {
             (_checkpointDuration - (_timestamp % _checkpointDuration));
     }
 
-    /// @notice Returns the closest checkpoint after _timestamp.
+    /// @dev Returns the closest checkpoint after _timestamp.
     /// @param _timestamp The timestamp to search for checkpoints.
     /// @return The closest checkpoint.
     function getCheckpointUp(

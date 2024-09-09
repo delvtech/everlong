@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.20;
+pragma solidity 0.8.22;
 
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
-import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
+import { ERC20 } from "openzeppelin/token/ERC20/ERC20.sol";
+import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { IEverlong } from "./interfaces/IEverlong.sol";
 import { EVERLONG_KIND, EVERLONG_VERSION } from "./libraries/Constants.sol";
 import { HyperdriveExecutionLibrary } from "./libraries/HyperdriveExecution.sol";
@@ -72,6 +73,7 @@ contract Everlong is IEverlong {
     using HyperdriveExecutionLibrary for IHyperdrive;
     using Portfolio for Portfolio.State;
     using SafeCast for *;
+    using SafeERC20 for ERC20;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Storage                                                 │
@@ -84,22 +86,22 @@ contract Everlong is IEverlong {
     //       https://zokyo-auditing-tutorials.gitbook.io/zokyo-gas-savings/tutorials/gas-saving-technique-23-public-to-private-constants
 
     /// @dev Name of the Everlong token.
-    string internal _name;
+    string public _name;
 
     /// @dev Symbol of the Everlong token.
     string internal _symbol;
 
     /// @notice Address of the Hyperdrive instance wrapped by Everlong.
-    IHyperdrive internal immutable _hyperdrive;
+    address public immutable override hyperdrive;
 
     /// @dev Whether to use Hyperdrive's base token to purchase bonds.
     ///      If false, use the Hyperdrive's `vaultSharesToken`.
-    bool internal immutable _asBase;
+    bool public immutable asBase;
 
     /// @dev Address of the underlying asset to use with hyperdrive.
-    IERC20 internal immutable _asset;
+    address public immutable _asset;
 
-    /// @dev Decimals to use with _asset.
+    /// @dev Decimals to use with asset.
     uint8 internal immutable _decimals;
 
     /// @dev Kind of everlong.
@@ -116,13 +118,13 @@ contract Everlong is IEverlong {
     ///       was picked arbitrarily.
     uint8 public constant decimalsOffset = 3;
 
-    // ────────────────────────── Internal ───────────────────────
+    // ─────────────────────────── State ────────────────────────
+
+    /// @dev Address of the contract admin.
+    address public admin;
 
     /// @dev Structure to store and account for everlong-controlled positions.
     Portfolio.State internal _portfolio;
-
-    /// @dev Address of the contract admin.
-    address internal _admin;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Modifiers                                               │
@@ -130,7 +132,7 @@ contract Everlong is IEverlong {
 
     /// @dev Ensures that the contract is being called by admin.
     modifier onlyAdmin() {
-        if (msg.sender != _admin) {
+        if (msg.sender != admin) {
             revert IEverlong.Unauthorized();
         }
         _;
@@ -144,29 +146,27 @@ contract Everlong is IEverlong {
     /// @param __name Name of the ERC20 token managed by Everlong.
     /// @param __symbol Symbol of the ERC20 token managed by Everlong.
     /// @param __decimals Decimals of the Everlong token and Hyperdrive token.
-    /// @param __hyperdrive Address of the Hyperdrive instance.
-    /// @param __asBase Whether to use the base or shares token from Hyperdrive.
+    /// @param _hyperdrive Address of the Hyperdrive instance.
+    /// @param _asBase Whether to use the base or shares token from Hyperdrive.
     constructor(
         string memory __name,
         string memory __symbol,
         uint8 __decimals,
-        address __hyperdrive,
-        bool __asBase
+        address _hyperdrive,
+        bool _asBase
     ) {
         // Store constructor parameters.
         _name = __name;
         _symbol = __symbol;
         _decimals = __decimals;
-        _hyperdrive = IHyperdrive(__hyperdrive);
-        _asBase = __asBase;
-        _asset = IERC20(
-            __asBase
-                ? IHyperdrive(__hyperdrive).baseToken()
-                : IHyperdrive(__hyperdrive).vaultSharesToken()
-        );
+        hyperdrive = _hyperdrive;
+        asBase = _asBase;
+        _asset = _asBase
+            ? IHyperdrive(_hyperdrive).baseToken()
+            : IHyperdrive(_hyperdrive).vaultSharesToken();
 
         // Set the admin to the contract deployer.
-        _admin = msg.sender;
+        admin = msg.sender;
     }
 
     // ╭─────────────────────────────────────────────────────────╮
@@ -174,10 +174,10 @@ contract Everlong is IEverlong {
     // ╰─────────────────────────────────────────────────────────╯
 
     /// @notice Allows admin to transfer the admin role.
-    /// @param __admin The new admin address.
-    function setAdmin(address __admin) external onlyAdmin {
-        _admin = __admin;
-        emit AdminUpdated(__admin);
+    /// @param _admin The new admin address.
+    function setAdmin(address _admin) external onlyAdmin {
+        admin = _admin;
+        emit AdminUpdated(_admin);
     }
 
     // ╭─────────────────────────────────────────────────────────╮
@@ -191,7 +191,7 @@ contract Everlong is IEverlong {
     /// @return Total amount of assets controlled by Everlong.
     function totalAssets() public view override returns (uint256) {
         // If everlong holds no bonds, return the balance.
-        uint256 balance = _asset.balanceOf(address(this));
+        uint256 balance = ERC20(_asset).balanceOf(address(this));
         if (_portfolio.totalBonds == 0) {
             return balance;
         }
@@ -203,25 +203,26 @@ contract Everlong is IEverlong {
         // timestamp to underestimate the value.
         return
             balance +
-            _hyperdrive.previewCloseLong(
-                _asBase,
+            IHyperdrive(hyperdrive).previewCloseLong(
+                asBase,
                 IEverlong.Position({
-                    maturityTime: _hyperdrive
+                    maturityTime: IHyperdrive(hyperdrive)
                         .getCheckpointIdUp(_portfolio.avgMaturityTime)
                         .toUint128(),
                     bondAmount: _portfolio.totalBonds
-                })
+                }),
+                ""
             );
     }
 
     /// @dev Frees sufficient assets for a withdrawal by closing positions.
-    /// @param _assets Amount of assets owed to the withdrawer.
+    /// @param assets Amount of assets owed to the withdrawer.
     function _beforeWithdraw(
-        uint256 _assets,
+        uint256 assets,
         uint256
     ) internal virtual override {
         // Close more positions until sufficient idle to process withdrawal.
-        _closePositions(_assets - _asset.balanceOf(address(this)));
+        _closePositions(assets - ERC20(_asset).balanceOf(address(this)));
     }
 
     // ╭─────────────────────────────────────────────────────────╮
@@ -234,13 +235,12 @@ contract Everlong is IEverlong {
         // Close matured positions.
         _closeMaturedPositions();
 
-        // Spend idle on opening a new position.
-        uint256 toSpend = _asset.balanceOf(address(this));
-        IERC20(_asset).approve(address(_hyperdrive), toSpend);
-        (uint256 maturityTime, uint256 bondAmount) = _hyperdrive.openLong(
-            _asBase,
-            toSpend
-        );
+        // Spend idle on opening a new position. Leave an extra wei for the
+        // approval to keep the slot warm.
+        uint256 toSpend = ERC20(_asset).balanceOf(address(this));
+        ERC20(_asset).forceApprove(address(hyperdrive), toSpend + 1);
+        (uint256 maturityTime, uint256 bondAmount) = IHyperdrive(hyperdrive)
+            .openLong(asBase, toSpend, "");
 
         // Account for the new position in the portfolio.
         _portfolio.handleOpenPosition(maturityTime, bondAmount);
@@ -256,10 +256,10 @@ contract Everlong is IEverlong {
         IEverlong.Position memory position;
         while (!_portfolio.isEmpty()) {
             position = _portfolio.head();
-            if (!_hyperdrive.isMature(position)) {
+            if (!IHyperdrive(hyperdrive).isMature(position)) {
                 return output;
             }
-            output += _hyperdrive.closeLong(_asBase, position);
+            output += IHyperdrive(hyperdrive).closeLong(asBase, position, "");
             _portfolio.handleClosePosition();
         }
         return output;
@@ -272,7 +272,11 @@ contract Everlong is IEverlong {
         uint256 _targetOutput
     ) internal returns (uint256 output) {
         while (!_portfolio.isEmpty() && output < _targetOutput) {
-            output += _hyperdrive.closeLong(_asBase, _portfolio.head());
+            output += IHyperdrive(hyperdrive).closeLong(
+                asBase,
+                _portfolio.head(),
+                ""
+            );
             _portfolio.handleClosePosition();
         }
         return output;
@@ -306,28 +310,11 @@ contract Everlong is IEverlong {
         return _decimals;
     }
 
-    /// @notice The address of the underlying Hyperdrive Instance.
-    /// @return The address of the underlying Hyperdrive Instance.
-    function hyperdrive() external view override returns (address) {
-        return address(_hyperdrive);
-    }
-
-    /// @notice Whether Everlong uses Hyperdrive's base token to transact.
-    /// @return Whether Everlong uses Hyperdrive's base token to transact.
-    function asBase() external view returns (bool) {
-        return _asBase;
-    }
-
-    /// @notice Returns the address of the token used to interact with the Hyperdrive 
+    /// @notice Returns the address of the token used to interact with the Hyperdrive
     ///         instance.
     /// @return Address of the token used to interact with the Hyperdrive instance.
     function asset() public view override returns (address) {
         return address(_asset);
-    }
-
-    /// @notice Gets the admin address for Everlong.
-    function admin() external view returns (address) {
-        return _admin;
     }
 
     // FIXME: Consider idle liquidity + maybe maxLong?
@@ -335,13 +322,13 @@ contract Everlong is IEverlong {
     /// @notice Returns whether the portfolio needs rebalancing.
     /// @return True if the portfolio needs rebalancing, false otherwise.
     function canRebalance() external view returns (bool) {
-        return _hyperdrive.isMature(_portfolio.head());
+        return IHyperdrive(hyperdrive).isMature(_portfolio.head());
     }
 
     /// @notice Returns whether the portfolio has matured positions.
     /// @return True if the portfolio has matured positions, false otherwise.
     function hasMaturedPositions() external view returns (bool) {
-        return _hyperdrive.isMature(_portfolio.head());
+        return IHyperdrive(hyperdrive).isMature(_portfolio.head());
     }
 
     /// @notice Retrieve the position at the specified location in the queue..
@@ -363,7 +350,12 @@ contract Everlong is IEverlong {
     /// @param _index Location of the position to value.
     /// @return Estimated proceeds of closing the position.
     function positionValue(uint256 _index) external view returns (uint256) {
-        return _hyperdrive.previewCloseLong(_asBase, _portfolio.at(_index));
+        return
+            IHyperdrive(hyperdrive).previewCloseLong(
+                asBase,
+                _portfolio.at(_index),
+                ""
+            );
     }
 
     /// @notice Weighted average maturity timestamp of the portfolio.

@@ -33,7 +33,8 @@ contract TestHyperdriveExecution is EverlongTest {
         uint256 longAmount = 10e18;
         uint256 previewBonds = hyperdrive.previewOpenLong(
             everlong.asBase(),
-            longAmount
+            longAmount,
+            ""
         );
         (, uint256 actualBonds) = openLong(alice, longAmount);
         assertEq(previewBonds, actualBonds);
@@ -43,7 +44,8 @@ contract TestHyperdriveExecution is EverlongTest {
         longAmount = 500e18;
         previewBonds = hyperdrive.previewOpenLong(
             everlong.asBase(),
-            longAmount
+            longAmount,
+            ""
         );
         (, actualBonds) = openLong(bob, longAmount);
         assertEq(previewBonds, actualBonds);
@@ -64,7 +66,8 @@ contract TestHyperdriveExecution is EverlongTest {
             IEverlong.Position({
                 maturityTime: maturityTime.toUint128(),
                 bondAmount: bondAmount.toUint128()
-            })
+            }),
+            ""
         );
         uint256 actualAssets = closeLong(alice, maturityTime, bondAmount);
         assertEq(actualAssets, previewAssets);
@@ -88,7 +91,8 @@ contract TestHyperdriveExecution is EverlongTest {
             IEverlong.Position({
                 maturityTime: maturityTime.toUint128(),
                 bondAmount: bondAmount.toUint128()
-            })
+            }),
+            ""
         );
         uint256 actualAssets = closeLong(alice, maturityTime, bondAmount);
         assertEq(actualAssets, previewAssets);
@@ -112,7 +116,8 @@ contract TestHyperdriveExecution is EverlongTest {
             IEverlong.Position({
                 maturityTime: maturityTime.toUint128(),
                 bondAmount: bondAmount.toUint128()
-            })
+            }),
+            ""
         );
         uint256 actualAssets = closeLong(alice, maturityTime, bondAmount);
         assertEq(actualAssets, previewAssets);
@@ -139,7 +144,8 @@ contract TestHyperdriveExecution is EverlongTest {
             IEverlong.Position({
                 maturityTime: maturityTime.toUint128(),
                 bondAmount: bondAmount.toUint128()
-            })
+            }),
+            ""
         );
         uint256 actualAssets = closeLong(alice, maturityTime, bondAmount);
         assertEq(actualAssets, previewAssets);
@@ -163,7 +169,8 @@ contract TestHyperdriveExecution is EverlongTest {
             IEverlong.Position({
                 maturityTime: maturityTime.toUint128(),
                 bondAmount: bondAmount.toUint128()
-            })
+            }),
+            ""
         );
         uint256 actualAssets = closeLong(alice, maturityTime, bondAmount);
         assertEq(actualAssets, previewAssets);
@@ -188,7 +195,8 @@ contract TestHyperdriveExecution is EverlongTest {
             IEverlong.Position({
                 maturityTime: maturityTime.toUint128(),
                 bondAmount: bondAmount.toUint128()
-            })
+            }),
+            ""
         );
         uint256 actualAssets = closeLong(alice, maturityTime, bondAmount);
         assertEq(actualAssets, previewAssets);
