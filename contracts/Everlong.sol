@@ -332,30 +332,10 @@ contract Everlong is IEverlong {
         return decimalsOffset;
     }
 
-    /// @notice The address of the underlying Hyperdrive Instance.
-    /// @return The address of the underlying Hyperdrive Instance.
-    function hyperdrive() external view override returns (address) {
-        return address(_hyperdrive);
-    }
-
-    /// @notice Whether Everlong uses Hyperdrive's base token to transact.
-    /// @return Whether Everlong uses Hyperdrive's base token to transact.
-    function asBase() external view returns (bool) {
-        return _asBase;
-    }
-
     /// @notice Address of the token used to interact with the Hyperdrive instance.
     /// @return Address of the token used to interact with the Hyperdrive instance.
     function asset() public view override returns (address) {
         return address(_asset);
-    }
-
-    // FIXME: Consider idle liquidity + maybe maxLong?
-    //
-    /// @notice Returns whether the portfolio needs rebalancing.
-    /// @return True if the portfolio needs rebalancing, false otherwise.
-    function canRebalance() external view returns (bool) {
-        return IHyperdrive(hyperdrive).isMature(_portfolio.head());
     }
 
     /// @notice Returns whether the portfolio has matured positions.
