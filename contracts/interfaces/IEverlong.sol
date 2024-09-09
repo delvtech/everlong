@@ -1,31 +1,43 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-import { IERC4626 } from "openzeppelin/interfaces/IERC4626.sol";
+import { ERC4626 } from "solady/tokens/ERC4626.sol";
 import { IEverlongAdmin } from "./IEverlongAdmin.sol";
 import { IEverlongEvents } from "./IEverlongEvents.sol";
-import { IEverlongPositions } from "./IEverlongPositions.sol";
+import { IEverlongPortfolio } from "./IEverlongPortfolio.sol";
 
-interface IEverlong is
+abstract contract IEverlong is
+    ERC4626,
     IEverlongAdmin,
-    IERC4626,
     IEverlongEvents,
-    IEverlongPositions
+    IEverlongPortfolio
 {
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Structs                                                 │
+    // ╰─────────────────────────────────────────────────────────╯
+
+    /// @notice Contains the information needed to identify an open Hyperdrive position.
+    struct Position {
+        /// @notice Time when the position matures.
+        uint128 maturityTime;
+        /// @notice Amount of bonds in the position.
+        uint128 bondAmount;
+    }
+
     // ╭─────────────────────────────────────────────────────────╮
     // │ Getters                                                 │
     // ╰─────────────────────────────────────────────────────────╯
 
     /// @notice Gets the address of the underlying Hyperdrive Instance
-    function hyperdrive() external view returns (address);
+    function hyperdrive() external view virtual returns (address);
 
     /// @notice Gets the Everlong instance's kind.
     /// @return The Everlong instance's kind.
-    function kind() external pure returns (string memory);
+    function kind() external pure virtual returns (string memory);
 
     /// @notice Gets the Everlong instance's version.
     /// @return The Everlong instance's version.
-    function version() external pure returns (string memory);
+    function version() external pure virtual returns (string memory);
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Errors                                                  │
@@ -35,18 +47,4 @@ interface IEverlong is
 
     /// @notice Thrown when caller is not the admin.
     error Unauthorized();
-
-    // ── Positions ──────────────────────────────────────────────
-
-    /// @notice Thrown when attempting to insert a position with
-    ///         a `maturityTime` sooner than the most recent position's.
-    error InconsistentPositionMaturity();
-
-    /// @notice Thrown when attempting to close a position with
-    ///         a `bondAmount` greater than that contained by the position.
-    error InconsistentPositionBondAmount();
-
-    /// @notice Thrown when a target idle amount is too high to be reached
-    ///         even after closing all positions.
-    error TargetIdleTooHigh();
 }

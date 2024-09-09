@@ -1,0 +1,16 @@
+forge-std/=lib/forge-std/src/
+hyperdrive/=lib/hyperdrive/
+openzeppelin/=lib/openzeppelin-contracts/contracts/
+solady/=lib/solady/src/
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
+ExcessivelySafeCall/=lib/hyperdrive/lib/ExcessivelySafeCall/src/
+aave-v3-core/=lib/hyperdrive/lib/aave-v3-core/
+aave/=lib/hyperdrive/lib/aave-v3-core/contracts/
+ds-test/=lib/hyperdrive/lib/solmate/lib/ds-test/src/
+erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/
+etherfi/=lib/hyperdrive/lib/smart-contracts/
+halmos-cheatcodes/=lib/openzeppelin-contracts/lib/halmos-cheatcodes/src/
+morpho-blue/=lib/hyperdrive/lib/morpho-blue/
+nomad/=lib/hyperdrive/lib/ExcessivelySafeCall/src/
+openzeppelin-contracts/=lib/openzeppelin-contracts/
+solmate/=lib/hyperdrive/lib/solmate/src/

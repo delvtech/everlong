@@ -137,3 +137,7 @@ lcov.info
 
 # vscode workspace settings
 .vscode
+
+# notes
+NOTES.md
+TODO.md
