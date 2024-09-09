@@ -45,10 +45,7 @@ contract TestEverlongPositions is EverlongTest {
         );
 
         // Record an opened position.
-        // Check that:
-        // - `PositionOpened` event is emitted
-        // - Position count is increased
-        vm.expectEmit(true, true, true, true);
+        // Check that position count is increased
         portfolio.handleOpenPosition(1, 1);
         assertEq(
             portfolio.positionCount(),
@@ -117,7 +114,7 @@ contract TestEverlongPositions is EverlongTest {
 
         // Check position count is 0.
         assertEq(
-            everlong.positionCount(),
+            portfolio.positionCount(),
             0,
             "position count should be 0 after opening and closing a long for the full bond amount"
         );

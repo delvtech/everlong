@@ -215,6 +215,13 @@ contract Everlong is IEverlong {
             );
     }
 
+    /// @dev Rebalance after a deposit if needed.
+    function _afterDeposit(uint256, uint256) internal virtual override {
+        if (canRebalance()) {
+            rebalance();
+        }
+    }
+
     /// @dev Frees sufficient assets for a withdrawal by closing positions.
     /// @param assets Amount of assets owed to the withdrawer.
     function _beforeWithdraw(
@@ -244,6 +251,14 @@ contract Everlong is IEverlong {
 
         // Account for the new position in the portfolio.
         _portfolio.handleOpenPosition(maturityTime, bondAmount);
+    }
+
+    // FIXME: Consider idle liquidity + maybe maxLong?
+    //
+    /// @notice Returns whether the portfolio needs rebalancing.
+    /// @return True if the portfolio needs rebalancing, false otherwise.
+    function canRebalance() public view returns (bool) {
+        return true;
     }
 
     // ╭─────────────────────────────────────────────────────────╮
@@ -310,19 +325,16 @@ contract Everlong is IEverlong {
         return _decimals;
     }
 
-    /// @notice Returns the address of the token used to interact with the Hyperdrive
-    ///         instance.
+    /// @dev The decimal offset used for virtual shares.
+    /// @return The decimal offset used for virtual shares.
+    function _decimalsOffset() internal view virtual override returns (uint8) {
+        return decimalsOffset;
+    }
+
+    /// @notice Address of the token used to interact with the Hyperdrive instance.
     /// @return Address of the token used to interact with the Hyperdrive instance.
     function asset() public view override returns (address) {
         return address(_asset);
-    }
-
-    // FIXME: Consider idle liquidity + maybe maxLong?
-    //
-    /// @notice Returns whether the portfolio needs rebalancing.
-    /// @return True if the portfolio needs rebalancing, false otherwise.
-    function canRebalance() external view returns (bool) {
-        return IHyperdrive(hyperdrive).isMature(_portfolio.head());
     }
 
     /// @notice Returns whether the portfolio has matured positions.

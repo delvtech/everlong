@@ -8,6 +8,11 @@ import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
 
 /// @dev Tests Everlong Admin functionality.
 contract TestEverlongAdmin is EverlongTest {
+    function setUp() public override {
+        super.setUp();
+        deployEverlong();
+    }
+
     /// @dev Validates revert when `setAdmin` called by non-admin.
     function test_setAdmin_failure_unauthorized() external {
         // Ensure that an unauthorized user cannot set the admin address.

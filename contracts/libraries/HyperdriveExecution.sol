@@ -128,8 +128,8 @@ library HyperdriveExecutionLibrary {
             poolConfig.timeStretch
         );
         bondReservesDelta = _calculateOpenLongFees(
-            bondReservesDelta,
             _shareAmount,
+            bondReservesDelta,
             _vaultSharePrice,
             spotPrice,
             poolConfig.fees.curve

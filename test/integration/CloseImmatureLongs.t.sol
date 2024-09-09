@@ -145,7 +145,6 @@ contract PricingTest is EverlongTest {
         ERC20Mintable(everlong.asset()).mint(basePaid);
         ERC20Mintable(everlong.asset()).approve(address(everlong), basePaid);
         uint256 shares = everlong.deposit(basePaid, bob);
-        everlong.rebalance();
 
         // half term passes
         advanceTimeWithCheckpoints(POSITION_DURATION / 2, variableInterest);
