@@ -75,8 +75,10 @@ library HyperdriveExecutionLibrary {
             );
     }
 
-    /// @dev Calculates the number of bonds a user will receive when opening a
-    ///      long position.
+    /// @dev Calculates the amount of output bonds received from opening a
+    ///      long. The process is as follows:
+    ///        1. Calculates the raw amount using yield space.
+    ///        2. Subtracts fees.
     /// @param _shareAmount Amount of shares being exchanged for bonds.
     /// @return Amount of bonds received.
     function _calculateOpenLong(
@@ -130,8 +132,7 @@ library HyperdriveExecutionLibrary {
             _shareAmount,
             _vaultSharePrice,
             spotPrice,
-            poolConfig.fees.curve,
-            poolConfig.fees.governanceLP
+            poolConfig.fees.curve
         );
         return bondReservesDelta;
     }
@@ -147,8 +148,7 @@ library HyperdriveExecutionLibrary {
         uint256 _bondReservesDelta,
         uint256 _vaultSharePrice,
         uint256 _spotPrice,
-        uint256 _curveFee,
-        uint256 _governanceLPFee
+        uint256 _curveFee
     ) internal pure returns (uint256) {
         // Calculate the fees charged to the user (curveFee).
         uint256 curveFee = _calculateFeesGivenShares(
