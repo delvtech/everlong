@@ -110,7 +110,6 @@ contract TestEverlongPositions is EverlongTest {
         // Record opening and fully closing a long.
         // Check that `PositionClosed` event is emitted.
         portfolio.handleOpenPosition(1, 1);
-        console.log("hello");
         portfolio.handleClosePosition();
 
         // Check position count is 0.
