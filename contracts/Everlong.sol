@@ -233,13 +233,13 @@ contract Everlong is IEverlong {
     }
 
     /// @dev Frees sufficient assets for a withdrawal by closing positions.
-    /// @param assets Amount of assets owed to the withdrawer.
+    /// @param _assets Amount of assets owed to the withdrawer.
     function _beforeWithdraw(
-        uint256 assets,
+        uint256 _assets,
         uint256
     ) internal virtual override {
         // Close more positions until sufficient idle to process withdrawal.
-        _closePositions(assets - ERC20(_asset).balanceOf(address(this)));
+        _closePositions(_assets - ERC20(_asset).balanceOf(address(this)));
     }
 
     // ╭─────────────────────────────────────────────────────────╮
@@ -266,6 +266,8 @@ contract Everlong is IEverlong {
 
         // Account for the new position in the portfolio.
         _portfolio.handleOpenPosition(maturityTime, bondAmount);
+
+        emit Rebalanced();
     }
 
     /// @notice Returns true if the portfolio can be rebalanced.
@@ -281,6 +283,11 @@ contract Everlong is IEverlong {
     }
 
     // TODO: Use cached poolconfig
+    //
+    /// @notice Returns the target amount of funds to keep idle in Everlong.
+    /// @dev If the target amount is lower than Hyperdrive's minimum,
+    ///      then Hyperdrive's minimum becomes the target.
+    /// @return assets Target amount of idle assets.
     function targetIdleLiquidity() public view returns (uint256 assets) {
         assets = targetIdleLiquidityPercentage
             .mulDivDown(totalAssets(), ONE)
@@ -290,6 +297,11 @@ contract Everlong is IEverlong {
     }
 
     // TODO: Use cached poolconfig
+    //
+    /// @notice Returns the max amount of funds to keep idle in Everlong.
+    /// @dev If the max amount is lower than Hyperdrive's minimum,
+    ///      then Hyperdrive's minimum becomes the max.
+    /// @return assets Maximum amount of idle assets.
     function maxIdleLiquidity() public view returns (uint256 assets) {
         assets = maxIdleLiquidityPercentage.mulDivDown(totalAssets(), ONE).max(
             IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount
