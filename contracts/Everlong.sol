@@ -7,7 +7,7 @@ import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { ERC20 } from "openzeppelin/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { IEverlong } from "./interfaces/IEverlong.sol";
-import { EVERLONG_KIND, EVERLONG_VERSION } from "./libraries/Constants.sol";
+import { EVERLONG_KIND, EVERLONG_VERSION, ONE } from "./libraries/Constants.sol";
 import { HyperdriveExecutionLibrary } from "./libraries/HyperdriveExecution.sol";
 import { Portfolio } from "./libraries/Portfolio.sol";
 
@@ -81,10 +81,6 @@ contract Everlong is IEverlong {
 
     // ───────────────────────── Immutables ──────────────────────
 
-    // NOTE: Immutables accessed during transactions are left as internal
-    //       to avoid the gas overhead of auto-generated getter functions.
-    //       https://zokyo-auditing-tutorials.gitbook.io/zokyo-gas-savings/tutorials/gas-saving-technique-23-public-to-private-constants
-
     /// @dev Name of the Everlong token.
     string public _name;
 
@@ -103,6 +99,12 @@ contract Everlong is IEverlong {
 
     /// @dev Decimals to use with asset.
     uint8 internal immutable _decimals;
+
+    /// @notice Target percentage of assets to leave uninvested.
+    uint256 public immutable targetIdleLiquidityPercentage;
+
+    /// @notice Maximum percentage of assets to leave uninvested.
+    uint256 public immutable maxIdleLiquidityPercentage;
 
     /// @dev Kind of everlong.
     string public constant override kind = EVERLONG_KIND;
@@ -148,12 +150,18 @@ contract Everlong is IEverlong {
     /// @param __decimals Decimals of the Everlong token and Hyperdrive token.
     /// @param _hyperdrive Address of the Hyperdrive instance.
     /// @param _asBase Whether to use the base or shares token from Hyperdrive.
+    /// @param _targetIdleLiquidityPercentage Target percentage of funds to
+    ///        keep idle.
+    /// @param _maxIdleLiquidityPercentage Max percentage of funds to keep
+    ///        idle.
     constructor(
         string memory __name,
         string memory __symbol,
         uint8 __decimals,
         address _hyperdrive,
-        bool _asBase
+        bool _asBase,
+        uint256 _targetIdleLiquidityPercentage,
+        uint256 _maxIdleLiquidityPercentage
     ) {
         // Store constructor parameters.
         _name = __name;
@@ -164,6 +172,8 @@ contract Everlong is IEverlong {
         _asset = _asBase
             ? IHyperdrive(_hyperdrive).baseToken()
             : IHyperdrive(_hyperdrive).vaultSharesToken();
+        targetIdleLiquidityPercentage = _targetIdleLiquidityPercentage;
+        maxIdleLiquidityPercentage = _maxIdleLiquidityPercentage;
 
         // Set the admin to the contract deployer.
         admin = msg.sender;
@@ -197,8 +207,8 @@ contract Everlong is IEverlong {
         }
 
         // Estimate the value of everlong-controlled positions by calculating
-        // the proceeds one would receive from closing a position with the portfolio's
-        // total amount of bonds and weighted average maturity.
+        // the proceeds one would receive from closing a position with the
+        // portfolio's total amount of bonds and weighted average maturity.
         // The weighted average maturity is rounded to the next checkpoint
         // timestamp to underestimate the value.
         return
@@ -215,9 +225,9 @@ contract Everlong is IEverlong {
             );
     }
 
-    /// @dev Rebalance after a deposit if needed.
+    /// @dev Attempt rebalancing after a deposit if idle is above max.
     function _afterDeposit(uint256, uint256) internal virtual override {
-        if (canRebalance()) {
+        if (ERC20(_asset).balanceOf(address(this)) > maxIdleLiquidity()) {
             rebalance();
         }
     }
@@ -239,6 +249,11 @@ contract Everlong is IEverlong {
     /// @notice Rebalance the everlong portfolio by closing mature positions
     ///         and using the proceeds to open new positions.
     function rebalance() public override {
+        // Early return if no rebalancing is needed.
+        if (!canRebalance()) {
+            return;
+        }
+
         // Close matured positions.
         _closeMaturedPositions();
 
@@ -253,12 +268,32 @@ contract Everlong is IEverlong {
         _portfolio.handleOpenPosition(maturityTime, bondAmount);
     }
 
-    // FIXME: Consider idle liquidity + maybe maxLong?
-    //
-    /// @notice Returns whether the portfolio needs rebalancing.
-    /// @return True if the portfolio needs rebalancing, false otherwise.
+    /// @notice Returns true if the portfolio can be rebalanced.
+    /// @notice The portfolio can be rebalanced if:
+    ///         - Any positions are matured.
+    ///         - The current idle liquidity is above the target.
+    /// @return True if the portfolio can be rebalanced, false otherwise.
     function canRebalance() public view returns (bool) {
-        return true;
+        return
+            (!_portfolio.isEmpty() &&
+                IHyperdrive(hyperdrive).isMature(_portfolio.head())) ||
+            ERC20(_asset).balanceOf(address(this)) > targetIdleLiquidity();
+    }
+
+    // TODO: Use cached poolconfig
+    function targetIdleLiquidity() public view returns (uint256 assets) {
+        assets = targetIdleLiquidityPercentage
+            .mulDivDown(totalAssets(), ONE)
+            .max(
+                IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount
+            );
+    }
+
+    // TODO: Use cached poolconfig
+    function maxIdleLiquidity() public view returns (uint256 assets) {
+        assets = maxIdleLiquidityPercentage.mulDivDown(totalAssets(), ONE).max(
+            IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount
+        );
     }
 
     // ╭─────────────────────────────────────────────────────────╮
@@ -340,7 +375,9 @@ contract Everlong is IEverlong {
     /// @notice Returns whether the portfolio has matured positions.
     /// @return True if the portfolio has matured positions, false otherwise.
     function hasMaturedPositions() external view returns (bool) {
-        return IHyperdrive(hyperdrive).isMature(_portfolio.head());
+        return
+            !_portfolio.isEmpty() &&
+            IHyperdrive(hyperdrive).isMature(_portfolio.head());
     }
 
     /// @notice Retrieve the position at the specified location in the queue..

@@ -44,6 +44,9 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     /// @dev Everlong token symbol.
     string internal EVERLONG_SYMBOL = "evTest";
 
+    uint256 internal TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0;
+    uint256 internal MAX_IDLE_LIQUIDITY_PERCENTAGE = 0;
+
     // ╭─────────────────────────────────────────────────────────╮
     // │ Hyperdrive Configuration                                │
     // ╰─────────────────────────────────────────────────────────╯
@@ -95,7 +98,9 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             EVERLONG_SYMBOL,
             hyperdrive.decimals(),
             address(hyperdrive),
-            true
+            true,
+            TARGET_IDLE_LIQUIDITY_PERCENTAGE,
+            MAX_IDLE_LIQUIDITY_PERCENTAGE
         );
         vm.stopPrank();
 
