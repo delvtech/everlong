@@ -31,6 +31,8 @@ contract TestEverlongPositions is EverlongTest {
     }
 
     function setUp() public virtual override {
+        TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0.1e17;
+        MAX_IDLE_LIQUIDITY_PERCENTAGE = 0.2e17;
         super.setUp();
         deployEverlong();
     }
@@ -206,36 +208,6 @@ contract TestEverlongPositions is EverlongTest {
         );
     }
 
-    /// @dev Ensures that `canRebalance()` returns false immediately after
-    ///      a rebalance is performed.
-    function test_canRebalance_false_after_rebalance() external {
-        // Mint some tokens to Everlong for opening Longs.
-        // Call `rebalance()` to cause Everlong to open a position.
-        // Ensure the `Rebalanced()` event is emitted.
-        mintApproveEverlongBaseAsset(address(everlong), 100e18);
-        vm.expectEmit(true, true, true, true);
-        emit Rebalanced();
-        everlong.rebalance();
-
-        // Ensure the position count is now 1.
-        // Ensure Everlong's balance is lt Hyperdrive's minTransactionAmount.
-        // Ensure `canRebalance()` returns false.
-        assertEq(
-            everlong.positionCount(),
-            1,
-            "position count after first rebalance with balance should be 1"
-        );
-        assertLt(
-            IERC20(everlong.asset()).balanceOf(address(everlong)),
-            hyperdrive.getPoolConfig().minimumTransactionAmount,
-            "everlong balance after first rebalance should be less than hyperdrive's minTransactionAmount"
-        );
-        assertFalse(
-            everlong.canRebalance(),
-            "cannot rebalance without matured positions nor sufficient balance after first rebalance"
-        );
-    }
-
     /// @dev Ensures that `canRebalance()` returns true with a matured
     ///      position.
     function test_canRebalance_with_matured_position() external {
@@ -263,20 +235,25 @@ contract TestEverlongPositions is EverlongTest {
     ///      3. No matured positions are held.
     function test_rebalance_state() external {
         // Mint some tokens to Everlong for opening longs and rebalance.
-        mintApproveEverlongBaseAsset(address(everlong), 100e18);
+        mintApproveEverlongBaseAsset(address(everlong), 10_000e18);
+        everlong.rebalance();
+        advanceTime(everlong.positionAt(0).maturityTime, 0);
         everlong.rebalance();
 
-        // Increase block.timestamp until position is mature.
-        // Ensure Everlong has a matured position.
-        // Ensure `canRebalance()` returns true.
-        advanceTime(everlong.positionAt(0).maturityTime, 0);
-        assertTrue(
-            everlong.hasMaturedPositions(),
-            "everlong should have matured position after advancing time"
+        // Ensure idle liquidity is close to target.
+        assertApproxEqAbs(
+            IERC20(everlong.asset()).balanceOf(address(everlong)),
+            everlong.targetIdleLiquidity(),
+            1e18
         );
-        assertTrue(
-            everlong.canRebalance(),
-            "everlong should allow rebalance with matured position"
+
+        // Ensure idle liquidity is not over max.
+        assertLt(
+            IERC20(everlong.asset()).balanceOf(address(everlong)),
+            everlong.maxIdleLiquidity()
         );
+
+        // Ensure no matured positions
+        assertFalse(everlong.hasMaturedPositions());
     }
 }
