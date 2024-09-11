@@ -47,4 +47,12 @@ abstract contract IEverlong is
 
     /// @notice Thrown when caller is not the admin.
     error Unauthorized();
+
+    // ── Idle Liquidity ─────────────────────────────────────────
+
+    /// @notice Thrown when a percentage value is too large (>1e18).
+    error PercentageTooLarge();
+
+    /// @notice Thrown when target is greater than max.
+    error TargetIdleGreaterThanMax();
 }

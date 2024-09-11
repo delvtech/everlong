@@ -173,17 +173,18 @@ contract Everlong is IEverlong {
             ? IHyperdrive(_hyperdrive).baseToken()
             : IHyperdrive(_hyperdrive).vaultSharesToken();
 
-        // Ensure target <= 1e18.
-        require(_targetIdleLiquidityPercentage <= 1e18, "Target over 100%");
-
-        // Ensure max <= 1e18.
-        require(_maxIdleLiquidityPercentage <= 1e18, "Max over 100%");
+        // Ensure target <= 1e18 and max <= 1e18.
+        if (
+            _targetIdleLiquidityPercentage > ONE ||
+            _maxIdleLiquidityPercentage > ONE
+        ) {
+            revert PercentageTooLarge();
+        }
 
         // Ensure target < max.
-        require(
-            _targetIdleLiquidityPercentage <= _maxIdleLiquidityPercentage,
-            "Target must be <= Max"
-        );
+        if (_targetIdleLiquidityPercentage > _maxIdleLiquidityPercentage) {
+            revert TargetIdleGreaterThanMax();
+        }
 
         // Store idle and max.
         targetIdleLiquidityPercentage = _targetIdleLiquidityPercentage;
@@ -252,13 +253,16 @@ contract Everlong is IEverlong {
         uint256 _assets,
         uint256
     ) internal virtual override {
+        // If we have enough balance to service the withdrawal, no need to
+        // close positions.
+        uint256 balance = ERC20(_asset).balanceOf(address(this));
+        if (_assets <= balance) {
+            return;
+        }
+
         // Close more positions until sufficient idle to process withdrawal
         // and keep remaining target.
-        _closePositions(
-            _assets -
-                ERC20(_asset).balanceOf(address(this)) +
-                targetIdleLiquidity()
-        );
+        _closePositions(_assets - balance);
     }
 
     // ╭─────────────────────────────────────────────────────────╮
@@ -298,10 +302,8 @@ contract Everlong is IEverlong {
     ///         - The current idle liquidity is above the target.
     /// @return True if the portfolio can be rebalanced, false otherwise.
     function canRebalance() public view returns (bool) {
-        return
-            (!_portfolio.isEmpty() &&
-                IHyperdrive(hyperdrive).isMature(_portfolio.head())) ||
-            ERC20(_asset).balanceOf(address(this)) > targetIdleLiquidity();
+        return (hasMaturedPositions() ||
+            ERC20(_asset).balanceOf(address(this)) > targetIdleLiquidity());
     }
 
     // TODO: Use cached poolconfig
@@ -311,11 +313,9 @@ contract Everlong is IEverlong {
     ///      then Hyperdrive's minimum becomes the target.
     /// @return assets Target amount of idle assets.
     function targetIdleLiquidity() public view returns (uint256 assets) {
-        assets = targetIdleLiquidityPercentage
-            .mulDivDown(totalAssets(), ONE)
-            .max(
-                IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount
-            );
+        assets = targetIdleLiquidityPercentage.mulDown(totalAssets()).max(
+            IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount
+        );
     }
 
     // TODO: Use cached poolconfig
@@ -325,7 +325,7 @@ contract Everlong is IEverlong {
     ///      then Hyperdrive's minimum becomes the max.
     /// @return assets Maximum amount of idle assets.
     function maxIdleLiquidity() public view returns (uint256 assets) {
-        assets = maxIdleLiquidityPercentage.mulDivDown(totalAssets(), ONE).max(
+        assets = maxIdleLiquidityPercentage.mulDown(totalAssets()).max(
             IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount
         );
     }
@@ -408,13 +408,13 @@ contract Everlong is IEverlong {
 
     /// @notice Returns whether the portfolio has matured positions.
     /// @return True if the portfolio has matured positions, false otherwise.
-    function hasMaturedPositions() external view returns (bool) {
+    function hasMaturedPositions() public view returns (bool) {
         return
             !_portfolio.isEmpty() &&
             IHyperdrive(hyperdrive).isMature(_portfolio.head());
     }
 
-    /// @notice Retrieve the position at the specified location in the queue..
+    /// @notice Retrieve the position at the specified location in the queue.
     /// @param _index Index in the queue to retrieve the position.
     /// @return The position at the specified location.
     function positionAt(

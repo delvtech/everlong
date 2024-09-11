@@ -36,12 +36,12 @@ interface IEverlongPortfolio {
     function canRebalance() external view returns (bool);
 
     /// @notice Returns the target percentage of idle liquidity to maintain.
-    /// @dev Expressed as a fraction of 1e18.
+    /// @dev Expressed as a fraction of ONE.
     /// @return The target percentage of idle liquidity to maintain.
     function targetIdleLiquidityPercentage() external view returns (uint256);
 
     /// @notice Returns the max percentage of idle liquidity to maintain.
-    /// @dev Expressed as a fraction of 1e18.
+    /// @dev Expressed as a fraction of ONE.
     /// @return The max percentage of idle liquidity to maintain.
     function maxIdleLiquidityPercentage() external view returns (uint256);
 

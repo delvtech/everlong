@@ -31,8 +31,8 @@ contract TestEverlongPositions is EverlongTest {
     }
 
     function setUp() public virtual override {
-        TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0.1e17;
-        MAX_IDLE_LIQUIDITY_PERCENTAGE = 0.2e17;
+        TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0.1e18;
+        MAX_IDLE_LIQUIDITY_PERCENTAGE = 0.2e18;
         super.setUp();
         deployEverlong();
     }
