@@ -155,11 +155,20 @@ contract TestEverlongPositions is EverlongTest {
         external
     {
         // Open unmatured positions with different maturity times.
-        everlong.exposed_handleOpenPosition(2, 5);
-        everlong.exposed_handleOpenPosition(3, 5);
+        everlong.exposed_handleOpenPosition(block.timestamp + 2, 5);
+        everlong.exposed_handleOpenPosition(
+            block.timestamp * 2 * POSITION_DURATION,
+            5
+        );
+
+        // Check that `hasMaturedPositions()` returns false.
+        assertFalse(
+            everlong.hasMaturedPositions(),
+            "should return false with single matured position"
+        );
 
         // Mature the first position (second will be unmature).
-        advanceTime(1, 0);
+        advanceTime(POSITION_DURATION, 0);
 
         // Check that `hasMaturedPositions()` returns true.
         assertTrue(
