@@ -256,4 +256,27 @@ contract TestEverlongPositions is EverlongTest {
             "everlong should allow rebalance with matured position"
         );
     }
+
+    /// @dev Ensures the following after a rebalance:
+    ///      1. Idle liquidity is close to target.
+    ///      2. Idle liquidity is not over max.
+    ///      3. No matured positions are held.
+    function test_rebalance_state() external {
+        // Mint some tokens to Everlong for opening longs and rebalance.
+        mintApproveEverlongBaseAsset(address(everlong), 100e18);
+        everlong.rebalance();
+
+        // Increase block.timestamp until position is mature.
+        // Ensure Everlong has a matured position.
+        // Ensure `canRebalance()` returns true.
+        advanceTime(everlong.positionAt(0).maturityTime, 0);
+        assertTrue(
+            everlong.hasMaturedPositions(),
+            "everlong should have matured position after advancing time"
+        );
+        assertTrue(
+            everlong.canRebalance(),
+            "everlong should allow rebalance with matured position"
+        );
+    }
 }

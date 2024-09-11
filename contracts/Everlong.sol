@@ -172,6 +172,20 @@ contract Everlong is IEverlong {
         _asset = _asBase
             ? IHyperdrive(_hyperdrive).baseToken()
             : IHyperdrive(_hyperdrive).vaultSharesToken();
+
+        // Ensure target <= 1e18.
+        require(_targetIdleLiquidityPercentage <= 1e18, "Target over 100%");
+
+        // Ensure max <= 1e18.
+        require(_maxIdleLiquidityPercentage <= 1e18, "Max over 100%");
+
+        // Ensure target < max.
+        require(
+            _targetIdleLiquidityPercentage <= _maxIdleLiquidityPercentage,
+            "Target must be <= Max"
+        );
+
+        // Store idle and max.
         targetIdleLiquidityPercentage = _targetIdleLiquidityPercentage;
         maxIdleLiquidityPercentage = _maxIdleLiquidityPercentage;
 
@@ -238,8 +252,13 @@ contract Everlong is IEverlong {
         uint256 _assets,
         uint256
     ) internal virtual override {
-        // Close more positions until sufficient idle to process withdrawal.
-        _closePositions(_assets - ERC20(_asset).balanceOf(address(this)));
+        // Close more positions until sufficient idle to process withdrawal
+        // and keep remaining target.
+        _closePositions(
+            _assets -
+                ERC20(_asset).balanceOf(address(this)) +
+                targetIdleLiquidity()
+        );
     }
 
     // ╭─────────────────────────────────────────────────────────╮
@@ -247,7 +266,7 @@ contract Everlong is IEverlong {
     // ╰─────────────────────────────────────────────────────────╯
 
     /// @notice Rebalance the everlong portfolio by closing mature positions
-    ///         and using the proceeds to open new positions.
+    ///         and using the proceeds over target idle to open new positions.
     function rebalance() public override {
         // Early return if no rebalancing is needed.
         if (!canRebalance()) {
@@ -257,9 +276,12 @@ contract Everlong is IEverlong {
         // Close matured positions.
         _closeMaturedPositions();
 
-        // Spend idle on opening a new position. Leave an extra wei for the
-        // approval to keep the slot warm.
-        uint256 toSpend = ERC20(_asset).balanceOf(address(this));
+        // Amount to spend is the current balance less the target idle.
+        uint256 toSpend = ERC20(_asset).balanceOf(address(this)) -
+            targetIdleLiquidity();
+
+        // Open a new position. Leave an extra wei for the approval to keep
+        // the slot warm.
         ERC20(_asset).forceApprove(address(hyperdrive), toSpend + 1);
         (uint256 maturityTime, uint256 bondAmount) = IHyperdrive(hyperdrive)
             .openLong(asBase, toSpend, "");
