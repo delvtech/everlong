@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.22;
 
+import { console2 as console } from "forge-std/console2.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
@@ -120,6 +121,8 @@ contract Everlong is IEverlong {
     ///       was picked arbitrarily.
     uint8 public constant decimalsOffset = 3;
 
+    uint256 internal portfolioValue;
+
     // ─────────────────────────── State ────────────────────────
 
     /// @notice Address of the contract admin.
@@ -226,18 +229,19 @@ contract Everlong is IEverlong {
         // portfolio's total amount of bonds and weighted average maturity.
         // The weighted average maturity is rounded to the next checkpoint
         // timestamp to underestimate the value.
-        return
-            balance +
-            IHyperdrive(hyperdrive).previewCloseLong(
-                asBase,
-                IEverlong.Position({
-                    maturityTime: IHyperdrive(hyperdrive)
-                        .getCheckpointIdUp(_portfolio.avgMaturityTime)
-                        .toUint128(),
-                    bondAmount: _portfolio.totalBonds
-                }),
-                ""
-            );
+        return portfolioValue;
+    }
+
+    function previewRedeem(
+        uint256 _shares
+    ) public view override returns (uint256 assets) {
+        assets = convertToAssets(_shares);
+        if (assets < ERC20(_asset).balanceOf(address(this))) {
+            return assets;
+        }
+        console.log("assets before: %s", assets);
+        assets -= _accountForImmatureLosses(assets);
+        console.log("assets after:  %s", assets);
     }
 
     /// @dev Attempt rebalancing after a deposit if idle is above max.
@@ -292,7 +296,26 @@ contract Everlong is IEverlong {
         // Account for the new position in the portfolio.
         _portfolio.handleOpenPosition(maturityTime, bondAmount);
 
+        _updatePortfolioValue();
+
         emit Rebalanced();
+    }
+
+    function _updatePortfolioValue() internal {
+        uint256 balance = ERC20(_asset).balanceOf(address(this));
+        portfolioValue =
+            balance +
+            IHyperdrive(hyperdrive).previewCloseLong(
+                asBase,
+                IEverlong.Position({
+                    // maturityTime: IHyperdrive(hyperdrive)
+                    //     .getCheckpointIdUp(_portfolio.avgMaturityTime)
+                    //     .toUint128(),
+                    maturityTime: block.timestamp.toUint128(),
+                    bondAmount: _portfolio.totalBonds
+                }),
+                ""
+            );
     }
 
     /// @notice Returns true if the portfolio can be rebalanced.
@@ -363,6 +386,40 @@ contract Everlong is IEverlong {
             _portfolio.handleClosePosition();
         }
         return output;
+    }
+
+    function _accountForImmatureLosses(
+        uint256 _assets
+    ) internal view returns (uint256 losses) {
+        uint256 output;
+        uint256 proceeds;
+        uint256 matureProceeds;
+        IEverlong.Position memory position;
+        uint256 i;
+        uint256 count = _portfolio.positionCount();
+        while (i < count && output < _assets) {
+            position = _portfolio.at(i);
+            proceeds = IHyperdrive(hyperdrive).previewCloseLong(
+                asBase,
+                position,
+                ""
+            );
+            matureProceeds = IHyperdrive(hyperdrive).previewCloseLong(
+                asBase,
+                IEverlong.Position({
+                    maturityTime: block.timestamp.toUint128(),
+                    bondAmount: position.bondAmount
+                }),
+                ""
+            );
+            output += matureProceeds;
+            if (proceeds < matureProceeds) {
+                losses += matureProceeds - proceeds;
+            }
+            i++;
+        }
+        losses = losses.mulDivUp(_assets, output);
+        return losses;
     }
 
     // ╭─────────────────────────────────────────────────────────╮

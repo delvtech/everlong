@@ -212,6 +212,26 @@ library HyperdriveExecutionLibrary {
         return shareProceeds;
     }
 
+    function previewCloseLong(
+        IHyperdrive self,
+        bool _asBase,
+        IEverlong.Position memory _position,
+        uint256 _openVaultSharePrice,
+        uint256 _closeVaultSharePrice,
+        bytes memory // unused extradata
+    ) internal view returns (uint256) {
+        uint256 shareProceeds = _calculateCloseLong(
+            self,
+            _position,
+            _openVaultSharePrice,
+            _closeVaultSharePrice
+        );
+        if (_asBase) {
+            return self.convertToBase(shareProceeds);
+        }
+        return shareProceeds;
+    }
+
     /// @dev Calculates the amount of output assets received from closing a
     ///      long. The process is as follows:
     ///        1. Calculates the raw amount using yield space.
@@ -223,6 +243,37 @@ library HyperdriveExecutionLibrary {
     function _calculateCloseLong(
         IHyperdrive self,
         IEverlong.Position memory _position
+    ) internal view returns (uint256) {
+        IHyperdrive.PoolConfig memory poolConfig = self.getPoolConfig();
+        uint256 openVaultSharePrice = getCheckpointDown(
+            self,
+            _position.maturityTime - poolConfig.positionDuration
+        ).vaultSharePrice;
+        uint256 closeVaultSharePrice = vaultSharePrice(self);
+        return
+            _calculateCloseLong(
+                self,
+                _position,
+                openVaultSharePrice,
+                closeVaultSharePrice
+            );
+    }
+
+    /// @dev Calculates the amount of output assets received from closing a
+    ///      long. The process is as follows:
+    ///        1. Calculates the raw amount using yield space.
+    ///        2. Subtracts fees.
+    ///        3. Accounts for negative interest.
+    ///        4. Converts to shares and back to account for any rounding issues.
+    /// @param _position Position containing information on the long to close.
+    /// @param _openVaultSharePrice Vault share price at open.
+    /// @param _closeVaultSharePrice Vault share price at close.
+    /// @return The amount of output assets received from closing the long.
+    function _calculateCloseLong(
+        IHyperdrive self,
+        IEverlong.Position memory _position,
+        uint256 _openVaultSharePrice,
+        uint256 _closeVaultSharePrice
     ) internal view returns (uint256) {
         // We must load the entire PoolConfig since it contains values from
         // immutables without public accessors.
@@ -248,11 +299,8 @@ library HyperdriveExecutionLibrary {
         // Hyperdrive uses the vaultSharePrice at the beginning of the
         // checkpoint as the open price, and the current vaultSharePrice as
         // the close price.
-        uint256 closeVaultSharePrice = vaultSharePrice(self);
-        uint256 openVaultSharePrice = getCheckpointDown(
-            self,
-            _position.maturityTime - poolConfig.positionDuration
-        ).vaultSharePrice;
+        uint256 openVaultSharePrice = _openVaultSharePrice;
+        uint256 closeVaultSharePrice = _closeVaultSharePrice;
 
         // Calculate the raw proceeds of the close without fees.
         (, , uint256 shareProceeds) = HyperdriveMath.calculateCloseLong(
@@ -275,11 +323,13 @@ library HyperdriveExecutionLibrary {
             poolConfig.timeStretch
         );
         IHyperdrive.Fees memory fees = poolConfig.fees;
+        IHyperdrive _self = self;
+        IEverlong.Position memory position = _position;
         (
             uint256 curveFee, // shares
             uint256 flatFee // shares
         ) = _calculateFeesGivenBonds(
-                _position.bondAmount,
+                position.bondAmount,
                 _normalizedTimeRemaining,
                 spotPrice,
                 closeVaultSharePrice,
@@ -301,8 +351,9 @@ library HyperdriveExecutionLibrary {
         // Correct for any error that crept into the calculation of the share
         // amount by converting the shares to base and then back to shares
         // using the vault's share conversion logic.
-        uint256 baseAmount = shareProceeds.mulDown(closeVaultSharePrice);
-        shareProceeds = self.convertToShares(baseAmount);
+        shareProceeds = _self.convertToShares(
+            shareProceeds.mulDown(closeVaultSharePrice)
+        );
 
         return shareProceeds;
     }

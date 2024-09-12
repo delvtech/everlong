@@ -30,8 +30,13 @@ contract VaultSharePriceManipulation is EverlongTest {
         uint256 attackerShort = 100e18;
         uint256 attackerEverlongDeposit = 100e18;
 
+        console.log("totalAssets1: %s", everlong.totalAssets());
+
         // Innocent bystander deposits into everlong.
+        uint256 celineShares = depositEverlong(10_000e18, celine);
         uint256 aliceShares = depositEverlong(bystanderEverlongDeposit, alice);
+
+        console.log("totalAssets2: %s", everlong.totalAssets());
 
         // Attacker opens a short on hyperdrive.
         (uint256 bobShortMaturityTime, uint256 bobShortAmount) = openShort(
@@ -39,11 +44,15 @@ contract VaultSharePriceManipulation is EverlongTest {
             attackerShort
         );
 
+        console.log("totalAssets3: %s", everlong.totalAssets());
+
         // Attacker deposits into everlong.
         uint256 bobEverlongShares = depositEverlong(
             attackerEverlongDeposit,
             bob
         );
+
+        console.log("totalAssets4: %s", everlong.totalAssets());
 
         // Attacker closes short on hyperdrive.
         uint256 bobProceedsShort = closeShort(
@@ -52,15 +61,40 @@ contract VaultSharePriceManipulation is EverlongTest {
             bobShortAmount
         );
 
+        console.log("totalAssets5: %s", everlong.totalAssets());
+
         // Attacker redeems from everlong.
         uint256 bobProceedsEverlong = redeemEverlong(bobEverlongShares, bob);
+
+        console.log("totalAssets6: %s", everlong.totalAssets());
 
         // Innocent bystander redeems from everlong.
         uint256 aliceProceeds = redeemEverlong(aliceShares, alice);
 
+        console.log("alice shares: %s", aliceShares);
+        console.log("bob shares:   %s", bobEverlongShares);
         console.log("bob proceeds e:   %s", bobProceedsEverlong);
-        console.log("bob short amnt:   %s", bobShortAmount);
-        console.log("bob proceeds h:   %s", bobProceedsShort);
-        console.log("alice proceeds:   %s", aliceProceeds);
+        // console.log("bob short amnt:   %s", bobShortAmount);
+        // console.log("bob proceeds h:   %s", bobProceedsShort);
+        console.log(
+            "alice balance:    %s",
+            ERC20Mintable(everlong.asset()).balanceOf(alice)
+        );
+        console.log(
+            "bob balance:      %s",
+            ERC20Mintable(everlong.asset()).balanceOf(bob)
+        );
+        console.log(
+            "everlong balance:      %s",
+            ERC20Mintable(everlong.asset()).balanceOf(address(everlong))
+        );
+
+        // NOTE: Need difference between totalAssets2 and totalAssets3 to be 0
+        //
+        // NOTE: Need difference between totalAssets4 and totalAssets5 to be 0
+        //
+        // NOTE: The issue is that on deposit, totalAssets decreases. To fix:
+        //       1. TotalAssets gives value of mature positions.
+        //       2. PreviewRedeem charges proportional losses to redeemer
     }
 }
