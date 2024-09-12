@@ -82,7 +82,7 @@ contract Everlong is IEverlong {
     // ───────────────────────── Immutables ──────────────────────
 
     /// @dev Name of the Everlong token.
-    string public _name;
+    string internal _name;
 
     /// @dev Symbol of the Everlong token.
     string internal _symbol;
@@ -90,12 +90,12 @@ contract Everlong is IEverlong {
     /// @notice Address of the Hyperdrive instance wrapped by Everlong.
     address public immutable override hyperdrive;
 
-    /// @dev Whether to use Hyperdrive's base token to purchase bonds.
+    /// @notice Whether to use Hyperdrive's base token to purchase bonds.
     ///      If false, use the Hyperdrive's `vaultSharesToken`.
     bool public immutable asBase;
 
     /// @dev Address of the underlying asset to use with hyperdrive.
-    address public immutable _asset;
+    address internal immutable _asset;
 
     /// @dev Decimals to use with asset.
     uint8 internal immutable _decimals;
@@ -106,10 +106,10 @@ contract Everlong is IEverlong {
     /// @notice Maximum percentage of assets to leave uninvested.
     uint256 public immutable maxIdleLiquidityPercentage;
 
-    /// @dev Kind of everlong.
+    /// @notice Kind of everlong.
     string public constant override kind = EVERLONG_KIND;
 
-    /// @dev Version of everlong.
+    /// @notice Version of everlong.
     string public constant override version = EVERLONG_VERSION;
 
     /// @notice Virtual shares are used to mitigate inflation attacks.
@@ -122,7 +122,7 @@ contract Everlong is IEverlong {
 
     // ─────────────────────────── State ────────────────────────
 
-    /// @dev Address of the contract admin.
+    /// @notice Address of the contract admin.
     address public admin;
 
     /// @dev Structure to store and account for everlong-controlled positions.
@@ -260,8 +260,7 @@ contract Everlong is IEverlong {
             return;
         }
 
-        // Close more positions until sufficient idle to process withdrawal
-        // and keep remaining target.
+        // Close more positions until sufficient idle to process withdrawal.
         _closePositions(_assets - balance);
     }
 
