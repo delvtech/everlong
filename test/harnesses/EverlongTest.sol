@@ -138,6 +138,16 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         return shares;
     }
 
+    function redeemEverlong(
+        uint256 _amount,
+        address _redeemer
+    ) internal returns (uint256 proceeds) {
+        // Make the redemption.
+        vm.startPrank(_redeemer);
+        proceeds = everlong.redeem(_amount, _redeemer, _redeemer);
+        vm.stopPrank();
+    }
+
     // TODO: This is gross, will refactor
     /// @dev Mint base token to the provided address a
     ///      and approve the Everlong contract.
