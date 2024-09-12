@@ -31,7 +31,10 @@ contract TestEverlongPositions is EverlongTest {
     }
 
     function setUp() public virtual override {
+        TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0.1e18;
+        MAX_IDLE_LIQUIDITY_PERCENTAGE = 0.2e18;
         super.setUp();
+        deployEverlong();
     }
 
     /// @dev Validates `recordOpenedLongs(..)` behavior when called
@@ -118,5 +121,148 @@ contract TestEverlongPositions is EverlongTest {
             0,
             "position count should be 0 after opening and closing a long for the full bond amount"
         );
+    }
+
+    /// @dev Validate that `hasMaturedPositions()` returns false
+    ///      with no positions.
+    function test_hasMaturedPositions_false_when_no_positions() external view {
+        // Check that `hasMaturedPositions()` returns false
+        // when no positions are held.
+        assertFalse(
+            everlong.hasMaturedPositions(),
+            "should return false when no positions"
+        );
+    }
+
+    /// @dev Validate that `hasMaturedPositions()` returns false
+    ///      with no mature positions.
+    function test_hasMaturedPositions_false_when_no_mature_positions()
+        external
+    {
+        // Open an unmature position.
+        everlong.exposed_handleOpenPosition(block.timestamp + 1, 5);
+
+        // Check that `hasMaturedPositions()` returns false.
+        assertFalse(
+            everlong.hasMaturedPositions(),
+            "should return false when position is newly created"
+        );
+    }
+
+    /// @dev Validate that `hasMaturedPositions()` returns true
+    ///      with a mature position.
+    function test_hasMaturedPositions_true_when_single_matured_position()
+        external
+    {
+        // Open unmatured positions with different maturity times.
+        everlong.exposed_handleOpenPosition(block.timestamp + 2, 5);
+        everlong.exposed_handleOpenPosition(
+            block.timestamp * 2 * POSITION_DURATION,
+            5
+        );
+
+        // Check that `hasMaturedPositions()` returns false.
+        assertFalse(
+            everlong.hasMaturedPositions(),
+            "should return false with single matured position"
+        );
+
+        // Mature the first position (second will be unmature).
+        advanceTime(POSITION_DURATION, 0);
+
+        // Check that `hasMaturedPositions()` returns true.
+        assertTrue(
+            everlong.hasMaturedPositions(),
+            "should return true with single matured position"
+        );
+    }
+
+    /// @dev Ensure that `canRebalance()` returns false when everlong has
+    ///      no positions nor balance.
+    function test_canRebalance_false_no_positions_no_balance() external view {
+        // Check that Everlong:
+        // - has no positions
+        // - has no balance
+        // - `canRebalance()` returns false
+        assertEq(
+            everlong.positionCount(),
+            0,
+            "everlong should not intialize with positions"
+        );
+        assertEq(
+            IERC20(everlong.asset()).balanceOf(address(everlong)),
+            0,
+            "everlong should not initialize with a balance"
+        );
+        assertFalse(
+            everlong.canRebalance(),
+            "cannot rebalance without matured positions or balance"
+        );
+    }
+
+    /// @dev Ensures that `canRebalance()` returns true with a balance
+    ///          greater than Hyperdrive's minTransactionAmount.
+    function test_canRebalance_with_balance_over_min_tx_amount() external {
+        // Mint some tokens to Everlong for opening longs.
+        // Ensure Everlong's balance is gte Hyperdrive's minTransactionAmount.
+        // Ensure `canRebalance()` returns true.
+        mintApproveEverlongBaseAsset(address(everlong), 100e18);
+        assertGe(
+            IERC20(everlong.asset()).balanceOf(address(everlong)),
+            hyperdrive.getPoolConfig().minimumTransactionAmount
+        );
+        assertTrue(
+            everlong.canRebalance(),
+            "everlong should be able to rebalance when it has a balance > hyperdrive's minTransactionAmount"
+        );
+    }
+
+    /// @dev Ensures that `canRebalance()` returns true with a matured
+    ///      position.
+    function test_canRebalance_with_matured_position() external {
+        // Mint some tokens to Everlong for opening longs and rebalance.
+        mintApproveEverlongBaseAsset(address(everlong), 100e18);
+        everlong.rebalance();
+
+        // Increase block.timestamp until position is mature.
+        // Ensure Everlong has a matured position.
+        // Ensure `canRebalance()` returns true.
+        advanceTime(everlong.positionAt(0).maturityTime, 0);
+        assertTrue(
+            everlong.hasMaturedPositions(),
+            "everlong should have matured position after advancing time"
+        );
+        assertTrue(
+            everlong.canRebalance(),
+            "everlong should allow rebalance with matured position"
+        );
+    }
+
+    /// @dev Ensures the following after a rebalance:
+    ///      1. Idle liquidity is close to target.
+    ///      2. Idle liquidity is not over max.
+    ///      3. No matured positions are held.
+    function test_rebalance_state() external {
+        // Mint some tokens to Everlong for opening longs and rebalance.
+        mintApproveEverlongBaseAsset(address(everlong), 10_000e18);
+        everlong.rebalance();
+        advanceTime(everlong.positionAt(0).maturityTime, 0);
+        everlong.rebalance();
+
+        // Ensure idle liquidity is close to target.
+        assertApproxEqAbs(
+            IERC20(everlong.asset()).balanceOf(address(everlong)),
+            everlong.targetIdleLiquidity(),
+            1e18
+        );
+
+        // Ensure idle liquidity is not over max.
+        assertLt(
+            IERC20(everlong.asset()).balanceOf(address(everlong)),
+            everlong.maxIdleLiquidity()
+        );
+
+        // Ensure no matured positions
+        assertFalse(everlong.hasMaturedPositions());
     }
 }

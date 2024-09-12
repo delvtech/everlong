@@ -34,4 +34,24 @@ interface IEverlongPortfolio {
     /// @notice Determines whether Everlong's portfolio can currently be rebalanced.
     /// @return True if the portfolio can be rebalanced, false otherwise.
     function canRebalance() external view returns (bool);
+
+    /// @notice Returns the target percentage of idle liquidity to maintain.
+    /// @dev Expressed as a fraction of ONE.
+    /// @return The target percentage of idle liquidity to maintain.
+    function targetIdleLiquidityPercentage() external view returns (uint256);
+
+    /// @notice Returns the max percentage of idle liquidity to maintain.
+    /// @dev Expressed as a fraction of ONE.
+    /// @return The max percentage of idle liquidity to maintain.
+    function maxIdleLiquidityPercentage() external view returns (uint256);
+
+    /// @notice Returns the target amount of idle liquidity to maintain.
+    /// @dev Expressed in assets.
+    /// @return The target amount of idle liquidity to maintain.
+    function targetIdleLiquidity() external view returns (uint256);
+
+    /// @notice Returns the max amount of idle liquidity to maintain.
+    /// @dev Expressed in assets.
+    /// @return The max amount of idle liquidity to maintain.
+    function maxIdleLiquidity() external view returns (uint256);
 }

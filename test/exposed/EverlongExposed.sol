@@ -22,8 +22,20 @@ contract EverlongExposed is Everlong, Test {
         string memory symbol_,
         uint8 decimals_,
         address hyperdrive_,
-        bool asBase_
-    ) Everlong(name_, symbol_, decimals_, hyperdrive_, asBase_) {}
+        bool asBase_,
+        uint256 _targetIdleLiquidityPercentage,
+        uint256 _maxIdleLiquidityPercentage
+    )
+        Everlong(
+            name_,
+            symbol_,
+            decimals_,
+            hyperdrive_,
+            asBase_,
+            _targetIdleLiquidityPercentage,
+            _maxIdleLiquidityPercentage
+        )
+    {}
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ ERC4626                                                 │
