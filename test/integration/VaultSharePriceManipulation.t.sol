@@ -36,7 +36,50 @@ contract VaultSharePriceManipulation is EverlongTest {
         uint256 timeToCloseEverlong;
     }
 
+    function test_no_sandwich_instant() external {
+        console.log("No Sandwich - Instant");
+        quiznos(
+            SandwichParams({
+                initialDeposit: 100e18,
+                bystanderDeposit: 100e18,
+                sandwichShort: 0,
+                sandwichDeposit: 100e18,
+                timeToCloseShort: 0,
+                timeToCloseEverlong: 0
+            })
+        );
+    }
+
+    function test_no_sandwich_immature() external {
+        console.log("No Sandwich - Immature");
+        quiznos(
+            SandwichParams({
+                initialDeposit: 100e18,
+                bystanderDeposit: 100e18,
+                sandwichShort: 0,
+                sandwichDeposit: 100e18,
+                timeToCloseShort: 0,
+                timeToCloseEverlong: POSITION_DURATION / 2
+            })
+        );
+    }
+
+    function test_no_sandwich_mature() external {
+        console.log("No Sandwich - Mature");
+        quiznos(
+            SandwichParams({
+                initialDeposit: 100e18,
+                bystanderDeposit: 100e18,
+                sandwichShort: 0,
+                sandwichDeposit: 100e18,
+                timeToCloseShort: 0,
+                timeToCloseEverlong: POSITION_DURATION + 1
+            })
+        );
+    }
+
     function test_sandwich_instant() external {
+        console.log("Sandwich - Instant");
         quiznos(
             SandwichParams({
                 initialDeposit: 100e18,
@@ -45,6 +88,34 @@ contract VaultSharePriceManipulation is EverlongTest {
                 sandwichDeposit: 100e18,
                 timeToCloseShort: 0,
                 timeToCloseEverlong: 0
+            })
+        );
+    }
+
+    function test_sandwich_immature() external {
+        console.log("Sandwich - Immature");
+        quiznos(
+            SandwichParams({
+                initialDeposit: 100e18,
+                bystanderDeposit: 100e18,
+                sandwichShort: 100e18,
+                sandwichDeposit: 100e18,
+                timeToCloseShort: 0,
+                timeToCloseEverlong: POSITION_DURATION / 2
+            })
+        );
+    }
+
+    function test_sandwich_mature() external {
+        console.log("Sandwich - Mature");
+        quiznos(
+            SandwichParams({
+                initialDeposit: 100e18,
+                bystanderDeposit: 100e18,
+                sandwichShort: 100e18,
+                sandwichDeposit: 100e18,
+                timeToCloseShort: 0,
+                timeToCloseEverlong: POSITION_DURATION + 1
             })
         );
     }
