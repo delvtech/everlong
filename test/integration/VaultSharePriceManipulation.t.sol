@@ -22,79 +22,96 @@ contract VaultSharePriceManipulation is EverlongTest {
     using FixedPointMath for uint256;
     using Lib for *;
 
-    function test_short_hyperdrive_everlong() external {
+    struct SandwichParams {
+        uint256 initialDeposit;
+        uint256 bystanderDeposit;
+        // Amount sandwicher spends on the short.
+        uint256 sandwichShort;
+        // Amount sandwicher deposits into everlong.
+        uint256 sandwichDeposit;
+        // Amount of time between attacker depositing into Everlong and
+        // closing short.
+        uint256 timeToCloseShort;
+        // Amount of time between closing the short and Everlong.
+        uint256 timeToCloseEverlong;
+    }
+
+    function test_sandwich_instant() external {
+        quiznos(
+            SandwichParams({
+                initialDeposit: 100e18,
+                bystanderDeposit: 100e18,
+                sandwichShort: 100e18,
+                sandwichDeposit: 100e18,
+                timeToCloseShort: 0,
+                timeToCloseEverlong: 0
+            })
+        );
+    }
+
+    function quiznos(SandwichParams memory _params) internal {
         // Deploy Everlong.
         deployEverlong();
 
-        uint256 bystanderEverlongDeposit = 100e18;
-        uint256 attackerShort = 100e18;
-        uint256 attackerEverlongDeposit = 100e18;
+        console.log("------------------------------------------------------");
+        console.log("Initial Deposit:     %s", _params.initialDeposit);
+        console.log("Bystander Deposit:   %s", _params.bystanderDeposit);
+        console.log("Sandwich Short:      %s", _params.sandwichShort);
+        console.log("Sandwich Deposit:    %s", _params.sandwichDeposit);
+        console.log("Time Close Short:    %s", _params.timeToCloseShort);
+        console.log("Time Close Everlong: %s", _params.timeToCloseEverlong);
+        console.log(" ");
 
-        console.log("totalAssets1: %s", everlong.totalAssets());
+        // Initial deposit is made into everlong.
+        uint256 celineShares = depositEverlong(_params.initialDeposit, celine);
 
         // Innocent bystander deposits into everlong.
-        uint256 celineShares = depositEverlong(10_000e18, celine);
-        uint256 aliceShares = depositEverlong(bystanderEverlongDeposit, alice);
-
-        console.log("totalAssets2: %s", everlong.totalAssets());
+        uint256 aliceShares = depositEverlong(_params.bystanderDeposit, alice);
 
         // Attacker opens a short on hyperdrive.
-        (uint256 bobShortMaturityTime, uint256 bobShortAmount) = openShort(
-            bob,
-            attackerShort
-        );
-
-        console.log("totalAssets3: %s", everlong.totalAssets());
+        uint256 bobShortMaturityTime;
+        uint256 bobShortAmount;
+        if (_params.sandwichShort > 0) {
+            (bobShortMaturityTime, bobShortAmount) = openShort(
+                bob,
+                _params.sandwichShort
+            );
+        }
 
         // Attacker deposits into everlong.
         uint256 bobEverlongShares = depositEverlong(
-            attackerEverlongDeposit,
+            _params.sandwichDeposit,
             bob
         );
 
-        console.log("totalAssets4: %s", everlong.totalAssets());
+        if (_params.timeToCloseShort > 0) {
+            advanceTime(_params.timeToCloseShort, VARIABLE_RATE);
+        }
 
         // Attacker closes short on hyperdrive.
-        uint256 bobProceedsShort = closeShort(
-            bob,
-            bobShortMaturityTime,
-            bobShortAmount
-        );
+        uint256 bobProceedsShort;
+        if (_params.sandwichShort > 0) {
+            bobProceedsShort = closeShort(
+                bob,
+                bobShortMaturityTime,
+                bobShortAmount
+            );
+        }
 
-        console.log("totalAssets5: %s", everlong.totalAssets());
+        if (_params.timeToCloseEverlong > 0) {
+            advanceTime(_params.timeToCloseEverlong, VARIABLE_RATE);
+        }
 
         // Attacker redeems from everlong.
         uint256 bobProceedsEverlong = redeemEverlong(bobEverlongShares, bob);
 
-        console.log("totalAssets6: %s", everlong.totalAssets());
-
         // Innocent bystander redeems from everlong.
         uint256 aliceProceeds = redeemEverlong(aliceShares, alice);
 
-        console.log("alice shares: %s", aliceShares);
-        console.log("bob shares:   %s", bobEverlongShares);
-        console.log("bob proceeds e:   %s", bobProceedsEverlong);
-        // console.log("bob short amnt:   %s", bobShortAmount);
-        // console.log("bob proceeds h:   %s", bobProceedsShort);
-        console.log(
-            "alice balance:    %s",
-            ERC20Mintable(everlong.asset()).balanceOf(alice)
-        );
-        console.log(
-            "bob balance:      %s",
-            ERC20Mintable(everlong.asset()).balanceOf(bob)
-        );
-        console.log(
-            "everlong balance:      %s",
-            ERC20Mintable(everlong.asset()).balanceOf(address(everlong))
-        );
-
-        // NOTE: Need difference between totalAssets2 and totalAssets3 to be 0
-        //
-        // NOTE: Need difference between totalAssets4 and totalAssets5 to be 0
-        //
-        // NOTE: The issue is that on deposit, totalAssets decreases. To fix:
-        //       1. TotalAssets gives value of mature positions.
-        //       2. PreviewRedeem charges proportional losses to redeemer
+        console.log("bystander shares:   %s", aliceShares);
+        console.log("attacker shares:    %s", bobEverlongShares);
+        console.log("bystander proceeds: %s", aliceProceeds);
+        console.log("attacker proceeds:  %s", bobProceedsEverlong);
+        console.log("------------------------------------------------------");
     }
 }

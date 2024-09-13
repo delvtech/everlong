@@ -7,6 +7,7 @@ import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMat
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { ERC20 } from "openzeppelin/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import { DoubleEndedQueue } from "openzeppelin/utils/structs/DoubleEndedQueue.sol";
 import { IEverlong } from "./interfaces/IEverlong.sol";
 import { EVERLONG_KIND, EVERLONG_VERSION, ONE } from "./libraries/Constants.sol";
 import { HyperdriveExecutionLibrary } from "./libraries/HyperdriveExecution.sol";
@@ -75,6 +76,7 @@ contract Everlong is IEverlong {
     using Portfolio for Portfolio.State;
     using SafeCast for *;
     using SafeERC20 for ERC20;
+    using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Storage                                                 │
@@ -122,6 +124,9 @@ contract Everlong is IEverlong {
     uint8 public constant decimalsOffset = 3;
 
     uint256 internal portfolioValue;
+
+    uint256 internal constant numPrices = 3;
+    DoubleEndedQueue.Bytes32Deque internal prices;
 
     // ─────────────────────────── State ────────────────────────
 
@@ -239,9 +244,7 @@ contract Everlong is IEverlong {
         if (assets < ERC20(_asset).balanceOf(address(this))) {
             return assets;
         }
-        console.log("assets before: %s", assets);
         assets -= _accountForImmatureLosses(assets);
-        console.log("assets after:  %s", assets);
     }
 
     /// @dev Attempt rebalancing after a deposit if idle is above max.
@@ -420,6 +423,23 @@ contract Everlong is IEverlong {
         }
         losses = losses.mulDivUp(_assets, output);
         return losses;
+    }
+
+    function _addSpotPrice() internal {
+        prices.pushFront(bytes32(IHyperdrive(hyperdrive).spotPrice()));
+        if (prices.length() > numPrices) {
+            prices.popBack();
+        }
+    }
+
+    function _getAvgSpotPrice() internal view returns (uint256 price) {
+        uint256 i;
+        uint256 len = prices.length();
+        while (i < len) {
+            price += uint256(prices.at(i));
+            i++;
+        }
+        price /= len;
     }
 
     // ╭─────────────────────────────────────────────────────────╮
