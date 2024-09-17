@@ -35,8 +35,12 @@ contract VaultSharePriceManipulation is EverlongTest {
         // Amount of time between attacker depositing into Everlong and
         // closing short.
         uint256 timeToCloseShort;
-        // Amount of time between closing the short and Everlong.
+        // Amount of time between attacker closing the short and closing their
+        // Everlong position.
         uint256 timeToCloseEverlong;
+        // Amount of time between attacker closing their Everlong position
+        // and the bystander closing their Everlong position.
+        uint256 bystanderCloseDelay;
     }
 
     // function test_no_sandwich_instant() external {
@@ -88,10 +92,11 @@ contract VaultSharePriceManipulation is EverlongTest {
             SandwichParams({
                 initialDeposit: 100e18,
                 bystanderDeposit: 100e18,
-                sandwichShort: 0,
-                sandwichDeposit: 100e18,
+                sandwichShort: 10_000e18,
+                sandwichDeposit: 10_000e18,
                 timeToCloseShort: 0,
-                timeToCloseEverlong: 0
+                timeToCloseEverlong: 0,
+                bystanderCloseDelay: POSITION_DURATION + 1
             })
         );
     }
@@ -102,10 +107,11 @@ contract VaultSharePriceManipulation is EverlongTest {
             SandwichParams({
                 initialDeposit: 100e18,
                 bystanderDeposit: 100e18,
-                sandwichShort: 0,
-                sandwichDeposit: 100e18,
+                sandwichShort: 10_000e18,
+                sandwichDeposit: 10_000e18,
                 timeToCloseShort: 0,
-                timeToCloseEverlong: POSITION_DURATION / 2
+                timeToCloseEverlong: POSITION_DURATION / 2,
+                bystanderCloseDelay: POSITION_DURATION / 2 + 1
             })
         );
     }
@@ -116,20 +122,21 @@ contract VaultSharePriceManipulation is EverlongTest {
             SandwichParams({
                 initialDeposit: 100e18,
                 bystanderDeposit: 100e18,
-                sandwichShort: 0,
-                sandwichDeposit: 100e18,
+                sandwichShort: 10_000e18,
+                sandwichDeposit: 10_000e18,
                 timeToCloseShort: 0,
-                timeToCloseEverlong: POSITION_DURATION + 1
+                timeToCloseEverlong: POSITION_DURATION + 1,
+                bystanderCloseDelay: 0
             })
         );
     }
 
     function quiznos(SandwichParams memory _params) internal {
         // Deploy Everlong.
-        // deployEverlong();
+        deployEverlong();
 
         // Deploy EverlongUpdateOnRebalance.
-        deployEverlongUpdateOnRebalance();
+        // deployEverlongUpdateOnRebalance();
 
         // console.log("------------------------------------------------------");
         console.log("Initial Deposit:     %e", _params.initialDeposit);
@@ -187,6 +194,16 @@ contract VaultSharePriceManipulation is EverlongTest {
 
         // Attacker redeems from everlong.
         uint256 bobProceedsEverlong = redeemEverlong(bobEverlongShares, bob);
+        if (everlong.canRebalance()) {
+            everlong.rebalance();
+        }
+
+        if (_params.bystanderCloseDelay > 0) {
+            advanceTime(_params.bystanderCloseDelay, VARIABLE_RATE);
+            if (everlong.canRebalance()) {
+                everlong.rebalance();
+            }
+        }
 
         // Innocent bystander redeems from everlong.
         uint256 aliceProceeds = redeemEverlong(aliceShares, alice);

@@ -120,8 +120,6 @@ contract EverlongUpdateOnRebalance is Everlong {
 
         // Close more positions until sufficient idle to process withdrawal.
         _closePositions(_assets - balance);
-
-        // _updatePortfolioValue();
     }
 
     // ╭─────────────────────────────────────────────────────────╮

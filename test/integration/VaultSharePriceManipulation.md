@@ -181,7 +181,38 @@ Sandwich Deposit:    1e22
 | --------------- | --------------------- | -------------------- |
 | x               | 4.845154275553862     | 4.8465624788911015   |
 
-## Only Update `totalAssets` After Deposit
+### Sandwich: 1x Initial - 100x Short - 100x Deposit - Bystander Holds to Maturity
+
+- NOTE: This adds a rebalance after the Attacker redeems
+
+```
+  Initial Deposit:     1e22
+  Bystander Deposit:   1e20
+  Sandwich Short:      1e22
+  Sandwich Deposit:    1e22
+```
+
+#### Sandwich - Instant
+
+| Share Delta (%) | Bystander Profits (%) | Attacker Profits (%) |
+| --------------- | --------------------- | -------------------- |
+| x               | 4.6437418169119692    | -0.0956680270235465  |
+
+#### Sandwich - Half Term
+
+| Share Delta (%) | Bystander Profits (%) | Attacker Profits (%) |
+| --------------- | --------------------- | -------------------- |
+| x               | 4.8081694782462698    | 2.3952330362547507   |
+
+#### Sandwich - Full Term
+
+| Share Delta (%) | Bystander Profits (%) | Attacker Profits (%) |
+| --------------- | --------------------- | -------------------- |
+| x               | 4.6435491953147589    | 4.7973425508871018   |
+
+## Estimate portfolio value at maturity
+
+- Only update after rebalance
 
 TLDR: Bad
 
