@@ -229,23 +229,35 @@ contract Everlong is IEverlong {
             return balance;
         }
 
+        return
+            IHyperdrive(hyperdrive).previewCloseLong(
+                asBase,
+                IEverlong.Position({
+                    maturityTime: IHyperdrive(hyperdrive)
+                        .getCheckpointIdDown(_portfolio.avgMaturityTime)
+                        .toUint128(),
+                    bondAmount: _portfolio.totalBonds
+                }),
+                ""
+            );
+
         // Estimate the value of everlong-controlled positions by calculating
         // the proceeds one would receive from closing a position with the
         // portfolio's total amount of bonds and weighted average maturity.
         // The weighted average maturity is rounded to the next checkpoint
         // timestamp to underestimate the value.
-        return portfolioValue;
+        // return portfolioValue;
     }
 
-    function previewRedeem(
-        uint256 _shares
-    ) public view override returns (uint256 assets) {
-        assets = convertToAssets(_shares);
-        if (assets < ERC20(_asset).balanceOf(address(this))) {
-            return assets;
-        }
-        assets -= _accountForImmatureLosses(assets);
-    }
+    // function previewRedeem(
+    //     uint256 _shares
+    // ) public view override returns (uint256 assets) {
+    //     assets = convertToAssets(_shares);
+    //     if (assets < ERC20(_asset).balanceOf(address(this))) {
+    //         return assets;
+    //     }
+    //     assets -= _accountForImmatureLosses(assets);
+    // }
 
     /// @dev Attempt rebalancing after a deposit if idle is above max.
     function _afterDeposit(uint256, uint256) internal virtual override {
@@ -299,27 +311,27 @@ contract Everlong is IEverlong {
         // Account for the new position in the portfolio.
         _portfolio.handleOpenPosition(maturityTime, bondAmount);
 
-        _updatePortfolioValue();
+        // _updatePortfolioValue();
 
         emit Rebalanced();
     }
 
-    function _updatePortfolioValue() internal {
-        uint256 balance = ERC20(_asset).balanceOf(address(this));
-        portfolioValue =
-            balance +
-            IHyperdrive(hyperdrive).previewCloseLong(
-                asBase,
-                IEverlong.Position({
-                    // maturityTime: IHyperdrive(hyperdrive)
-                    //     .getCheckpointIdUp(_portfolio.avgMaturityTime)
-                    //     .toUint128(),
-                    maturityTime: block.timestamp.toUint128(),
-                    bondAmount: _portfolio.totalBonds
-                }),
-                ""
-            );
-    }
+    // function _updatePortfolioValue() internal {
+    //     uint256 balance = ERC20(_asset).balanceOf(address(this));
+    //     portfolioValue =
+    //         balance +
+    //         IHyperdrive(hyperdrive).previewCloseLong(
+    //             asBase,
+    //             IEverlong.Position({
+    //                 // maturityTime: IHyperdrive(hyperdrive)
+    //                 //     .getCheckpointIdUp(_portfolio.avgMaturityTime)
+    //                 //     .toUint128(),
+    //                 maturityTime: block.timestamp.toUint128(),
+    //                 bondAmount: _portfolio.totalBonds
+    //             }),
+    //             ""
+    //         );
+    // }
 
     /// @notice Returns true if the portfolio can be rebalanced.
     /// @notice The portfolio can be rebalanced if:

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
+import { stdMath } from "forge-std/StdMath.sol";
 import { console2 as console } from "forge-std/console2.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
@@ -20,7 +21,9 @@ contract VaultSharePriceManipulation is EverlongTest {
     using Packing for bytes32;
     using FixedPointMath for uint128;
     using FixedPointMath for uint256;
+    using FixedPointMath for uint256;
     using Lib for *;
+    using stdMath for *;
 
     struct SandwichParams {
         uint256 initialDeposit;
@@ -36,47 +39,48 @@ contract VaultSharePriceManipulation is EverlongTest {
         uint256 timeToCloseEverlong;
     }
 
-    function test_no_sandwich_instant() external {
-        console.log("No Sandwich - Instant");
-        quiznos(
-            SandwichParams({
-                initialDeposit: 100e18,
-                bystanderDeposit: 100e18,
-                sandwichShort: 0,
-                sandwichDeposit: 100e18,
-                timeToCloseShort: 0,
-                timeToCloseEverlong: 0
-            })
-        );
-    }
-
-    function test_no_sandwich_immature() external {
-        console.log("No Sandwich - Immature");
-        quiznos(
-            SandwichParams({
-                initialDeposit: 100e18,
-                bystanderDeposit: 100e18,
-                sandwichShort: 0,
-                sandwichDeposit: 100e18,
-                timeToCloseShort: 0,
-                timeToCloseEverlong: POSITION_DURATION / 2
-            })
-        );
-    }
-
-    function test_no_sandwich_mature() external {
-        console.log("No Sandwich - Mature");
-        quiznos(
-            SandwichParams({
-                initialDeposit: 100e18,
-                bystanderDeposit: 100e18,
-                sandwichShort: 0,
-                sandwichDeposit: 100e18,
-                timeToCloseShort: 0,
-                timeToCloseEverlong: POSITION_DURATION + 1
-            })
-        );
-    }
+    // function test_no_sandwich_instant() external {
+    //     console.log("No Sandwich - Instant");
+    //     quiznos(
+    //         SandwichParams({
+    //             initialDeposit: 100e18,
+    //             bystanderDeposit: 100e18,
+    //             sandwichShort: 0,
+    //             sandwichDeposit: 100e18,
+    //             timeToCloseShort: 0,
+    //             timeToCloseEverlong: 0
+    //         })
+    //     );
+    // }
+    //
+    // function test_no_sandwich_immature() external {
+    //     console.log("No Sandwich - Immature");
+    //     quiznos(
+    //         SandwichParams({
+    //             initialDeposit: 100e18,
+    //             bystanderDeposit: 100e18,
+    //             sandwichShort: 0,
+    //             sandwichDeposit: 100e18,
+    //             timeToCloseShort: 0,
+    //             timeToCloseEverlong: POSITION_DURATION / 2
+    //         })
+    //     );
+    // }
+    //
+    // function test_no_sandwich_mature() external {
+    //     console.log("No Sandwich - Mature");
+    //     quiznos(
+    //         SandwichParams({
+    //             initialDeposit: 100e18,
+    //             bystanderDeposit: 100e18,
+    //             sandwichShort: 0,
+    //             sandwichDeposit: 100e18,
+    //             timeToCloseShort: 0,
+    //             timeToCloseEverlong: POSITION_DURATION + 1
+    //         })
+    //     );
+    // }
+    //
 
     function test_sandwich_instant() external {
         console.log("Sandwich - Instant");
@@ -124,14 +128,13 @@ contract VaultSharePriceManipulation is EverlongTest {
         // Deploy Everlong.
         deployEverlong();
 
-        console.log("------------------------------------------------------");
-        console.log("Initial Deposit:     %s", _params.initialDeposit);
-        console.log("Bystander Deposit:   %s", _params.bystanderDeposit);
-        console.log("Sandwich Short:      %s", _params.sandwichShort);
-        console.log("Sandwich Deposit:    %s", _params.sandwichDeposit);
+        // console.log("------------------------------------------------------");
+        console.log("Initial Deposit:     %e", _params.initialDeposit);
+        console.log("Bystander Deposit:   %e", _params.bystanderDeposit);
+        console.log("Sandwich Short:      %e", _params.sandwichShort);
+        console.log("Sandwich Deposit:    %e", _params.sandwichDeposit);
         console.log("Time Close Short:    %s", _params.timeToCloseShort);
         console.log("Time Close Everlong: %s", _params.timeToCloseEverlong);
-        console.log(" ");
 
         // Initial deposit is made into everlong.
         uint256 celineShares = depositEverlong(_params.initialDeposit, celine);
@@ -157,6 +160,9 @@ contract VaultSharePriceManipulation is EverlongTest {
 
         if (_params.timeToCloseShort > 0) {
             advanceTime(_params.timeToCloseShort, VARIABLE_RATE);
+            if (everlong.canRebalance()) {
+                everlong.rebalance();
+            }
         }
 
         // Attacker closes short on hyperdrive.
@@ -171,6 +177,9 @@ contract VaultSharePriceManipulation is EverlongTest {
 
         if (_params.timeToCloseEverlong > 0) {
             advanceTime(_params.timeToCloseEverlong, VARIABLE_RATE);
+            if (everlong.canRebalance()) {
+                everlong.rebalance();
+            }
         }
 
         // Attacker redeems from everlong.
@@ -179,10 +188,44 @@ contract VaultSharePriceManipulation is EverlongTest {
         // Innocent bystander redeems from everlong.
         uint256 aliceProceeds = redeemEverlong(aliceShares, alice);
 
-        console.log("bystander shares:   %s", aliceShares);
-        console.log("attacker shares:    %s", bobEverlongShares);
-        console.log("bystander proceeds: %s", aliceProceeds);
-        console.log("attacker proceeds:  %s", bobProceedsEverlong);
+        console.log(
+            "share delta percent:   %e",
+            (
+                bobEverlongShares > aliceShares
+                    ? int256(bobEverlongShares.percentDelta(aliceShares))
+                    : -1 * int256(bobEverlongShares.percentDelta(aliceShares))
+            )
+        );
+        console.log(
+            "bystander profits:  %e",
+            int256(
+                _params.bystanderDeposit > aliceProceeds
+                    ? -1 *
+                        int256(
+                            _params.bystanderDeposit.percentDelta(aliceProceeds)
+                        )
+                    : int256(
+                        _params.bystanderDeposit.percentDelta(aliceProceeds)
+                    )
+            )
+        );
+        console.log(
+            "attacker profits:   %e",
+            int256(
+                _params.sandwichDeposit > aliceProceeds
+                    ? -1 *
+                        int256(
+                            _params.sandwichDeposit.percentDelta(
+                                bobProceedsEverlong
+                            )
+                        )
+                    : int256(
+                        _params.bystanderDeposit.percentDelta(
+                            bobProceedsEverlong
+                        )
+                    )
+            )
+        );
         console.log("------------------------------------------------------");
     }
 }
