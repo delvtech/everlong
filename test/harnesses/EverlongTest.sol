@@ -7,6 +7,7 @@ import { HyperdriveTest } from "hyperdrive/test/utils/HyperdriveTest.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol";
 import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
+import { EverlongUpdateOnRebalance } from "../../contracts/EverlongUpdateOnRebalance.sol";
 import { EverlongExposed } from "../exposed/EverlongExposed.sol";
 
 // TODO: Refactor this to include an instance of `Everlong` with exposed internal functions.
@@ -101,6 +102,46 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             true,
             TARGET_IDLE_LIQUIDITY_PERCENTAGE,
             MAX_IDLE_LIQUIDITY_PERCENTAGE
+        );
+        vm.stopPrank();
+
+        // Fast forward and accrue some interest.
+        advanceTimeWithCheckpoints(POSITION_DURATION * 2, VARIABLE_RATE);
+    }
+
+    /// @dev Deploy the Everlong instance with default underlying, name,
+    ///      and symbol.
+    function deployEverlongUpdateOnRebalance() internal {
+        // Deploy the hyperdrive instance.
+        deploy(
+            deployer,
+            FIXED_RATE,
+            INITIAL_VAULT_SHARE_PRICE,
+            CURVE_FEE,
+            FLAT_FEE,
+            GOVERNANCE_LP_FEE,
+            GOVERNANCE_ZOMBIE_FEE
+        );
+
+        // Seed liquidity for the hyperdrive instance.
+        if (HYPERDRIVE_INITIALIZER == address(0)) {
+            HYPERDRIVE_INITIALIZER = deployer;
+        }
+        initialize(HYPERDRIVE_INITIALIZER, FIXED_RATE, INITIAL_CONTRIBUTION);
+
+        vm.startPrank(deployer);
+        everlong = EverlongExposed(
+            address(
+                new EverlongUpdateOnRebalance(
+                    EVERLONG_NAME,
+                    EVERLONG_SYMBOL,
+                    hyperdrive.decimals(),
+                    address(hyperdrive),
+                    true,
+                    TARGET_IDLE_LIQUIDITY_PERCENTAGE,
+                    MAX_IDLE_LIQUIDITY_PERCENTAGE
+                )
+            )
         );
         vm.stopPrank();
 

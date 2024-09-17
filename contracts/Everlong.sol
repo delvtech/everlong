@@ -123,7 +123,7 @@ contract Everlong is IEverlong {
     ///       was picked arbitrarily.
     uint8 public constant decimalsOffset = 3;
 
-    uint256 internal portfolioValue;
+    // uint256 internal portfolioValue;
 
     uint256 internal constant numPrices = 3;
     DoubleEndedQueue.Bytes32Deque internal prices;
@@ -222,7 +222,7 @@ contract Everlong is IEverlong {
     /// @dev Underestimates the actual value by overestimating the average
     ///      maturity of the portfolio.
     /// @return Total amount of assets controlled by Everlong.
-    function totalAssets() public view override returns (uint256) {
+    function totalAssets() public view virtual override returns (uint256) {
         // If everlong holds no bonds, return the balance.
         uint256 balance = ERC20(_asset).balanceOf(address(this));
         if (_portfolio.totalBonds == 0) {
@@ -234,7 +234,7 @@ contract Everlong is IEverlong {
                 asBase,
                 IEverlong.Position({
                     maturityTime: IHyperdrive(hyperdrive)
-                        .getCheckpointIdDown(_portfolio.avgMaturityTime)
+                        .getCheckpointIdUp(_portfolio.avgMaturityTime)
                         .toUint128(),
                     bondAmount: _portfolio.totalBonds
                 }),
@@ -289,7 +289,7 @@ contract Everlong is IEverlong {
 
     /// @notice Rebalance the everlong portfolio by closing mature positions
     ///         and using the proceeds over target idle to open new positions.
-    function rebalance() public override {
+    function rebalance() public virtual override {
         // Early return if no rebalancing is needed.
         if (!canRebalance()) {
             return;
@@ -403,39 +403,39 @@ contract Everlong is IEverlong {
         return output;
     }
 
-    function _accountForImmatureLosses(
-        uint256 _assets
-    ) internal view returns (uint256 losses) {
-        uint256 output;
-        uint256 proceeds;
-        uint256 matureProceeds;
-        IEverlong.Position memory position;
-        uint256 i;
-        uint256 count = _portfolio.positionCount();
-        while (i < count && output < _assets) {
-            position = _portfolio.at(i);
-            proceeds = IHyperdrive(hyperdrive).previewCloseLong(
-                asBase,
-                position,
-                ""
-            );
-            matureProceeds = IHyperdrive(hyperdrive).previewCloseLong(
-                asBase,
-                IEverlong.Position({
-                    maturityTime: block.timestamp.toUint128(),
-                    bondAmount: position.bondAmount
-                }),
-                ""
-            );
-            output += matureProceeds;
-            if (proceeds < matureProceeds) {
-                losses += matureProceeds - proceeds;
-            }
-            i++;
-        }
-        losses = losses.mulDivUp(_assets, output);
-        return losses;
-    }
+    // function _accountForImmatureLosses(
+    //     uint256 _assets
+    // ) internal view returns (uint256 losses) {
+    //     uint256 output;
+    //     uint256 proceeds;
+    //     uint256 matureProceeds;
+    //     IEverlong.Position memory position;
+    //     uint256 i;
+    //     uint256 count = _portfolio.positionCount();
+    //     while (i < count && output < _assets) {
+    //         position = _portfolio.at(i);
+    //         proceeds = IHyperdrive(hyperdrive).previewCloseLong(
+    //             asBase,
+    //             position,
+    //             ""
+    //         );
+    //         matureProceeds = IHyperdrive(hyperdrive).previewCloseLong(
+    //             asBase,
+    //             IEverlong.Position({
+    //                 maturityTime: block.timestamp.toUint128(),
+    //                 bondAmount: position.bondAmount
+    //             }),
+    //             ""
+    //         );
+    //         output += matureProceeds;
+    //         if (proceeds < matureProceeds) {
+    //             losses += matureProceeds - proceeds;
+    //         }
+    //         i++;
+    //     }
+    //     losses = losses.mulDivUp(_assets, output);
+    //     return losses;
+    // }
 
     function _addSpotPrice() internal {
         prices.pushFront(bytes32(IHyperdrive(hyperdrive).spotPrice()));

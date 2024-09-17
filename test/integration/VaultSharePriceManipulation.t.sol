@@ -88,7 +88,7 @@ contract VaultSharePriceManipulation is EverlongTest {
             SandwichParams({
                 initialDeposit: 100e18,
                 bystanderDeposit: 100e18,
-                sandwichShort: 100e18,
+                sandwichShort: 0,
                 sandwichDeposit: 100e18,
                 timeToCloseShort: 0,
                 timeToCloseEverlong: 0
@@ -102,7 +102,7 @@ contract VaultSharePriceManipulation is EverlongTest {
             SandwichParams({
                 initialDeposit: 100e18,
                 bystanderDeposit: 100e18,
-                sandwichShort: 100e18,
+                sandwichShort: 0,
                 sandwichDeposit: 100e18,
                 timeToCloseShort: 0,
                 timeToCloseEverlong: POSITION_DURATION / 2
@@ -116,7 +116,7 @@ contract VaultSharePriceManipulation is EverlongTest {
             SandwichParams({
                 initialDeposit: 100e18,
                 bystanderDeposit: 100e18,
-                sandwichShort: 100e18,
+                sandwichShort: 0,
                 sandwichDeposit: 100e18,
                 timeToCloseShort: 0,
                 timeToCloseEverlong: POSITION_DURATION + 1
@@ -126,7 +126,10 @@ contract VaultSharePriceManipulation is EverlongTest {
 
     function quiznos(SandwichParams memory _params) internal {
         // Deploy Everlong.
-        deployEverlong();
+        // deployEverlong();
+
+        // Deploy EverlongUpdateOnRebalance.
+        deployEverlongUpdateOnRebalance();
 
         // console.log("------------------------------------------------------");
         console.log("Initial Deposit:     %e", _params.initialDeposit);
@@ -202,26 +205,26 @@ contract VaultSharePriceManipulation is EverlongTest {
                 _params.bystanderDeposit > aliceProceeds
                     ? -1 *
                         int256(
-                            _params.bystanderDeposit.percentDelta(aliceProceeds)
+                            aliceProceeds.percentDelta(_params.bystanderDeposit)
                         )
                     : int256(
-                        _params.bystanderDeposit.percentDelta(aliceProceeds)
+                        aliceProceeds.percentDelta(_params.bystanderDeposit)
                     )
             )
         );
         console.log(
             "attacker profits:   %e",
             int256(
-                _params.sandwichDeposit > aliceProceeds
+                _params.sandwichDeposit > bobProceedsEverlong
                     ? -1 *
                         int256(
-                            _params.sandwichDeposit.percentDelta(
-                                bobProceedsEverlong
+                            bobProceedsEverlong.percentDelta(
+                                _params.sandwichDeposit
                             )
                         )
                     : int256(
-                        _params.bystanderDeposit.percentDelta(
-                            bobProceedsEverlong
+                        bobProceedsEverlong.percentDelta(
+                            _params.sandwichDeposit
                         )
                     )
             )
