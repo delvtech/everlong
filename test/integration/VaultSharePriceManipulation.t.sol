@@ -24,6 +24,7 @@ contract VaultSharePriceManipulation is EverlongTest {
     using FixedPointMath for uint256;
     using Lib for *;
     using stdMath for *;
+    using HyperdriveUtils for *;
 
     struct SandwichParams {
         uint256 initialDeposit;
@@ -92,11 +93,11 @@ contract VaultSharePriceManipulation is EverlongTest {
             SandwichParams({
                 initialDeposit: 100e18,
                 bystanderDeposit: 100e18,
-                sandwichShort: 10_000e18,
-                sandwichDeposit: 10_000e18,
+                sandwichShort: 100e18,
+                sandwichDeposit: 100e18,
                 timeToCloseShort: 0,
                 timeToCloseEverlong: 0,
-                bystanderCloseDelay: POSITION_DURATION + 1
+                bystanderCloseDelay: 0
             })
         );
     }
@@ -107,11 +108,11 @@ contract VaultSharePriceManipulation is EverlongTest {
             SandwichParams({
                 initialDeposit: 100e18,
                 bystanderDeposit: 100e18,
-                sandwichShort: 10_000e18,
-                sandwichDeposit: 10_000e18,
+                sandwichShort: 100e18,
+                sandwichDeposit: 100e18,
                 timeToCloseShort: 0,
                 timeToCloseEverlong: POSITION_DURATION / 2,
-                bystanderCloseDelay: POSITION_DURATION / 2 + 1
+                bystanderCloseDelay: 0
             })
         );
     }
@@ -122,8 +123,8 @@ contract VaultSharePriceManipulation is EverlongTest {
             SandwichParams({
                 initialDeposit: 100e18,
                 bystanderDeposit: 100e18,
-                sandwichShort: 10_000e18,
-                sandwichDeposit: 10_000e18,
+                sandwichShort: 100e18,
+                sandwichDeposit: 100e18,
                 timeToCloseShort: 0,
                 timeToCloseEverlong: POSITION_DURATION + 1,
                 bystanderCloseDelay: 0
@@ -133,10 +134,10 @@ contract VaultSharePriceManipulation is EverlongTest {
 
     function quiznos(SandwichParams memory _params) internal {
         // Deploy Everlong.
-        deployEverlong();
+        // deployEverlong();
 
         // Deploy EverlongUpdateOnRebalance.
-        // deployEverlongUpdateOnRebalance();
+        deployEverlongUpdateOnRebalance();
 
         // console.log("------------------------------------------------------");
         console.log("Initial Deposit:     %e", _params.initialDeposit);
@@ -158,7 +159,8 @@ contract VaultSharePriceManipulation is EverlongTest {
         if (_params.sandwichShort > 0) {
             (bobShortMaturityTime, bobShortAmount) = openShort(
                 bob,
-                _params.sandwichShort
+                _params.sandwichShort,
+                true
             );
         }
 
@@ -169,7 +171,7 @@ contract VaultSharePriceManipulation is EverlongTest {
         );
 
         if (_params.timeToCloseShort > 0) {
-            advanceTime(_params.timeToCloseShort, VARIABLE_RATE);
+            advanceTimeWithCheckpoints(_params.timeToCloseShort, VARIABLE_RATE);
             if (everlong.canRebalance()) {
                 everlong.rebalance();
             }
@@ -181,12 +183,16 @@ contract VaultSharePriceManipulation is EverlongTest {
             bobProceedsShort = closeShort(
                 bob,
                 bobShortMaturityTime,
-                bobShortAmount
+                _params.sandwichShort,
+                true
             );
         }
 
         if (_params.timeToCloseEverlong > 0) {
-            advanceTime(_params.timeToCloseEverlong, VARIABLE_RATE);
+            advanceTimeWithCheckpoints(
+                _params.timeToCloseEverlong,
+                VARIABLE_RATE
+            );
             if (everlong.canRebalance()) {
                 everlong.rebalance();
             }
@@ -199,7 +205,10 @@ contract VaultSharePriceManipulation is EverlongTest {
         }
 
         if (_params.bystanderCloseDelay > 0) {
-            advanceTime(_params.bystanderCloseDelay, VARIABLE_RATE);
+            advanceTimeWithCheckpoints(
+                _params.bystanderCloseDelay,
+                VARIABLE_RATE
+            );
             if (everlong.canRebalance()) {
                 everlong.rebalance();
             }
@@ -207,9 +216,23 @@ contract VaultSharePriceManipulation is EverlongTest {
 
         // Innocent bystander redeems from everlong.
         uint256 aliceProceeds = redeemEverlong(aliceShares, alice);
+        if (everlong.canRebalance()) {
+            everlong.rebalance();
+        }
+
+        // Initial depositor redeems from everlong.
+        uint256 celineProceeds = redeemEverlong(celineShares, celine);
+        if (everlong.canRebalance()) {
+            everlong.rebalance();
+        }
 
         console.log(
-            "share delta percent:   %e",
+            "everlong balance %: %e",
+            ERC20Mintable(everlong.asset()).balanceOf(address(everlong))
+        );
+
+        console.log(
+            "share delta percent %:   %e",
             (
                 bobEverlongShares > aliceShares
                     ? int256(bobEverlongShares.percentDelta(aliceShares))
@@ -217,20 +240,7 @@ contract VaultSharePriceManipulation is EverlongTest {
             )
         );
         console.log(
-            "bystander profits:  %e",
-            int256(
-                _params.bystanderDeposit > aliceProceeds
-                    ? -1 *
-                        int256(
-                            aliceProceeds.percentDelta(_params.bystanderDeposit)
-                        )
-                    : int256(
-                        aliceProceeds.percentDelta(_params.bystanderDeposit)
-                    )
-            )
-        );
-        console.log(
-            "attacker profits:   %e",
+            "attacker everlong profits %:   %e",
             int256(
                 _params.sandwichDeposit > bobProceedsEverlong
                     ? -1 *
@@ -246,6 +256,49 @@ contract VaultSharePriceManipulation is EverlongTest {
                     )
             )
         );
+        console.log(
+            "attacker short profits %:   %e",
+            int256(
+                bobShortAmount > bobProceedsShort
+                    ? -1 * int256(bobProceedsShort.percentDelta(bobShortAmount))
+                    : int256(bobProceedsShort.percentDelta(bobShortAmount))
+            )
+        );
+        int256 attackerStart = int256(bobShortAmount + _params.sandwichDeposit);
+        int256 attackerEnd = int256(
+            ERC20Mintable(everlong.asset()).balanceOf(bob)
+        );
+        int256 attackerProfitPercentage = attackerEnd < attackerStart
+            ? -1 * int256(attackerStart.percentDelta(attackerEnd))
+            : int256(attackerStart.percentDelta(attackerEnd));
+        console.log("attacker profits %: %e", attackerProfitPercentage);
+        console.log(
+            "bystander profits %:  %e",
+            int256(
+                _params.bystanderDeposit > aliceProceeds
+                    ? -1 *
+                        int256(
+                            aliceProceeds.percentDelta(_params.bystanderDeposit)
+                        )
+                    : int256(
+                        aliceProceeds.percentDelta(_params.bystanderDeposit)
+                    )
+            )
+        );
+        console.log(
+            "initial depositor profits %:  %e",
+            int256(
+                _params.initialDeposit > celineProceeds
+                    ? -1 *
+                        int256(
+                            celineProceeds.percentDelta(_params.initialDeposit)
+                        )
+                    : int256(
+                        celineProceeds.percentDelta(_params.initialDeposit)
+                    )
+            )
+        );
+
         console.log("------------------------------------------------------");
     }
 }

@@ -84,18 +84,21 @@ contract EverlongUpdateOnRebalance is Everlong {
         if (_portfolio.totalBonds == 0) {
             return balance;
         }
+        //
+        // return portfolioValue;
 
-        return portfolioValue;
+        return _calculatePortfolioValue();
     }
 
     function previewRedeem(
         uint256 _shares
     ) public view override returns (uint256 assets) {
         assets = convertToAssets(_shares);
-        if (assets < ERC20(_asset).balanceOf(address(this))) {
+        uint256 balance = ERC20(_asset).balanceOf(address(this));
+        if (assets < balance) {
             return assets;
         }
-        assets -= _accountForImmatureLosses(assets);
+        assets -= _accountForImmatureLosses(assets - balance);
     }
 
     /// @dev Attempt rebalancing after a deposit if idle is above max.
@@ -156,17 +159,55 @@ contract EverlongUpdateOnRebalance is Everlong {
     }
 
     function _updatePortfolioValue() internal {
-        uint256 balance = ERC20(_asset).balanceOf(address(this));
-        portfolioValue =
-            balance +
-            IHyperdrive(hyperdrive).previewCloseLong(
-                asBase,
-                IEverlong.Position({
-                    maturityTime: block.timestamp.toUint128(),
-                    bondAmount: _portfolio.totalBonds
-                }),
-                ""
+        portfolioValue = _calculatePortfolioValue();
+    }
+
+    function _calculatePortfolioValue() internal view returns (uint256) {
+        return
+            ERC20(_asset).balanceOf(address(this)) +
+            _calculateViaSpotPrice(
+                IHyperdrive(hyperdrive).getCheckpointIdUp(
+                    _portfolio.avgMaturityTime
+                ),
+                _portfolio.totalBonds
             );
+    }
+
+    function _calculateViaSpotPrice(
+        uint256 _maturity,
+        uint256 _bonds
+    ) internal view returns (uint256) {
+        if (_bonds == 0) {
+            return 0;
+        }
+        uint256 t = IHyperdrive(hyperdrive).normalizedTimeRemaining(_maturity);
+        uint256 p = IHyperdrive(hyperdrive)
+            .getCheckpointDown(block.timestamp)
+            .weightedSpotPrice;
+        uint256 adjusted = IHyperdrive(hyperdrive).previewCloseLong(
+            asBase,
+            IEverlong.Position({
+                maturityTime: uint128(_maturity),
+                bondAmount: uint128(_bonds)
+            }),
+            p,
+            ""
+        );
+        return adjusted;
+    }
+
+    function _calculateViaSpotPrice2(
+        uint256 _maturity,
+        uint256 _bonds
+    ) internal view returns (uint256) {
+        if (_bonds == 0) {
+            return 0;
+        }
+        uint256 t = IHyperdrive(hyperdrive).normalizedTimeRemaining(_maturity);
+        uint256 p = IHyperdrive(hyperdrive)
+            .getCheckpointDown(block.timestamp)
+            .weightedSpotPrice;
+        return (p.mulUp(t) + (1 - t)).mulUp(_bonds);
     }
 
     function _accountForImmatureLosses(
@@ -174,7 +215,7 @@ contract EverlongUpdateOnRebalance is Everlong {
     ) internal view returns (uint256 losses) {
         uint256 output;
         uint256 proceeds;
-        uint256 matureProceeds;
+        uint256 estimatedProceeds;
         IEverlong.Position memory position;
         uint256 i;
         uint256 count = _portfolio.positionCount();
@@ -185,17 +226,13 @@ contract EverlongUpdateOnRebalance is Everlong {
                 position,
                 ""
             );
-            matureProceeds = IHyperdrive(hyperdrive).previewCloseLong(
-                asBase,
-                IEverlong.Position({
-                    maturityTime: block.timestamp.toUint128(),
-                    bondAmount: position.bondAmount
-                }),
-                ""
+            estimatedProceeds = _calculateViaSpotPrice(
+                position.maturityTime,
+                position.bondAmount
             );
-            output += matureProceeds;
-            if (proceeds < matureProceeds) {
-                losses += matureProceeds - proceeds;
+            output += estimatedProceeds;
+            if (proceeds < estimatedProceeds) {
+                losses += estimatedProceeds - proceeds;
             }
             i++;
         }

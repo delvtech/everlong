@@ -18,6 +18,7 @@ allows the attacker to enter at a more favorable share price.
 ## Base Case
 
 - Portfolio value calculated w/ `previewCloseLong` and weighted avg maturity.
+- Hyperdrive initial LP of 5million
 
 ### No Sandwich: 1x Initial - 0x Short - 1x Deposit
 
@@ -258,4 +259,70 @@ share delta percent:   -2.3344307083161762e16
 bystander profits:  3.9074051424698906e16
 attacker profits:   1.481736070797418e16
 ------------------------------------------------------
+```
+
+## Estimate portfolio value using avg maturity and last checkpoint spot price
+
+- When positions must be closed to fulfill a withdrawal, the amount of assets
+  received by the withdrawer is reduced by a proportional amount of the
+  difference between estimated and actual output.
+
+TLDR: Pretty good!
+
+### 60k LP Initialization Worst Case
+
+```
+[PASS] test_sandwich_immature() (gas: 115340122)
+Logs:
+  Sandwich - Immature
+  Initial Deposit:     1e20
+  Bystander Deposit:   1e20
+  Sandwich Short:      1e20
+  Sandwich Deposit:    1e20
+  Time Close Short:    0
+  Time Close Everlong: 15768000
+  everlong balance: 1e0
+  share delta percent:   8.67624013334659e14
+  attacker everlong profits:   2.4971250686836459e16
+  attacker short profits:   -2.7415019486149694e16
+  attacker profits: 2.2073272255316409e16
+  bystander profits:  2.310193480597976e16
+  initial depositor profits:  2.112702068053189e16
+  ------------------------------------------------------
+
+[PASS] test_sandwich_instant() (gas: 95705956)
+Logs:
+  Sandwich - Instant
+  Initial Deposit:     1e20
+  Bystander Deposit:   1e20
+  Sandwich Short:      1e20
+  Sandwich Deposit:    1e20
+  Time Close Short:    0
+  Time Close Everlong: 0
+  everlong balance: 3.98813307687057e14
+  share delta percent:   8.67624013334659e14
+  attacker everlong profits:   5.6405969412531e13
+  attacker short profits:   -2.7415019486149694e16
+  attacker profits: -1.203473364658452e15
+  bystander profits:  -1.767700139795591e15
+  initial depositor profits:  -3.699207587942905e15
+  ------------------------------------------------------
+
+[PASS] test_sandwich_mature() (gas: 135092781)
+Logs:
+  Sandwich - Mature
+  Initial Deposit:     1e20
+  Bystander Deposit:   1e20
+  Sandwich Short:      1e20
+  Sandwich Deposit:    1e20
+  Time Close Short:    0
+  Time Close Everlong: 31536001
+  everlong balance: 4.04641190249307e14
+  share delta percent:   8.67624013334659e14
+  attacker everlong profits:   4.8430874287631885e16
+  attacker short profits:   -2.7415019486149694e16
+  attacker profits: 4.3022333686754315e16
+  bystander profits:  4.6542994800431871e16
+  initial depositor profits:  4.4542487317840394e16
+  ------------------------------------------------------
 ```
