@@ -301,4 +301,178 @@ contract VaultSharePriceManipulation is EverlongTest {
 
         console.log("------------------------------------------------------");
     }
+
+    function quiznos2(SandwichParams memory _params) internal {
+        // Deploy Everlong.
+        // deployEverlong();
+
+        // Deploy EverlongUpdateOnRebalance.
+        deployEverlongUpdateOnRebalance();
+
+        // console.log("------------------------------------------------------");
+        console.log("Initial Deposit:     %e", _params.initialDeposit);
+        console.log("Bystander Deposit:   %e", _params.bystanderDeposit);
+        console.log("Sandwich Short:      %e", _params.sandwichShort);
+        console.log("Sandwich Deposit:    %e", _params.sandwichDeposit);
+        console.log("Time Close Short:    %s", _params.timeToCloseShort);
+        console.log("Time Close Everlong: %s", _params.timeToCloseEverlong);
+
+        // Initial deposit is made into everlong.
+        uint256 celineShares = depositEverlong(_params.initialDeposit, celine);
+
+        // Innocent bystander deposits into everlong.
+        uint256 aliceShares = depositEverlong(_params.bystanderDeposit, alice);
+
+        // Attacker opens a short on hyperdrive.
+        uint256 bobShortMaturityTime;
+        uint256 bobShortAmount;
+        if (_params.sandwichShort > 0) {
+            (bobShortMaturityTime, bobShortAmount) = openShort(
+                bob,
+                _params.sandwichShort,
+                true
+            );
+        }
+
+        // Attacker deposits into everlong.
+        uint256 bobEverlongShares = depositEverlong(
+            _params.sandwichDeposit,
+            bob
+        );
+
+        if (_params.timeToCloseShort > 0) {
+            advanceTimeWithCheckpoints(_params.timeToCloseShort, VARIABLE_RATE);
+            if (everlong.canRebalance()) {
+                everlong.rebalance();
+            }
+        }
+
+        // Attacker closes short on hyperdrive.
+        uint256 bobProceedsShort;
+        if (_params.sandwichShort > 0) {
+            bobProceedsShort = closeShort(
+                bob,
+                bobShortMaturityTime,
+                _params.sandwichShort,
+                true
+            );
+        }
+
+        if (_params.timeToCloseEverlong > 0) {
+            advanceTimeWithCheckpoints(
+                _params.timeToCloseEverlong,
+                VARIABLE_RATE
+            );
+            if (everlong.canRebalance()) {
+                everlong.rebalance();
+            }
+        }
+
+        // Attacker redeems from everlong.
+        uint256 bobProceedsEverlong = redeemEverlong(bobEverlongShares, bob);
+        if (everlong.canRebalance()) {
+            everlong.rebalance();
+        }
+
+        if (_params.bystanderCloseDelay > 0) {
+            advanceTimeWithCheckpoints(
+                _params.bystanderCloseDelay,
+                VARIABLE_RATE
+            );
+            if (everlong.canRebalance()) {
+                everlong.rebalance();
+            }
+        }
+
+        // Innocent bystander redeems from everlong.
+        uint256 aliceProceeds = redeemEverlong(aliceShares, alice);
+        if (everlong.canRebalance()) {
+            everlong.rebalance();
+        }
+
+        // Initial depositor redeems from everlong.
+        uint256 celineProceeds = redeemEverlong(celineShares, celine);
+        if (everlong.canRebalance()) {
+            everlong.rebalance();
+        }
+
+        console.log(
+            "everlong balance %: %e",
+            ERC20Mintable(everlong.asset()).balanceOf(address(everlong))
+        );
+
+        console.log(
+            "share delta percent %:   %e",
+            (
+                bobEverlongShares > aliceShares
+                    ? int256(bobEverlongShares.percentDelta(aliceShares))
+                    : -1 * int256(bobEverlongShares.percentDelta(aliceShares))
+            )
+        );
+        console.log(
+            "attacker everlong profits %:   %e",
+            int256(
+                _params.sandwichDeposit > bobProceedsEverlong
+                    ? -1 *
+                        int256(
+                            bobProceedsEverlong.percentDelta(
+                                _params.sandwichDeposit
+                            )
+                        )
+                    : int256(
+                        bobProceedsEverlong.percentDelta(
+                            _params.sandwichDeposit
+                        )
+                    )
+            )
+        );
+        console.log(
+            "attacker short profits %:   %e",
+            int256(
+                bobShortAmount > bobProceedsShort
+                    ? -1 * int256(bobProceedsShort.percentDelta(bobShortAmount))
+                    : int256(bobProceedsShort.percentDelta(bobShortAmount))
+            )
+        );
+
+        int256 attackerStart = int256(bobShortAmount + _params.sandwichDeposit);
+        int256 attackerEnd = int256(
+            ERC20Mintable(everlong.asset()).balanceOf(bob)
+        );
+        int256 attackerProfitPercentage = attackerEnd < attackerStart
+            ? -1 * int256(attackerStart.percentDelta(attackerEnd))
+            : int256(attackerStart.percentDelta(attackerEnd));
+
+        console.log("attacker profits %: %e", attackerProfitPercentage);
+
+        console.log(
+            "bystander profits %:  %e",
+            int256(
+                _params.bystanderDeposit > aliceProceeds
+                    ? -1 *
+                        int256(
+                            aliceProceeds.percentDelta(_params.bystanderDeposit)
+                        )
+                    : int256(
+                        aliceProceeds.percentDelta(_params.bystanderDeposit)
+                    )
+            )
+        );
+
+        console.log(
+            "initial depositor profits %:  %e",
+            int256(
+                _params.initialDeposit > celineProceeds
+                    ? -1 *
+                        int256(
+                            celineProceeds.percentDelta(_params.initialDeposit)
+                        )
+                    : int256(
+                        celineProceeds.percentDelta(_params.initialDeposit)
+                    )
+            )
+        );
+
+        console.log("------------------------------------------------------");
+    }
 }
