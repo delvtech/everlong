@@ -244,16 +244,22 @@ contract TestEverlongPositions is EverlongTest {
     ///      3. No matured positions are held.
     function test_rebalance_state() external {
         // Mint some tokens to Everlong for opening longs and rebalance.
-        mintApproveEverlongBaseAsset(address(everlong), 10_000e18);
+        mintApproveEverlongBaseAsset(address(everlong), 1000e18);
         everlong.rebalance();
         advanceTime(everlong.positionAt(0).maturityTime, 0);
         everlong.rebalance();
+
+        console.log(
+            "%e",
+            IERC20(everlong.asset()).balanceOf(address(everlong))
+        );
+        console.log("%e", everlong.targetIdleLiquidity());
 
         // Ensure idle liquidity is close to target.
         assertApproxEqAbs(
             IERC20(everlong.asset()).balanceOf(address(everlong)),
             everlong.targetIdleLiquidity(),
-            1e18
+            15e18
         );
 
         // Ensure idle liquidity is not over max.

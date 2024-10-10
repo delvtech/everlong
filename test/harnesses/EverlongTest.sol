@@ -4,9 +4,11 @@ pragma solidity ^0.8.20;
 // solhint-disable-next-line no-console, no-unused-import
 import { console2 as console } from "forge-std/console2.sol";
 import { HyperdriveTest } from "hyperdrive/test/utils/HyperdriveTest.sol";
+import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol";
 import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
+import { EverlongUpdateOnRebalance } from "../../contracts/EverlongUpdateOnRebalance.sol";
 import { EverlongExposed } from "../exposed/EverlongExposed.sol";
 
 // TODO: Refactor this to include an instance of `Everlong` with exposed internal functions.
@@ -57,7 +59,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     int256 internal VARIABLE_RATE = 0.10e18;
 
     uint256 internal INITIAL_VAULT_SHARE_PRICE = 1e18;
-    uint256 internal INITIAL_CONTRIBUTION = 500_000_000e18;
+    uint256 internal INITIAL_CONTRIBUTION = 50_000e18;
 
     uint256 internal CURVE_FEE = 0.01e18;
     uint256 internal FLAT_FEE = 0.0005e18;
@@ -108,6 +110,80 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         advanceTimeWithCheckpoints(POSITION_DURATION * 2, VARIABLE_RATE);
     }
 
+    /// @dev Deploy the Everlong instance with default underlying, name,
+    ///      and symbol.
+    function deployEverlongUpdateOnRebalance() internal {
+        // Deploy the hyperdrive instance.
+        deploy(
+            deployer,
+            FIXED_RATE,
+            INITIAL_VAULT_SHARE_PRICE,
+            CURVE_FEE,
+            FLAT_FEE,
+            GOVERNANCE_LP_FEE,
+            GOVERNANCE_ZOMBIE_FEE
+        );
+
+        // Seed liquidity for the hyperdrive instance.
+        if (HYPERDRIVE_INITIALIZER == address(0)) {
+            HYPERDRIVE_INITIALIZER = deployer;
+        }
+        initialize(HYPERDRIVE_INITIALIZER, FIXED_RATE, INITIAL_CONTRIBUTION);
+
+        vm.startPrank(deployer);
+        everlong = EverlongExposed(
+            address(
+                new EverlongUpdateOnRebalance(
+                    EVERLONG_NAME,
+                    EVERLONG_SYMBOL,
+                    hyperdrive.decimals(),
+                    address(hyperdrive),
+                    true,
+                    TARGET_IDLE_LIQUIDITY_PERCENTAGE,
+                    MAX_IDLE_LIQUIDITY_PERCENTAGE
+                )
+            )
+        );
+        vm.stopPrank();
+
+        // Fast forward and accrue some interest.
+        advanceTimeWithCheckpoints(POSITION_DURATION * 2, VARIABLE_RATE);
+    }
+
+    /// @dev Deploy the Everlong instance with default underlying, name,
+    ///      and symbol.
+    function deployEverlongUpdateOnRebalance(
+        IHyperdrive.PoolConfig memory _config
+    ) internal {
+        // Deploy the hyperdrive instance.
+        deploy(deployer, _config);
+
+        // Seed liquidity for the hyperdrive instance.
+        if (HYPERDRIVE_INITIALIZER == address(0)) {
+            HYPERDRIVE_INITIALIZER = deployer;
+        }
+        initialize(HYPERDRIVE_INITIALIZER, FIXED_RATE, INITIAL_CONTRIBUTION);
+
+        vm.startPrank(deployer);
+        everlong = EverlongExposed(
+            address(
+                new EverlongUpdateOnRebalance(
+                    EVERLONG_NAME,
+                    EVERLONG_SYMBOL,
+                    hyperdrive.decimals(),
+                    address(hyperdrive),
+                    true,
+                    TARGET_IDLE_LIQUIDITY_PERCENTAGE,
+                    MAX_IDLE_LIQUIDITY_PERCENTAGE
+                )
+            )
+        );
+        vm.stopPrank();
+
+        // Fast forward and accrue some interest.
+        advanceTimeWithCheckpoints(POSITION_DURATION * 2, VARIABLE_RATE);
+    }
+
     // ╭─────────────────────────────────────────────────────────╮
     // │ Deposit Helpers                                         │
     // ╰─────────────────────────────────────────────────────────╯
@@ -136,6 +212,16 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
 
         // Return the amount of shares issued to _depositor for the deposit.
         return shares;
+    }
+
+    function redeemEverlong(
+        uint256 _amount,
+        address _redeemer
+    ) internal returns (uint256 proceeds) {
+        // Make the redemption.
+        vm.startPrank(_redeemer);
+        proceeds = everlong.redeem(_amount, _redeemer, _redeemer);
+        vm.stopPrank();
     }
 
     // TODO: This is gross, will refactor
