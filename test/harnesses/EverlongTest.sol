@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 // solhint-disable-next-line no-console, no-unused-import
 import { console2 as console } from "forge-std/console2.sol";
 import { HyperdriveTest } from "hyperdrive/test/utils/HyperdriveTest.sol";
+import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol";
 import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
@@ -122,6 +123,40 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             GOVERNANCE_LP_FEE,
             GOVERNANCE_ZOMBIE_FEE
         );
+
+        // Seed liquidity for the hyperdrive instance.
+        if (HYPERDRIVE_INITIALIZER == address(0)) {
+            HYPERDRIVE_INITIALIZER = deployer;
+        }
+        initialize(HYPERDRIVE_INITIALIZER, FIXED_RATE, INITIAL_CONTRIBUTION);
+
+        vm.startPrank(deployer);
+        everlong = EverlongExposed(
+            address(
+                new EverlongUpdateOnRebalance(
+                    EVERLONG_NAME,
+                    EVERLONG_SYMBOL,
+                    hyperdrive.decimals(),
+                    address(hyperdrive),
+                    true,
+                    TARGET_IDLE_LIQUIDITY_PERCENTAGE,
+                    MAX_IDLE_LIQUIDITY_PERCENTAGE
+                )
+            )
+        );
+        vm.stopPrank();
+
+        // Fast forward and accrue some interest.
+        advanceTimeWithCheckpoints(POSITION_DURATION * 2, VARIABLE_RATE);
+    }
+
+    /// @dev Deploy the Everlong instance with default underlying, name,
+    ///      and symbol.
+    function deployEverlongUpdateOnRebalance(
+        IHyperdrive.PoolConfig memory _config
+    ) internal {
+        // Deploy the hyperdrive instance.
+        deploy(deployer, _config);
 
         // Seed liquidity for the hyperdrive instance.
         if (HYPERDRIVE_INITIALIZER == address(0)) {

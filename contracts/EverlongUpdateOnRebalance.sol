@@ -180,7 +180,6 @@ contract EverlongUpdateOnRebalance is Everlong {
         if (_bonds == 0) {
             return 0;
         }
-        uint256 t = IHyperdrive(hyperdrive).normalizedTimeRemaining(_maturity);
         uint256 p = IHyperdrive(hyperdrive)
             .getCheckpointDown(block.timestamp)
             .weightedSpotPrice;

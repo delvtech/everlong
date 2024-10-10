@@ -5,6 +5,7 @@ import { stdMath } from "forge-std/StdMath.sol";
 import { console2 as console } from "forge-std/console2.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
+import { HyperdriveMath } from "hyperdrive/contracts/src/libraries/HyperdriveMath.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
@@ -44,134 +45,394 @@ contract VaultSharePriceManipulation is EverlongTest {
         uint256 bystanderCloseDelay;
     }
 
-    // function test_no_sandwich_instant() external {
-    //     console.log("No Sandwich - Instant");
-    //     quiznos(
-    //         SandwichParams({
-    //             initialDeposit: 100e18,
-    //             bystanderDeposit: 100e18,
-    //             sandwichShort: 0,
-    //             sandwichDeposit: 100e18,
-    //             timeToCloseShort: 0,
-    //             timeToCloseEverlong: 0
-    //         })
-    //     );
-    // }
-    //
-    // function test_no_sandwich_immature() external {
-    //     console.log("No Sandwich - Immature");
-    //     quiznos(
-    //         SandwichParams({
-    //             initialDeposit: 100e18,
-    //             bystanderDeposit: 100e18,
-    //             sandwichShort: 0,
-    //             sandwichDeposit: 100e18,
-    //             timeToCloseShort: 0,
-    //             timeToCloseEverlong: POSITION_DURATION / 2
-    //         })
-    //     );
-    // }
-    //
-    // function test_no_sandwich_mature() external {
-    //     console.log("No Sandwich - Mature");
-    //     quiznos(
-    //         SandwichParams({
-    //             initialDeposit: 100e18,
-    //             bystanderDeposit: 100e18,
-    //             sandwichShort: 0,
-    //             sandwichDeposit: 100e18,
-    //             timeToCloseShort: 0,
-    //             timeToCloseEverlong: POSITION_DURATION + 1
-    //         })
-    //     );
-    // }
-    //
+    SandwichParams params =
+        SandwichParams({
+            initialDeposit: 0,
+            bystanderDeposit: 0,
+            sandwichShort: 0,
+            sandwichDeposit: 0,
+            timeToCloseShort: 0,
+            timeToCloseEverlong: 0,
+            bystanderCloseDelay: 0
+        });
 
-    function test_sandwich_instant() external {
-        console.log("Sandwich - Instant");
-        quiznos(
-            SandwichParams({
-                initialDeposit: 100e18,
-                bystanderDeposit: 100e18,
-                sandwichShort: 100e18,
-                sandwichDeposit: 100e18,
-                timeToCloseShort: 0,
-                timeToCloseEverlong: 0,
-                bystanderCloseDelay: 0
-            })
+    IHyperdrive.PoolConfig poolConfig;
+
+    uint256[] fixedRates;
+    int256[] variableRates;
+
+    function test_sandwichScenarios() external {
+        // console.log(
+        //     "hyperdrive_liquidity,fixed_rate,variable_rate,timestretch,curve_fee,flat_fee,initial_deposit,bystander_deposit,sandwich_short,sandwich_deposit,time_to_close_short,time_to_close_everlong,bystander_close_delay,attacker_profit_percent,bystander_profit_percent,initial_depositor_profit_percent"
+        // );
+        console.log(
+            "hyperdrive_liquidity,fixed_rate,variable_rate,timestretch,curve_fee,flat_fee,initial_deposit,bystander_deposit,sandwich_short,sandwich_deposit,time_to_close_short,time_to_close_everlong,bystander_close_delay,sandwich_short_cost,attacker_balance,bystander_balance,initial_depositor_balance,everlong_balance"
+        );
+
+        // fixedRates.push(0.025e18);
+        // fixedRates.push(0.05e18);
+        fixedRates.push(0.1e18);
+        variableRates.push(0.025e18);
+        variableRates.push(0.05e18);
+        variableRates.push(0.1e18);
+
+        for (uint256 i = 0; i < fixedRates.length; i++) {
+            FIXED_RATE = fixedRates[i];
+            for (uint256 j = 0; j < variableRates.length; j++) {
+                VARIABLE_RATE = variableRates[j];
+
+                // ── With Fees ──────────────────────────────────────────────
+
+                updatePoolConfig();
+
+                // Base
+                sandwichScenarios();
+
+                // Double TimeStretch
+                poolConfig.timeStretch = poolConfig.timeStretch * 2;
+                sandwichScenarios();
+
+                // Half TimeStretch
+                poolConfig.timeStretch = poolConfig.timeStretch / 4;
+                sandwichScenarios();
+
+                // ── Without Fees ───────────────────────────────────────────
+
+                poolConfig = testConfig(FIXED_RATE, POSITION_DURATION);
+
+                // Base
+                sandwichScenarios();
+
+                // Double TimeStretch
+                poolConfig.timeStretch = poolConfig.timeStretch * 2;
+                sandwichScenarios();
+
+                // Half TimeStretch
+                poolConfig.timeStretch = poolConfig.timeStretch / 4;
+                sandwichScenarios();
+            }
+        }
+    }
+
+    function updatePoolConfig() internal {
+        poolConfig = testConfig(FIXED_RATE, POSITION_DURATION);
+        poolConfig.fees = IHyperdrive.Fees({
+            curve: CURVE_FEE,
+            flat: FLAT_FEE,
+            governanceLP: GOVERNANCE_LP_FEE,
+            governanceZombie: GOVERNANCE_ZOMBIE_FEE
+        });
+    }
+
+    function sandwichScenarios() internal {
+        // No Attack
+        params = SandwichParams({
+            initialDeposit: 100e18,
+            bystanderDeposit: 100e18,
+            sandwichShort: 0,
+            sandwichDeposit: 100e18,
+            timeToCloseShort: 0,
+            timeToCloseEverlong: 0,
+            bystanderCloseDelay: 0
+        });
+        varyTiming();
+
+        // Base Attack
+        params = SandwichParams({
+            initialDeposit: 100e18,
+            bystanderDeposit: 100e18,
+            sandwichShort: 100e18,
+            sandwichDeposit: 100e18,
+            timeToCloseShort: 0,
+            timeToCloseEverlong: 0,
+            bystanderCloseDelay: 0
+        });
+        varyTiming();
+
+        // // Increased Initial Deposit Amount
+        // params = SandwichParams({
+        //     initialDeposit: 1_000e18,
+        //     bystanderDeposit: 100e18,
+        //     sandwichShort: 100e18,
+        //     sandwichDeposit: 100e18,
+        //     timeToCloseShort: 0,
+        //     timeToCloseEverlong: 0,
+        //     bystanderCloseDelay: 0
+        // });
+        // varyTiming();
+
+        // // Increased Sandwich Short Amount
+        // params = SandwichParams({
+        //     initialDeposit: 100e18,
+        //     bystanderDeposit: 100e18,
+        //     sandwichShort: 1_000e18,
+        //     sandwichDeposit: 100e18,
+        //     timeToCloseShort: 0,
+        //     timeToCloseEverlong: 0,
+        //     bystanderCloseDelay: 0
+        // });
+        // varyTiming();
+
+        // Super-Increased Sandwich Short Amount
+        params = SandwichParams({
+            initialDeposit: 100e18,
+            bystanderDeposit: 100e18,
+            sandwichShort: 15_000e18,
+            sandwichDeposit: 100e18,
+            timeToCloseShort: 0,
+            timeToCloseEverlong: 0,
+            bystanderCloseDelay: 0
+        });
+        varyTiming();
+
+        // // Increased Sandwich Deposit Amount
+        // params = SandwichParams({
+        //     initialDeposit: 100e18,
+        //     bystanderDeposit: 100e18,
+        //     sandwichShort: 100e18,
+        //     sandwichDeposit: 1_000e18,
+        //     timeToCloseShort: 0,
+        //     timeToCloseEverlong: 0,
+        //     bystanderCloseDelay: 0
+        // });
+        // varyTiming();
+
+        // Super-Increased Sandwich Deposit Amount
+        // NOTE: Runs into insufficient liq. @10k
+        // params = SandwichParams({
+        //     initialDeposit: 100e18,
+        //     bystanderDeposit: 100e18,
+        //     sandwichShort: 100e18,
+        //     sandwichDeposit: 5_000e18,
+        //     timeToCloseShort: 0,
+        //     timeToCloseEverlong: 0,
+        //     bystanderCloseDelay: 0
+        // });
+        // varyTiming();
+    }
+
+    function varyTiming() internal {
+        string memory profits = "";
+
+        // Short: Close Immediately
+        // Everlong: Close Immediately
+        // Bystander: Close Immediately
+        params.timeToCloseShort = 0;
+        params.timeToCloseEverlong = 0;
+        params.bystanderCloseDelay = 0;
+        profits = sandwich();
+        logCSVRow(profits);
+
+        // Short: Close Immediately
+        // Everlong: Close Half Term
+        // Bystander: Close Half Term
+        params.timeToCloseShort = 0;
+        params.timeToCloseEverlong = POSITION_DURATION / 2;
+        params.bystanderCloseDelay = 0;
+        profits = sandwich();
+        logCSVRow(profits);
+
+        // Short: Close Immediately
+        // Everlong: Close Half Term
+        // Bystander: Close Full Term
+        params.timeToCloseShort = 0;
+        params.timeToCloseEverlong = POSITION_DURATION / 2;
+        params.bystanderCloseDelay = POSITION_DURATION / 2 + 1;
+        profits = sandwich();
+        logCSVRow(profits);
+
+        // Short: Close Immediately
+        // Everlong: Close Full Term
+        // Bystander: Close Full Term
+        params.timeToCloseShort = 0;
+        params.timeToCloseEverlong = POSITION_DURATION + 1;
+        params.bystanderCloseDelay = 0;
+        profits = sandwich();
+        logCSVRow(profits);
+
+        // Short: Close Half Term
+        // Everlong: Close Half Term
+        // Bystander: Close Half Term
+        params.timeToCloseShort = POSITION_DURATION / 2;
+        params.timeToCloseEverlong = 0;
+        params.bystanderCloseDelay = 0;
+        profits = sandwich();
+        logCSVRow(profits);
+
+        // Short: Close Half Term
+        // Everlong: Close Full Term
+        // Bystander: Close Full Term
+        params.timeToCloseShort = POSITION_DURATION / 2;
+        params.timeToCloseEverlong = POSITION_DURATION / 2 + 1;
+        params.bystanderCloseDelay = 0;
+        profits = sandwich();
+        logCSVRow(profits);
+
+        // Short: Close Half Term
+        // Everlong: Close Half Term
+        // Bystander: Close Full Term
+        params.timeToCloseShort = POSITION_DURATION / 2;
+        params.timeToCloseEverlong = 0;
+        params.bystanderCloseDelay = POSITION_DURATION / 2 + 1;
+        profits = sandwich();
+        logCSVRow(profits);
+
+        // Short: Close Full Term
+        // Everlong: Close Full Term
+        // Bystander: Close Full Term
+        params.timeToCloseShort = POSITION_DURATION + 1;
+        params.timeToCloseEverlong = 0;
+        params.bystanderCloseDelay = 0;
+        profits = sandwich();
+        logCSVRow(profits);
+    }
+
+    function logCSVRow(string memory _profits) internal view {
+        console.log(
+            string(
+                abi.encodePacked(
+                    INITIAL_CONTRIBUTION.toString(18),
+                    ",",
+                    FIXED_RATE.toString(18),
+                    ",",
+                    VARIABLE_RATE.toString(18),
+                    ",",
+                    hyperdrive.getPoolConfig().timeStretch.toString(18),
+                    ",",
+                    hyperdrive.getPoolConfig().fees.curve.toString(18),
+                    ",",
+                    hyperdrive.getPoolConfig().fees.flat.toString(18),
+                    ",",
+                    paramsToCSV(),
+                    ",",
+                    _profits,
+                    ",",
+                    ERC20Mintable(everlong.asset())
+                        .balanceOf(address(everlong))
+                        .toString(18)
+                )
+            )
         );
     }
 
-    function test_sandwich_immature() external {
-        console.log("Sandwich - Immature");
-        quiznos(
-            SandwichParams({
-                initialDeposit: 100e18,
-                bystanderDeposit: 100e18,
-                sandwichShort: 100e18,
-                sandwichDeposit: 100e18,
-                timeToCloseShort: 0,
-                timeToCloseEverlong: POSITION_DURATION / 2,
-                bystanderCloseDelay: 0
-            })
-        );
+    function paramsToCSV() internal view returns (string memory) {
+        return
+            string(
+                abi.encodePacked(
+                    params.initialDeposit.toString(18),
+                    ",",
+                    params.bystanderDeposit.toString(18),
+                    ",",
+                    params.sandwichShort.toString(18),
+                    ",",
+                    params.sandwichDeposit.toString(18),
+                    ",",
+                    (
+                        params.timeToCloseShort > 0
+                            ? params.timeToCloseShort.divDown(POSITION_DURATION)
+                            : 0
+                    ).toString(18),
+                    ",",
+                    (
+                        params.timeToCloseEverlong > 0
+                            ? params.timeToCloseEverlong.divDown(
+                                POSITION_DURATION
+                            )
+                            : 0
+                    ).toString(18),
+                    ",",
+                    (
+                        params.bystanderCloseDelay > 0
+                            ? params.bystanderCloseDelay.divDown(
+                                POSITION_DURATION
+                            )
+                            : 0
+                    ).toString(18)
+                )
+            );
     }
 
-    function test_sandwich_mature() external {
-        console.log("Sandwich - Mature");
-        quiznos(
-            SandwichParams({
-                initialDeposit: 100e18,
-                bystanderDeposit: 100e18,
-                sandwichShort: 100e18,
-                sandwichDeposit: 100e18,
-                timeToCloseShort: 0,
-                timeToCloseEverlong: POSITION_DURATION + 1,
-                bystanderCloseDelay: 0
-            })
+    function clearBalances() internal {
+        // Clear initial depositor balance
+        vm.startPrank(celine);
+        ERC20Mintable(everlong.asset()).burn(
+            ERC20Mintable(everlong.asset()).balanceOf(celine)
         );
+        vm.stopPrank();
+        // Clear attacker balance
+        vm.startPrank(bob);
+        ERC20Mintable(everlong.asset()).burn(
+            ERC20Mintable(everlong.asset()).balanceOf(bob)
+        );
+        vm.stopPrank();
+        // Clear bystander balance
+        vm.startPrank(alice);
+        ERC20Mintable(everlong.asset()).burn(
+            ERC20Mintable(everlong.asset()).balanceOf(alice)
+        );
+        vm.stopPrank();
     }
 
-    function quiznos(SandwichParams memory _params) internal {
+    /// @dev Order of operations:
+    ///      1. Celine makes an initial deposit into Everlong.
+    ///      2. Alice (bystander) makes a deposit.
+    ///      3. Bob (attacker) opens a short on Hyperdrive.
+    ///      4. Bob (attacker) makes a deposit.
+    ///      5. Bob (attacker) closes short on Hyperdrive.
+    ///      6. Bob (attacker) redeems from Everlong.
+    ///      7. Alice (bystander) redeems from Everlong.
+    ///      8. Celine redeems from Everlong.
+    function sandwich() internal returns (string memory) {
         // Deploy Everlong.
         // deployEverlong();
 
         // Deploy EverlongUpdateOnRebalance.
-        deployEverlongUpdateOnRebalance();
+        deployEverlongUpdateOnRebalance(poolConfig);
+
+        // Clear all balances
+        clearBalances();
+
+        // Adjust short amount
+        if (params.sandwichShort > 0) {
+            uint256 maxShort = hyperdrive.calculateMaxShort();
+            if (params.sandwichShort > maxShort) {
+                params.sandwichShort = maxShort;
+            }
+        }
 
         // console.log("------------------------------------------------------");
-        console.log("Initial Deposit:     %e", _params.initialDeposit);
-        console.log("Bystander Deposit:   %e", _params.bystanderDeposit);
-        console.log("Sandwich Short:      %e", _params.sandwichShort);
-        console.log("Sandwich Deposit:    %e", _params.sandwichDeposit);
-        console.log("Time Close Short:    %s", _params.timeToCloseShort);
-        console.log("Time Close Everlong: %s", _params.timeToCloseEverlong);
+        // console.log("Initial Deposit:     %e", _params.initialDeposit);
+        // console.log("Bystander Deposit:   %e", _params.bystanderDeposit);
+        // console.log("Sandwich Short:      %e", _params.sandwichShort);
+        // console.log("Sandwich Deposit:    %e", _params.sandwichDeposit);
+        // console.log("Time Close Short:    %s", _params.timeToCloseShort);
+        // console.log("Time Close Everlong: %s", _params.timeToCloseEverlong);
 
         // Initial deposit is made into everlong.
-        uint256 celineShares = depositEverlong(_params.initialDeposit, celine);
+        uint256 celineShares = depositEverlong(params.initialDeposit, celine);
 
         // Innocent bystander deposits into everlong.
-        uint256 aliceShares = depositEverlong(_params.bystanderDeposit, alice);
+        uint256 aliceShares = depositEverlong(params.bystanderDeposit, alice);
 
         // Attacker opens a short on hyperdrive.
         uint256 bobShortMaturityTime;
         uint256 bobShortAmount;
-        if (_params.sandwichShort > 0) {
+        if (params.sandwichShort > 0) {
             (bobShortMaturityTime, bobShortAmount) = openShort(
                 bob,
-                _params.sandwichShort,
+                params.sandwichShort,
                 true
             );
         }
 
         // Attacker deposits into everlong.
         uint256 bobEverlongShares = depositEverlong(
-            _params.sandwichDeposit,
+            params.sandwichDeposit,
             bob
         );
 
-        if (_params.timeToCloseShort > 0) {
-            advanceTimeWithCheckpoints(_params.timeToCloseShort, VARIABLE_RATE);
+        if (params.timeToCloseShort > 0) {
+            advanceTimeWithCheckpoints(params.timeToCloseShort, VARIABLE_RATE);
             if (everlong.canRebalance()) {
                 everlong.rebalance();
             }
@@ -179,18 +440,18 @@ contract VaultSharePriceManipulation is EverlongTest {
 
         // Attacker closes short on hyperdrive.
         uint256 bobProceedsShort;
-        if (_params.sandwichShort > 0) {
+        if (params.sandwichShort > 0) {
             bobProceedsShort = closeShort(
                 bob,
                 bobShortMaturityTime,
-                _params.sandwichShort,
+                params.sandwichShort,
                 true
             );
         }
 
-        if (_params.timeToCloseEverlong > 0) {
+        if (params.timeToCloseEverlong > 0) {
             advanceTimeWithCheckpoints(
-                _params.timeToCloseEverlong,
+                params.timeToCloseEverlong,
                 VARIABLE_RATE
             );
             if (everlong.canRebalance()) {
@@ -199,14 +460,15 @@ contract VaultSharePriceManipulation is EverlongTest {
         }
 
         // Attacker redeems from everlong.
-        uint256 bobProceedsEverlong = redeemEverlong(bobEverlongShares, bob);
+        // uint256 bobProceedsEverlong = redeemEverlong(bobEverlongShares, bob);
+        redeemEverlong(bobEverlongShares, bob);
         if (everlong.canRebalance()) {
             everlong.rebalance();
         }
 
-        if (_params.bystanderCloseDelay > 0) {
+        if (params.bystanderCloseDelay > 0) {
             advanceTimeWithCheckpoints(
-                _params.bystanderCloseDelay,
+                params.bystanderCloseDelay,
                 VARIABLE_RATE
             );
             if (everlong.canRebalance()) {
@@ -226,253 +488,92 @@ contract VaultSharePriceManipulation is EverlongTest {
             everlong.rebalance();
         }
 
-        console.log(
-            "everlong balance %: %e",
-            ERC20Mintable(everlong.asset()).balanceOf(address(everlong))
-        );
-
-        console.log(
-            "share delta percent %:   %e",
-            (
-                bobEverlongShares > aliceShares
-                    ? int256(bobEverlongShares.percentDelta(aliceShares))
-                    : -1 * int256(bobEverlongShares.percentDelta(aliceShares))
-            )
-        );
-        console.log(
-            "attacker everlong profits %:   %e",
-            int256(
-                _params.sandwichDeposit > bobProceedsEverlong
-                    ? -1 *
-                        int256(
-                            bobProceedsEverlong.percentDelta(
-                                _params.sandwichDeposit
-                            )
-                        )
-                    : int256(
-                        bobProceedsEverlong.percentDelta(
-                            _params.sandwichDeposit
-                        )
-                    )
-            )
-        );
-        console.log(
-            "attacker short profits %:   %e",
-            int256(
-                bobShortAmount > bobProceedsShort
-                    ? -1 * int256(bobProceedsShort.percentDelta(bobShortAmount))
-                    : int256(bobProceedsShort.percentDelta(bobShortAmount))
-            )
-        );
-        int256 attackerStart = int256(bobShortAmount + _params.sandwichDeposit);
+        // console.log(
+        //     "share delta percent %:   %e",
+        //     (
+        //         bobEverlongShares > aliceShares
+        //             ? int256(bobEverlongShares.percentDelta(aliceShares))
+        //             : -1 * int256(bobEverlongShares.percentDelta(aliceShares))
+        //     )
+        // );
+        // console.log(
+        //     "attacker everlong profits %:   %e",
+        //     int256(
+        //         _params.sandwichDeposit > bobProceedsEverlong
+        //             ? -1 *
+        //                 int256(
+        //                     bobProceedsEverlong.percentDelta(
+        //                         _params.sandwichDeposit
+        //                     )
+        //                 )
+        //             : int256(
+        //                 bobProceedsEverlong.percentDelta(
+        //                     _params.sandwichDeposit
+        //                 )
+        //             )
+        //     )
+        // );
+        // console.log(
+        //     "attacker short profits %:   %e",
+        //     int256(
+        //         bobShortAmount > bobProceedsShort
+        //             ? -1 * int256(bobProceedsShort.percentDelta(bobShortAmount))
+        //             : int256(bobProceedsShort.percentDelta(bobShortAmount))
+        //     )
+        // );
+        int256 attackerStart = int256(bobShortAmount + params.sandwichDeposit);
         int256 attackerEnd = int256(
             ERC20Mintable(everlong.asset()).balanceOf(bob)
         );
-        int256 attackerProfitPercentage = attackerEnd < attackerStart
-            ? -1 * int256(attackerStart.percentDelta(attackerEnd))
-            : int256(attackerStart.percentDelta(attackerEnd));
-        console.log("attacker profits %: %e", attackerProfitPercentage);
-        console.log(
-            "bystander profits %:  %e",
-            int256(
-                _params.bystanderDeposit > aliceProceeds
-                    ? -1 *
-                        int256(
-                            aliceProceeds.percentDelta(_params.bystanderDeposit)
-                        )
-                    : int256(
-                        aliceProceeds.percentDelta(_params.bystanderDeposit)
-                    )
-            )
-        );
-        console.log(
-            "initial depositor profits %:  %e",
-            int256(
-                _params.initialDeposit > celineProceeds
-                    ? -1 *
-                        int256(
-                            celineProceeds.percentDelta(_params.initialDeposit)
-                        )
-                    : int256(
-                        celineProceeds.percentDelta(_params.initialDeposit)
-                    )
-            )
-        );
-
-        console.log("------------------------------------------------------");
-    }
-
-    function quiznos2(SandwichParams memory _params) internal {
-        // Deploy Everlong.
-        // deployEverlong();
-
-        // Deploy EverlongUpdateOnRebalance.
-        deployEverlongUpdateOnRebalance();
-
-        // console.log("------------------------------------------------------");
-        console.log("Initial Deposit:     %e", _params.initialDeposit);
-        console.log("Bystander Deposit:   %e", _params.bystanderDeposit);
-        console.log("Sandwich Short:      %e", _params.sandwichShort);
-        console.log("Sandwich Deposit:    %e", _params.sandwichDeposit);
-        console.log("Time Close Short:    %s", _params.timeToCloseShort);
-        console.log("Time Close Everlong: %s", _params.timeToCloseEverlong);
-
-        // Initial deposit is made into everlong.
-        uint256 celineShares = depositEverlong(_params.initialDeposit, celine);
-
-        // Innocent bystander deposits into everlong.
-        uint256 aliceShares = depositEverlong(_params.bystanderDeposit, alice);
-
-        // Attacker opens a short on hyperdrive.
-        uint256 bobShortMaturityTime;
-        uint256 bobShortAmount;
-        if (_params.sandwichShort > 0) {
-            (bobShortMaturityTime, bobShortAmount) = openShort(
-                bob,
-                _params.sandwichShort,
-                true
+        // console.log(
+        //     "attacker profit %, bystander profit %, initial depositor profit %"
+        // );
+        int256 attackerProfitPercent;
+        if (attackerStart > 0) {
+            attackerProfitPercent = (
+                attackerEnd < attackerStart
+                    ? -1 * int256(attackerStart.percentDelta(attackerEnd))
+                    : int256(attackerStart.percentDelta(attackerEnd))
             );
         }
-
-        // Attacker deposits into everlong.
-        uint256 bobEverlongShares = depositEverlong(
-            _params.sandwichDeposit,
-            bob
+        int256 bystanderProfitPercent = int256(
+            params.bystanderDeposit > aliceProceeds
+                ? -1 *
+                    int256(aliceProceeds.percentDelta(params.bystanderDeposit))
+                : int256(aliceProceeds.percentDelta(params.bystanderDeposit))
         );
 
-        if (_params.timeToCloseShort > 0) {
-            advanceTimeWithCheckpoints(_params.timeToCloseShort, VARIABLE_RATE);
-            if (everlong.canRebalance()) {
-                everlong.rebalance();
-            }
-        }
-
-        // Attacker closes short on hyperdrive.
-        uint256 bobProceedsShort;
-        if (_params.sandwichShort > 0) {
-            bobProceedsShort = closeShort(
-                bob,
-                bobShortMaturityTime,
-                _params.sandwichShort,
-                true
-            );
-        }
-
-        if (_params.timeToCloseEverlong > 0) {
-            advanceTimeWithCheckpoints(
-                _params.timeToCloseEverlong,
-                VARIABLE_RATE
-            );
-            if (everlong.canRebalance()) {
-                everlong.rebalance();
-            }
-        }
-
-        // Attacker redeems from everlong.
-        uint256 bobProceedsEverlong = redeemEverlong(bobEverlongShares, bob);
-        if (everlong.canRebalance()) {
-            everlong.rebalance();
-        }
-
-        if (_params.bystanderCloseDelay > 0) {
-            advanceTimeWithCheckpoints(
-                _params.bystanderCloseDelay,
-                VARIABLE_RATE
-            );
-            if (everlong.canRebalance()) {
-                everlong.rebalance();
-            }
-        }
-
-        // Innocent bystander redeems from everlong.
-        uint256 aliceProceeds = redeemEverlong(aliceShares, alice);
-        if (everlong.canRebalance()) {
-            everlong.rebalance();
-        }
-
-        // Initial depositor redeems from everlong.
-        uint256 celineProceeds = redeemEverlong(celineShares, celine);
-        if (everlong.canRebalance()) {
-            everlong.rebalance();
-        }
-
-        console.log(
-            "everlong balance %: %e",
-            ERC20Mintable(everlong.asset()).balanceOf(address(everlong))
+        int256 initialDepositorProfitPercent = int256(
+            params.initialDeposit > celineProceeds
+                ? -1 *
+                    int256(celineProceeds.percentDelta(params.initialDeposit))
+                : int256(celineProceeds.percentDelta(params.initialDeposit))
         );
-
-        console.log(
-            "share delta percent %:   %e",
-            (
-                bobEverlongShares > aliceShares
-                    ? int256(bobEverlongShares.percentDelta(aliceShares))
-                    : -1 * int256(bobEverlongShares.percentDelta(aliceShares))
-            )
-        );
-        console.log(
-            "attacker everlong profits %:   %e",
-            int256(
-                _params.sandwichDeposit > bobProceedsEverlong
-                    ? -1 *
-                        int256(
-                            bobProceedsEverlong.percentDelta(
-                                _params.sandwichDeposit
-                            )
-                        )
-                    : int256(
-                        bobProceedsEverlong.percentDelta(
-                            _params.sandwichDeposit
-                        )
+        // return
+        //     string(
+        //         abi.encodePacked(
+        //             attackerProfitPercent.toString(18),
+        //             ",",
+        //             bystanderProfitPercent.toString(18),
+        //             ",",
+        //             initialDepositorProfitPercent.toString(18)
+        //         )
+        //     );
+        return
+            string(
+                abi.encodePacked(
+                    bobShortAmount.toString(18),
+                    ",",
+                    ERC20Mintable(everlong.asset()).balanceOf(bob).toString(18),
+                    ",",
+                    ERC20Mintable(everlong.asset()).balanceOf(alice).toString(
+                        18
+                    ),
+                    ",",
+                    ERC20Mintable(everlong.asset()).balanceOf(celine).toString(
+                        18
                     )
-            )
-        );
-        console.log(
-            "attacker short profits %:   %e",
-            int256(
-                bobShortAmount > bobProceedsShort
-                    ? -1 * int256(bobProceedsShort.percentDelta(bobShortAmount))
-                    : int256(bobProceedsShort.percentDelta(bobShortAmount))
-            )
-        );
-
-        int256 attackerStart = int256(bobShortAmount + _params.sandwichDeposit);
-        int256 attackerEnd = int256(
-            ERC20Mintable(everlong.asset()).balanceOf(bob)
-        );
-        int256 attackerProfitPercentage = attackerEnd < attackerStart
-            ? -1 * int256(attackerStart.percentDelta(attackerEnd))
-            : int256(attackerStart.percentDelta(attackerEnd));
-
-        console.log("attacker profits %: %e", attackerProfitPercentage);
-
-        console.log(
-            "bystander profits %:  %e",
-            int256(
-                _params.bystanderDeposit > aliceProceeds
-                    ? -1 *
-                        int256(
-                            aliceProceeds.percentDelta(_params.bystanderDeposit)
-                        )
-                    : int256(
-                        aliceProceeds.percentDelta(_params.bystanderDeposit)
-                    )
-            )
-        );
-
-        console.log(
-            "initial depositor profits %:  %e",
-            int256(
-                _params.initialDeposit > celineProceeds
-                    ? -1 *
-                        int256(
-                            celineProceeds.percentDelta(_params.initialDeposit)
-                        )
-                    : int256(
-                        celineProceeds.percentDelta(_params.initialDeposit)
-                    )
-            )
-        );
-
-        console.log("------------------------------------------------------");
+                )
+            );
     }
 }

@@ -333,14 +333,22 @@ contract Everlong is IEverlong {
     //         );
     // }
 
+    // TODO: Use cached poolconfig
+    //
     /// @notice Returns true if the portfolio can be rebalanced.
     /// @notice The portfolio can be rebalanced if:
     ///         - Any positions are matured.
     ///         - The current idle liquidity is above the target.
     /// @return True if the portfolio can be rebalanced, false otherwise.
     function canRebalance() public view returns (bool) {
+        uint256 balance = ERC20(_asset).balanceOf(address(this));
+        uint256 target = targetIdleLiquidity();
         return (hasMaturedPositions() ||
-            ERC20(_asset).balanceOf(address(this)) > targetIdleLiquidity());
+            (balance > target &&
+                balance - target >
+                IHyperdrive(hyperdrive)
+                    .getPoolConfig()
+                    .minimumTransactionAmount));
     }
 
     // TODO: Use cached poolconfig
