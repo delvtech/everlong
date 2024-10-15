@@ -224,7 +224,7 @@ contract Everlong is IEverlong {
         // Estimate the value of everlong-controlled positions by calculating
         // the proceeds one would receive from closing a position with the
         // portfolio's total amount of bonds and weighted average maturity.
-        // The weighted average maturity is rounded to the next checkpoint
+        // The weighted average maturity is rounded up to the next checkpoint
         // timestamp to underestimate the value.
         return
             balance +
@@ -240,6 +240,44 @@ contract Everlong is IEverlong {
             );
     }
 
+    /// @notice Returns an approximate lower bound on the amount of assets
+    ///      received from redeeming the specified amount of shares.
+    /// @param _shares Amount of shares to redeem.
+    /// @return assets Amount of assets that will be received.
+    function previewRedeem(
+        uint256 _shares
+    ) public view override returns (uint256 assets) {
+        // Convert the share amount to assets.
+        assets = convertToAssets(_shares);
+
+        // If the amount of assets is less than Everlong's balance, no positions
+        // need to be closed and we can return.
+        uint256 balance = ERC20(_asset).balanceOf(address(this));
+        if (assets < balance) {
+            return assets;
+        }
+
+        // TODO: Evaluate whether we need mature position closing logic here.
+
+        // The amount of assets requires the closing of immature positions,
+        // during which losses can be incurred. Apply these losses to the
+        // amount of assets the redeemer will receive.
+        uint256 losses = _calcImmaturePositionLosses(assets - balance);
+
+        // If the losses from closing immature positions exceeds the assets
+        // owed to the redeemer, set the assets owed to zero.
+        if (losses > assets) {
+            // NOTE: We return zero since `previewRedeem` must not revert.
+            assets = 0;
+            return assets;
+        }
+
+        // Decrement the assets owed to the redeemer by the amount of losses
+        // incurred from closing immature positions.
+        assets -= losses;
+        return assets;
+    }
+
     /// @dev Attempt rebalancing after a deposit if idle is above max.
     function _afterDeposit(uint256, uint256) internal virtual override {
         if (ERC20(_asset).balanceOf(address(this)) > maxIdleLiquidity()) {
@@ -253,6 +291,11 @@ contract Everlong is IEverlong {
         uint256 _assets,
         uint256
     ) internal virtual override {
+        // If no assets are to be received, revert.
+        if (_assets == 0) {
+            revert IEverlong.RedemptionZeroOutput();
+        }
+
         // If we have enough balance to service the withdrawal, no need to
         // close positions.
         uint256 balance = ERC20(_asset).balanceOf(address(this));
@@ -363,6 +406,66 @@ contract Everlong is IEverlong {
             _portfolio.handleClosePosition();
         }
         return output;
+    }
+
+    /// @dev Calculate the losses incurred from closing sufficient positions
+    ///      to receive at least `_targetOutput`.
+    /// @param _targetOutput Target asset output from closed positions.
+    /// @return losses Losses incurred from closing the immature positions.
+    function _calcImmaturePositionLosses(
+        uint256 _targetOutput
+    ) internal view returns (uint256 losses) {
+        // Initialize variables.
+        uint256 output;
+        uint256 proceeds;
+        uint256 estimatedProceeds;
+        IEverlong.Position memory position;
+        uint256 i;
+        uint256 count = _portfolio.positionCount();
+
+        // Retrieve the `weightedSpotPrice` from the most recent checkpoint.
+        uint256 spotPrice = IHyperdrive(hyperdrive)
+            .getCheckpointDown(block.timestamp)
+            .weightedSpotPrice;
+
+        // Iterate through the position queue (most to least mature).
+        // For each position, calculate the `closeLong` output at the current
+        // spot price and compare it to the `closeLong` output using the
+        // most recent checkpoint's `weightedSpotPrice`. The difference
+        // between the two is the loss.
+        while (i < count && output < _targetOutput) {
+            // Retrieve the position at the current index.
+            position = _portfolio.at(i);
+
+            // Calculate the `closeLong` output using the current spot price.
+            proceeds = IHyperdrive(hyperdrive).previewCloseLong(
+                asBase,
+                position,
+                ""
+            );
+
+            // Calculate the `closeLong` output using the latest checkpoint's
+            // `weightedSpotPrice` and add it to the received output.
+            estimatedProceeds = IHyperdrive(hyperdrive).previewCloseLong(
+                asBase,
+                position,
+                spotPrice,
+                ""
+            );
+            // TODO: Reevaluate whether `estimatedProceeds` or `proceeds`
+            //       should be used to increment output. Maybe use the min?
+            output += estimatedProceeds;
+
+            // If actual proceeds are less than estimated, add the difference
+            // to the cumulative losses.
+            if (proceeds < estimatedProceeds) {
+                losses += estimatedProceeds - proceeds;
+            }
+
+            // Increment the counter
+            i++;
+        }
+        return losses;
     }
 
     // ╭─────────────────────────────────────────────────────────╮
