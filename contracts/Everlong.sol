@@ -120,6 +120,10 @@ contract Everlong is IEverlong {
     ///       was picked arbitrarily.
     uint8 public constant decimalsOffset = 3;
 
+    /// @notice Estimated value of the bond portfolio, updated on rebalance to
+    ///         minimize manipulation.
+    uint256 public estimatedPortfolioValue;
+
     // ─────────────────────────── State ────────────────────────
 
     /// @notice Address of the contract admin.
@@ -226,18 +230,7 @@ contract Everlong is IEverlong {
         // portfolio's total amount of bonds and weighted average maturity.
         // The weighted average maturity is rounded up to the next checkpoint
         // timestamp to underestimate the value.
-        return
-            balance +
-            IHyperdrive(hyperdrive).previewCloseLong(
-                asBase,
-                IEverlong.Position({
-                    maturityTime: IHyperdrive(hyperdrive)
-                        .getCheckpointIdUp(_portfolio.avgMaturityTime)
-                        .toUint128(),
-                    bondAmount: _portfolio.totalBonds
-                }),
-                ""
-            );
+        return balance + estimatedPortfolioValue;
     }
 
     /// @notice Returns an approximate lower bound on the amount of assets
@@ -334,6 +327,9 @@ contract Everlong is IEverlong {
 
         // Account for the new position in the portfolio.
         _portfolio.handleOpenPosition(maturityTime, bondAmount);
+
+        // Calculate the new portfolio value and save it.
+        estimatedPortfolioValue = _calcPortfolioValue();
 
         emit Rebalanced();
     }
@@ -466,6 +462,20 @@ contract Everlong is IEverlong {
             i++;
         }
         return losses;
+    }
+
+    /// @dev Calculates the present portfolio value using its avg maturity.
+    /// @return The present portfolio value.
+    function _calcPortfolioValue() internal view returns (uint256) {
+        return
+            IHyperdrive(hyperdrive).previewCloseLong(
+                asBase,
+                IEverlong.Position({
+                    maturityTime: _portfolio.avgMaturityTime,
+                    bondAmount: _portfolio.totalBonds
+                }),
+                ""
+            );
     }
 
     // ╭─────────────────────────────────────────────────────────╮
