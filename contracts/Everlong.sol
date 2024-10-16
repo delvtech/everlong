@@ -120,10 +120,6 @@ contract Everlong is IEverlong {
     ///       was picked arbitrarily.
     uint8 public constant decimalsOffset = 3;
 
-    /// @notice Estimated value of the bond portfolio, updated on rebalance to
-    ///         minimize manipulation.
-    uint256 public estimatedPortfolioValue;
-
     // ─────────────────────────── State ────────────────────────
 
     /// @notice Address of the contract admin.
@@ -131,6 +127,10 @@ contract Everlong is IEverlong {
 
     /// @dev Structure to store and account for everlong-controlled positions.
     Portfolio.State internal _portfolio;
+
+    /// @notice Value of the bond portfolio. Only updated on rebalance to
+    ///         minimize manipulation.
+    uint256 public portfolioValue;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Modifiers                                               │
@@ -230,7 +230,7 @@ contract Everlong is IEverlong {
         // portfolio's total amount of bonds and weighted average maturity.
         // The weighted average maturity is rounded up to the next checkpoint
         // timestamp to underestimate the value.
-        return balance + estimatedPortfolioValue;
+        return balance + portfolioValue;
     }
 
     /// @notice Returns an approximate lower bound on the amount of assets
@@ -329,7 +329,7 @@ contract Everlong is IEverlong {
         _portfolio.handleOpenPosition(maturityTime, bondAmount);
 
         // Calculate the new portfolio value and save it.
-        estimatedPortfolioValue = _calcPortfolioValue();
+        portfolioValue = _calcPortfolioValue();
 
         emit Rebalanced();
     }
@@ -464,7 +464,8 @@ contract Everlong is IEverlong {
         return losses;
     }
 
-    /// @dev Calculates the present portfolio value using its avg maturity.
+    /// @dev Calculates the present portfolio value using the total amount of
+    ///      bonds and the weighted average maturity of all positions.
     /// @return The present portfolio value.
     function _calcPortfolioValue() internal view returns (uint256) {
         return
