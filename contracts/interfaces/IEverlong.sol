@@ -55,4 +55,7 @@ abstract contract IEverlong is
 
     /// @notice Thrown when target is greater than max.
     error TargetIdleGreaterThanMax();
+
+    /// @notice Thrown when a redemption results in zero output assets.
+    error RedemptionZeroOutput();
 }
