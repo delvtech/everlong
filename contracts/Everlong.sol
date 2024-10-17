@@ -386,6 +386,10 @@ contract Everlong is IEverlong {
         uint256 i;
         uint256 numPositions = _portfolio.positionCount();
         IEverlong.Position memory position;
+
+        // Iterate through positions from most to least mature.
+        // If the position is mature, add the proceeds from closing and continue.
+        // If the position is not mature, exit.
         while (i < numPositions) {
             position = _portfolio.at(i);
             if (!IHyperdrive(hyperdrive).isMature(position)) {
@@ -475,8 +479,6 @@ contract Everlong is IEverlong {
                 spotPrice,
                 ""
             );
-            // TODO: Reevaluate whether `estimatedProceeds` or `proceeds`
-            //       should be used to increment output. Maybe use the min?
             output += estimatedProceeds;
 
             // If actual proceeds are less than estimated, add the difference
