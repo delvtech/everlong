@@ -253,7 +253,7 @@ contract TestEverlongPositions is EverlongTest {
         assertApproxEqAbs(
             IERC20(everlong.asset()).balanceOf(address(everlong)),
             everlong.targetIdleLiquidity(),
-            1e18
+            everlong.targetIdleLiquidity() / 10
         );
 
         // Ensure idle liquidity is not over max.
