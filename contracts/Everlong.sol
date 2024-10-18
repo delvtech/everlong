@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.22;
 
+import { Lib } from "hyperdrive/test/utils/Lib.sol";
+import { console2 as console } from "forge-std/console2.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
@@ -74,6 +76,7 @@ contract Everlong is IEverlong {
     using Portfolio for Portfolio.State;
     using SafeCast for *;
     using SafeERC20 for ERC20;
+    using Lib for *;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Storage                                                 │
@@ -127,6 +130,10 @@ contract Everlong is IEverlong {
 
     /// @dev Structure to store and account for everlong-controlled positions.
     Portfolio.State internal _portfolio;
+
+    /// @notice Value of the bond portfolio. Only updated on rebalance to
+    ///         minimize manipulation.
+    uint256 public portfolioValue;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Modifiers                                               │
@@ -215,29 +222,37 @@ contract Everlong is IEverlong {
     ///      maturity of the portfolio.
     /// @return Total amount of assets controlled by Everlong.
     function totalAssets() public view override returns (uint256) {
-        // If everlong holds no bonds, return the balance.
-        uint256 balance = ERC20(_asset).balanceOf(address(this));
-        if (_portfolio.totalBonds == 0) {
-            return balance;
-        }
+        return portfolioValue;
+    }
 
-        // Estimate the value of everlong-controlled positions by calculating
-        // the proceeds one would receive from closing a position with the
-        // portfolio's total amount of bonds and weighted average maturity.
-        // The weighted average maturity is rounded to the next checkpoint
-        // timestamp to underestimate the value.
-        return
-            balance +
-            IHyperdrive(hyperdrive).previewCloseLong(
-                asBase,
-                IEverlong.Position({
-                    maturityTime: IHyperdrive(hyperdrive)
-                        .getCheckpointIdUp(_portfolio.avgMaturityTime)
-                        .toUint128(),
-                    bondAmount: _portfolio.totalBonds
-                }),
-                ""
-            );
+    /// @notice Returns an approximate lower bound on the amount of assets
+    ///         received from redeeming the specified amount of shares.
+    /// @param _shares Amount of shares to redeem.
+    /// @return assets Amount of assets that will be received.
+    function previewRedeem(
+        uint256 _shares
+    ) public view override returns (uint256 assets) {
+        // Convert the share amount to assets.
+        assets = convertToAssets(_shares);
+
+        // Apply losses incurred by the portfolio.
+        uint256 losses = _calcPortfolioLosses().mulDivDown(
+            assets,
+            totalAssets()
+        );
+        console.log("Losses: %e", losses);
+
+        // If the losses from closing immature positions exceeds the assets
+        // owed to the redeemer, set the assets owed to zero.
+        if (losses > assets) {
+            // NOTE: We return zero since `previewRedeem` must not revert.
+            assets = 0;
+        }
+        // Decrement the assets owed to the redeemer by the amount of losses
+        // incurred from closing immature positions.
+        else {
+            assets -= losses;
+        }
     }
 
     /// @dev Attempt rebalancing after a deposit if idle is above max.
@@ -253,21 +268,34 @@ contract Everlong is IEverlong {
         uint256 _assets,
         uint256
     ) internal virtual override {
-        // If we have enough balance to service the withdrawal, no need to
-        // close positions.
-        uint256 balance = ERC20(_asset).balanceOf(address(this));
+        // If no assets are to be received, revert.
+        if (_assets == 0) {
+            revert IEverlong.RedemptionZeroOutput();
+        }
+
+        // If we have enough balance to service the withdrawal after closing
+        // any matured positions, there's no need to close immature positions.
+        uint256 balance = ERC20(_asset).balanceOf(address(this)) +
+            _closeMaturedPositions();
         if (_assets <= balance) {
             return;
         }
 
         // Close more positions until sufficient idle to process withdrawal.
-        _closePositions(_assets - balance);
+        balance += _closePositions(_assets - balance);
+
+        console.log("Have: %s", balance.toString(18));
+        console.log("Want: %s", _assets.toString(18));
+
+        portfolioValue = _calcPortfolioValue() - _assets;
     }
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Rebalancing                                             │
     // ╰─────────────────────────────────────────────────────────╯
 
+    // TODO: Handle case where rebalancing would exceed gas limit
+    //
     /// @notice Rebalance the everlong portfolio by closing mature positions
     ///         and using the proceeds over target idle to open new positions.
     function rebalance() public override {
@@ -291,6 +319,9 @@ contract Everlong is IEverlong {
 
         // Account for the new position in the portfolio.
         _portfolio.handleOpenPosition(maturityTime, bondAmount);
+
+        // Calculate the new portfolio value and save it.
+        portfolioValue = _calcPortfolioValue();
 
         emit Rebalanced();
     }
@@ -333,6 +364,34 @@ contract Everlong is IEverlong {
     // │ Hyperdrive                                              │
     // ╰─────────────────────────────────────────────────────────╯
 
+    /// @dev Preview the output received from closing all matured positions.
+    /// @return output Output to be received from closing mature positions.
+    function _previewCloseMaturedPositions()
+        internal
+        view
+        returns (uint256 output)
+    {
+        uint256 i;
+        uint256 numPositions = _portfolio.positionCount();
+        IEverlong.Position memory position;
+
+        // Iterate through positions from most to least mature.
+        // If the position is mature, add the proceeds from closing and continue.
+        // If the position is not mature, exit.
+        while (i < numPositions) {
+            position = _portfolio.at(i);
+            if (!IHyperdrive(hyperdrive).isMature(position)) {
+                break;
+            }
+            output += IHyperdrive(hyperdrive).previewCloseLong(
+                asBase,
+                position,
+                ""
+            );
+            ++i;
+        }
+    }
+
     /// @dev Close only matured positions in the portfolio.
     /// @return output Proceeds of closing the matured positions.
     function _closeMaturedPositions() internal returns (uint256 output) {
@@ -340,12 +399,11 @@ contract Everlong is IEverlong {
         while (!_portfolio.isEmpty()) {
             position = _portfolio.head();
             if (!IHyperdrive(hyperdrive).isMature(position)) {
-                return output;
+                break;
             }
             output += IHyperdrive(hyperdrive).closeLong(asBase, position, "");
             _portfolio.handleClosePosition();
         }
-        return output;
     }
 
     /// @dev Close positions until the targeted amount of output is received.
@@ -363,6 +421,114 @@ contract Everlong is IEverlong {
             _portfolio.handleClosePosition();
         }
         return output;
+    }
+
+    /// @dev Calculate the losses incurred from closing sufficient positions
+    ///      to receive at least `_targetOutput`.
+    /// @param _targetOutput Target asset output from closed positions.
+    /// @return losses Losses incurred from closing the immature positions.
+    function _calcPositionLosses(
+        uint256 _targetOutput
+    ) internal view returns (uint256 losses) {
+        // Initialize variables.
+        uint256 output;
+        uint256 proceeds;
+        uint256 estimatedProceeds;
+        IEverlong.Position memory position;
+        uint256 i;
+        uint256 count = _portfolio.positionCount();
+
+        // Iterate through the position queue (most to least mature).
+        // For each position, calculate the `closeLong` output at the current
+        // spot price and compare it to the `closeLong` output using the
+        // most recent checkpoint's `weightedSpotPrice`. The difference
+        // between the two is the loss.
+        while (i < count && output < _targetOutput) {
+            // Retrieve the position at the current index.
+            position = _portfolio.at(i);
+
+            // Calculate the `closeLong` output using the current spot price.
+            proceeds = IHyperdrive(hyperdrive).previewCloseLong(
+                asBase,
+                position,
+                ""
+            );
+
+            // Calculate the `closeLong` output using the latest checkpoint's
+            // `weightedSpotPrice` and add it to the received output.
+            estimatedProceeds = _estimateProceeds2(position);
+            output += estimatedProceeds;
+
+            console.log("Estimated: %s", estimatedProceeds.toString(18));
+            console.log("Actual:    %s", proceeds.toString(18));
+
+            // If actual proceeds are less than estimated, add the difference
+            // to the cumulative losses.
+            if (proceeds < estimatedProceeds) {
+                losses += estimatedProceeds - proceeds;
+            }
+
+            // Increment the counter
+            i++;
+        }
+        return losses;
+    }
+
+    // Uses the previous checkpoint's weightedSpotPrice to calculate the
+    // expected value of a position in loss accounting.
+    function _estimateProceeds(
+        IEverlong.Position memory position
+    ) internal view returns (uint256) {
+        return
+            IHyperdrive(hyperdrive).previewCloseLong(
+                asBase,
+                position,
+                IHyperdrive(hyperdrive)
+                    .getCheckpointDown(block.timestamp)
+                    .weightedSpotPrice,
+                ""
+            );
+    }
+
+    // Uses the estimated portfolio value to calculate the expected value of
+    // a position based on its percentage of the portfolio's total bond amount.
+    function _estimateProceeds2(
+        IEverlong.Position memory position
+    ) internal view returns (uint256) {
+        return
+            portfolioValue.mulDivDown(
+                position.bondAmount,
+                _portfolio.totalBonds
+            );
+    }
+
+    function _calcPortfolioLosses() internal view returns (uint256) {
+        uint256 currentPortfolioValue = _calcPortfolioValue();
+        if (currentPortfolioValue < portfolioValue) {
+            return portfolioValue - currentPortfolioValue;
+        }
+        return 0;
+    }
+
+    /// @dev Calculates the present portfolio value using the total amount of
+    ///      bonds and the weighted average maturity of all positions.
+    /// @return value The present portfolio value.
+    function _calcPortfolioValue() internal view returns (uint256 value) {
+        value = ERC20(_asset).balanceOf(address(this));
+        if (_portfolio.totalBonds != 0) {
+            // NOTE: The maturity time is rounded to the next checkpoint to
+            // underestimate the portfolio value.
+            value += IHyperdrive(hyperdrive).previewCloseLong(
+                asBase,
+                IEverlong.Position({
+                    maturityTime: IHyperdrive(hyperdrive)
+                        .getCheckpointIdUp(_portfolio.avgMaturityTime)
+                        .toUint128(),
+                    bondAmount: _portfolio.totalBonds
+                }),
+                ""
+            );
+        }
     }
 
     // ╭─────────────────────────────────────────────────────────╮
