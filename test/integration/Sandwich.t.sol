@@ -76,4 +76,83 @@ contract ExampleTest is EverlongTest {
         // Ensure the attacker does not profit.
         assertLt(attackerProceeds, attackerPaid);
     }
+
+    /// @dev Tests the following scenario:
+    ///      1. Attacker adds liquidity.
+    ///      2. Bystander deposits.
+    ///      3. Attacker deposits.
+    ///      4. Attacker removes liquidity.
+    ///      5. Attacker withdraws.
+    ///      6. Bystander withdraws.
+    function test_sandwich_lp_instant() external {
+        // Alice is the attacker, and Bob is the bystander.
+        address attacker = alice;
+        address bystander = bob;
+
+        // The attacker adds liquidity to Hyperdrive.
+        uint256 attackerLPPaid = 500_000e18;
+        uint256 attackerLPShares = addLiquidity(attacker, attackerLPPaid);
+
+        // The bystander deposits into Everlong.
+        uint256 bystanderEverlongPaid = 500_000e18;
+        uint256 bystanderEverlongShares = depositEverlong(
+            bystanderEverlongPaid,
+            bystander
+        );
+
+        // The attacker deposits into Everlong.
+        uint256 attackerEverlongPaid = 1_000e18;
+        uint256 attackerEverlongShares = depositEverlong(
+            attackerEverlongPaid,
+            attacker
+        );
+
+        // The attacker removes liquidity from Hyperdrive.
+        (
+            uint256 attackerLPProceeds,
+            uint256 attackerLPWithdrawalShares
+        ) = removeLiquidity(attacker, attackerLPShares);
+        console.log(
+            "Withdrawal Shares: %s",
+            attackerLPWithdrawalShares.toString(18)
+        );
+
+        // The attacker redeems from Everlong.
+        uint256 attackerEverlongProceeds = redeemEverlong(
+            attackerEverlongShares,
+            attacker
+        );
+
+        console.log("CanRebalance: %s", everlong.canRebalance());
+        everlong.rebalance();
+
+        // The bystander redeems from Everlong.
+        uint256 bystanderEverlongProceeds = redeemEverlong(
+            bystanderEverlongShares,
+            bystander
+        );
+
+        // Log the results.
+        console.log(
+            "attacker paid      = %s",
+            (attackerEverlongPaid + attackerLPPaid).toString(18)
+        );
+        console.log(
+            "attacker proceeds  = %s",
+            (attackerEverlongProceeds + attackerLPProceeds).toString(18)
+        );
+        console.log(
+            "attacker everlong  = %s",
+            attackerEverlongProceeds.toString(18)
+        );
+        console.log("attacker lp        = %s", attackerLPProceeds.toString(18));
+        console.log(
+            "bystander paid     = %s",
+            bystanderEverlongPaid.toString(18)
+        );
+        console.log(
+            "bystander proceeds = %s",
+            bystanderEverlongProceeds.toString(18)
+        );
+    }
 }

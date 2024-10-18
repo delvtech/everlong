@@ -149,8 +149,8 @@ contract PricingTest is EverlongTest {
 
         // Estimate the proceeds.
         uint256 estimatedProceeds = everlong.previewRedeem(shares);
-        console.log("previewRedeem: %s", estimatedProceeds);
-        console.log("totalAssets:   %s", everlong.totalAssets());
+        console.log("previewRedeem: %e", estimatedProceeds);
+        console.log("totalAssets:   %e", everlong.totalAssets());
 
         // Close the long.
         uint256 baseProceeds = everlong.redeem(shares, bob, bob);
