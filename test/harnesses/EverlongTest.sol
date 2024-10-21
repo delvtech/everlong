@@ -44,11 +44,8 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     /// @dev Everlong token symbol.
     string internal EVERLONG_SYMBOL = "evTest";
 
-    // uint256 internal TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0.1e18;
-    // uint256 internal MAX_IDLE_LIQUIDITY_PERCENTAGE = 0.2e18;
-
-    uint256 internal TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0.0e18;
-    uint256 internal MAX_IDLE_LIQUIDITY_PERCENTAGE = 0.0e18;
+    uint256 internal TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0.1e18;
+    uint256 internal MAX_IDLE_LIQUIDITY_PERCENTAGE = 0.2e18;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Hyperdrive Configuration                                │

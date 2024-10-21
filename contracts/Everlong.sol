@@ -240,7 +240,6 @@ contract Everlong is IEverlong {
             assets,
             totalAssets()
         );
-        console.log("Losses: %e", losses);
 
         // If the losses from closing immature positions exceeds the assets
         // owed to the redeemer, set the assets owed to zero.
@@ -283,9 +282,6 @@ contract Everlong is IEverlong {
 
         // Close more positions until sufficient idle to process withdrawal.
         balance += _closePositions(_assets - balance);
-
-        console.log("Have: %s", balance.toString(18));
-        console.log("Want: %s", _assets.toString(18));
 
         portfolioValue = _calcPortfolioValue() - _assets;
     }
@@ -458,9 +454,6 @@ contract Everlong is IEverlong {
             // `weightedSpotPrice` and add it to the received output.
             estimatedProceeds = _estimateProceeds2(position);
             output += estimatedProceeds;
-
-            console.log("Estimated: %s", estimatedProceeds.toString(18));
-            console.log("Actual:    %s", proceeds.toString(18));
 
             // If actual proceeds are less than estimated, add the difference
             // to the cumulative losses.

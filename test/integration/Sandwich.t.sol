@@ -3,10 +3,12 @@ pragma solidity 0.8.22;
 
 import { console2 as console } from "forge-std/console2.sol";
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
+import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { EverlongTest } from "../harnesses/EverlongTest.sol";
 
-contract ExampleTest is EverlongTest {
+contract Sandwich is EverlongTest {
     using Lib for *;
+    using HyperdriveUtils for *;
 
     function setUp() public override {
         super.setUp();
@@ -63,13 +65,79 @@ contract ExampleTest is EverlongTest {
         );
 
         // The bystander redeems their Everlong shares.
-        uint256 bystanderEverlongProceeds = redeemEverlong(
-            bystanderShares,
-            bystander
-        );
+        redeemEverlong(bystanderShares, bystander);
 
         // Calculate the amount paid and the proceeds for the attacker.
         uint256 attackerPaid = attackerEverlongBasePaid + attackerShortBasePaid;
+        uint256 attackerProceeds = attackerEverlongProceeds +
+            attackerShortProceeds;
+
+        // Ensure the attacker does not profit.
+        assertLt(attackerProceeds, attackerPaid);
+    }
+
+    function testFuzz_sandwich_short_instant(
+        uint256 _shortAmount,
+        uint256 _attackerDepositAmount,
+        uint256 _bystanderDepositAmount
+    ) external {
+        // Limit the range of values for the fuzz test.
+
+        // Alice is the attacker, and Bob is the bystander.
+        address attacker = alice;
+        address bystander = bob;
+
+        // The bystander deposits into Everlong.
+        _bystanderDepositAmount = bound(
+            _bystanderDepositAmount,
+            1e18,
+            hyperdrive.calculateMaxLong() / 10
+        );
+        uint256 bystanderShares = depositEverlong(
+            _bystanderDepositAmount,
+            bystander
+        );
+
+        // The attacker opens a large short.
+        _shortAmount = bound(
+            _shortAmount,
+            1e18,
+            hyperdrive.calculateMaxShort() / 10
+        );
+        (uint256 maturityTime, uint256 attackerShortBasePaid) = openShort(
+            attacker,
+            _shortAmount
+        );
+
+        // The attacker deposits into Everlong.
+        _attackerDepositAmount = bound(
+            _attackerDepositAmount,
+            1e18,
+            hyperdrive.calculateMaxLong() / 10
+        );
+        uint256 attackerShares = depositEverlong(
+            _attackerDepositAmount,
+            attacker
+        );
+
+        // The attacker closes their short position.
+        uint256 attackerShortProceeds = closeShort(
+            attacker,
+            maturityTime,
+            _shortAmount
+        );
+
+        // The attacker redeems their Everlong shares.
+        uint256 attackerEverlongProceeds = redeemEverlong(
+            attackerShares,
+            attacker
+        );
+
+        // The bystander redeems their Everlong shares.
+        redeemEverlong(bystanderShares, bystander);
+
+        // Calculate the amount paid and the proceeds for the attacker.
+        uint256 attackerPaid = _attackerDepositAmount + attackerShortBasePaid;
         uint256 attackerProceeds = attackerEverlongProceeds +
             attackerShortProceeds;
 
@@ -154,5 +222,63 @@ contract ExampleTest is EverlongTest {
             "bystander proceeds = %s",
             bystanderEverlongProceeds.toString(18)
         );
+    }
+
+    function testFuzz_sandwich_lp_instant(
+        uint256 _lpDeposit,
+        uint256 _bystanderDeposit,
+        uint256 _attackerDeposit
+    ) external {
+        // Alice is the attacker, and Bob is the bystander.
+        address attacker = alice;
+        address bystander = bob;
+
+        // The attacker adds liquidity to Hyperdrive.
+        _lpDeposit = bound(_lpDeposit, 1e18, INITIAL_CONTRIBUTION);
+        uint256 attackerLPShares = addLiquidity(attacker, _lpDeposit);
+
+        // The bystander deposits into Everlong.
+        _bystanderDeposit = bound(
+            _bystanderDeposit,
+            1e18,
+            hyperdrive.calculateMaxLong() / 10
+        );
+        uint256 bystanderEverlongShares = depositEverlong(
+            _bystanderDeposit,
+            bystander
+        );
+
+        // The attacker deposits into Everlong.
+        _attackerDeposit = bound(
+            _attackerDeposit,
+            1e18,
+            hyperdrive.calculateMaxLong() / 10
+        );
+        uint256 attackerEverlongShares = depositEverlong(
+            _attackerDeposit,
+            attacker
+        );
+
+        // The attacker removes liquidity from Hyperdrive.
+        (
+            uint256 attackerLPProceeds,
+            uint256 attackerLPWithdrawalShares
+        ) = removeLiquidity(attacker, attackerLPShares);
+
+        // The attacker redeems from Everlong.
+        uint256 attackerEverlongProceeds = redeemEverlong(
+            attackerEverlongShares,
+            attacker
+        );
+
+        everlong.rebalance();
+
+        // The bystander redeems from Everlong.
+        uint256 bystanderEverlongProceeds = redeemEverlong(
+            bystanderEverlongShares,
+            bystander
+        );
+
+        assertLt(attackerEverlongProceeds, _attackerDeposit);
     }
 }
