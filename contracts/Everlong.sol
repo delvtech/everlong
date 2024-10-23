@@ -250,12 +250,15 @@ contract Everlong is IEverlong {
         }
     }
 
-    // TODO: Always update _totalAssets here.
-    //
     /// @dev Attempt rebalancing after a deposit if idle is above max.
     function _afterDeposit(uint256, uint256) internal virtual override {
         if (ERC20(_asset).balanceOf(address(this)) > maxIdleLiquidity()) {
             rebalance();
+        }
+        // A rebalance can't be performed, but `_totalAssets` should still
+        // be updated.
+        else {
+            _totalAssets = _calculateTotalAssets();
         }
     }
 
