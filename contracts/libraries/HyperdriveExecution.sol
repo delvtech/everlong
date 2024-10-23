@@ -402,36 +402,6 @@ library HyperdriveExecutionLibrary {
             .mulUp(_shareAmount);
     }
 
-    // // TODO: Use cached poolConfig.
-    // //
-    // /// @dev Calculates the current spot price of a long.
-    // /// @return The current spot price.
-    // function spotPrice(IHyperdrive self) internal view returns (uint256) {
-    //     IHyperdrive.PoolConfig memory poolConfig = self.getPoolConfig();
-    //
-    //     // Read hyperdrive configuration parameters directly from storage.
-    //     uint256[] memory slots = new uint256[](2);
-    //     slots[0] = HYPERDRIVE_SHARE_RESERVES_BOND_RESERVES_SLOT;
-    //     slots[1] = HYPERDRIVE_SHARE_ADJUSTMENT_SHORTS_OUTSTANDING_SLOT;
-    //     bytes32[] memory values = self.load(slots);
-    //
-    //     // Calculate the effective share reserves.
-    //     uint256 effectiveShareReserves = HyperdriveMath
-    //         .calculateEffectiveShareReserves(
-    //             uint128(values[0].extract_32_16(16)), // shareReserves
-    //             uint256(uint128(values[1].extract_32_16(16))).toInt256() // shareAdjustment
-    //         );
-    //
-    //     // Calculate the current spot price.
-    //     return
-    //         HyperdriveMath.calculateSpotPrice(
-    //             effectiveShareReserves,
-    //             uint128(values[0].extract_32_16(0)), // bondReserves
-    //             poolConfig.initialVaultSharePrice,
-    //             poolConfig.timeStretch
-    //         );
-    // }
-
     /// @dev Obtains the vaultSharePrice from the hyperdrive instance.
     /// @return The current vaultSharePrice.
     function vaultSharePrice(IHyperdrive self) internal view returns (uint256) {
