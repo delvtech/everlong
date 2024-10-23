@@ -121,7 +121,7 @@ library HyperdriveExecutionLibrary {
             );
 
         // Apply fees to the output bond amount and return it.
-        uint256 spotPrice = HyperdriveMath.calculateSpotPrice(
+        uint256 _spotPrice = HyperdriveMath.calculateSpotPrice(
             effectiveShareReserves,
             bondReserves,
             poolConfig.initialVaultSharePrice,
@@ -131,7 +131,7 @@ library HyperdriveExecutionLibrary {
             _shareAmount,
             bondReservesDelta,
             _vaultSharePrice,
-            spotPrice,
+            _spotPrice,
             poolConfig.fees.curve
         );
         return bondReservesDelta;

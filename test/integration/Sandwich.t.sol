@@ -203,10 +203,7 @@ contract Sandwich is EverlongTest {
         );
 
         // The attacker removes liquidity from Hyperdrive.
-        (
-            uint256 attackerLPProceeds,
-            uint256 attackerLPWithdrawalShares
-        ) = removeLiquidity(attacker, attackerLPShares);
+        removeLiquidity(attacker, attackerLPShares);
 
         // The attacker redeems from Everlong.
         uint256 attackerEverlongProceeds = redeemEverlong(
@@ -217,10 +214,7 @@ contract Sandwich is EverlongTest {
         everlong.rebalance();
 
         // The bystander redeems from Everlong.
-        uint256 bystanderEverlongProceeds = redeemEverlong(
-            bystanderEverlongShares,
-            bystander
-        );
+        redeemEverlong(bystanderEverlongShares, bystander);
 
         assertLt(attackerEverlongProceeds, _attackerDeposit);
     }
