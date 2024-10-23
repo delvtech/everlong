@@ -102,6 +102,26 @@ library Portfolio {
         self.totalBonds -= position.bondAmount;
     }
 
+    /// @notice Update portfolio accounting for a newly-closed position.
+    ///         Since the portfolio handles positions via a queue, the
+    ///         position being closed always the oldest at the head.
+    /// @param _amount Amount to reduce the position's bondAmount by.
+    function handleClosePosition(State storage self, uint256 _amount) internal {
+        IEverlong.Position memory position = _decreasePosition(
+            self,
+            _amount.toUint128()
+        );
+        self.avgMaturityTime = uint256(self.avgMaturityTime)
+            .updateWeightedAverage(
+                self.totalBonds,
+                position.maturityTime,
+                _amount,
+                false
+            )
+            .toUint128();
+        self.totalBonds -= _amount.toUint128();
+    }
+
     /// @notice Obtain the position at the head of the queue.
     ///         This is the oldest position in the portfolio.
     /// @return Position at the head of the queue.
@@ -175,6 +195,36 @@ library Portfolio {
             // Update indices to extend the queue.
             self._q[backIndex] = value;
             self._end = backIndex + 1;
+        }
+    }
+
+    /// @dev Decrease the most mature position's bondAmount by the amount
+    ///      specified. If the amount is equal to the position's remaining
+    ///      bondAmount, remove the position.
+    /// @param _amount Amount of bonds to remove from the position.
+    /// @return value A copy of the position that was just popped.
+    function _decreasePosition(
+        State storage self,
+        uint128 _amount
+    ) internal returns (IEverlong.Position memory value) {
+        unchecked {
+            uint128 frontIndex = self._begin;
+
+            // Ensure there are items in the queue.
+            if (frontIndex == self._end) revert QueueEmpty();
+
+            // TODO: Ensure that we're safe to not fully clear storage here.
+            //
+            // Remove the position if _amount equals the position's bondAmount.
+            if (_amount >= self._q[frontIndex].bondAmount) {
+                value = _removePosition(self);
+            }
+            // Reduce the position's bondAmount by `_amount`.
+            else {
+                self._q[frontIndex].bondAmount -= _amount;
+                // Return updated position.
+                value = self._q[frontIndex];
+            }
         }
     }
 
