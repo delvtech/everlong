@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.22;
 
+import { console2 as console } from "forge-std/console2.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
@@ -282,12 +283,12 @@ contract Everlong is IEverlong {
         uint256 balance = ERC20(_asset).balanceOf(address(this)) +
             _closeMaturedPositions();
         if (_assets <= balance) {
+            _totalAssets = _calculateTotalAssets() - _assets;
             return;
         }
 
         // Close more positions until sufficient idle to process withdrawal.
         balance += _closePositions(_assets - balance);
-
         _totalAssets = _calculateTotalAssets() - _assets;
     }
 
@@ -327,14 +328,21 @@ contract Everlong is IEverlong {
         emit Rebalanced();
     }
 
+    // TODO: Use cached poolconfig.
+    //
     /// @notice Returns true if the portfolio can be rebalanced.
     /// @notice The portfolio can be rebalanced if:
     ///         - Any positions are matured.
     ///         - The current idle liquidity is above the target.
     /// @return True if the portfolio can be rebalanced, false otherwise.
     function canRebalance() public view returns (bool) {
+        uint256 balance = ERC20(_asset).balanceOf(address(this));
         return (hasMaturedPositions() ||
-            ERC20(_asset).balanceOf(address(this)) > targetIdleLiquidity());
+            (balance > targetIdleLiquidity() &&
+                balance - targetIdleLiquidity() >
+                IHyperdrive(hyperdrive)
+                    .getPoolConfig()
+                    .minimumTransactionAmount));
     }
 
     // TODO: Use cached poolconfig
@@ -379,19 +387,74 @@ contract Everlong is IEverlong {
         }
     }
 
+    ///// @dev Close positions until the targeted amount of output is received.
+    ///// @param _targetOutput Minimum amount of proceeds to receive.
+    ///// @return output Total output received from closed positions.
+    //function _closePositions(
+    //    uint256 _targetOutput
+    //) internal returns (uint256 output) {
+    //    while (!_portfolio.isEmpty() && output < _targetOutput) {
+    //        output += IHyperdrive(hyperdrive).closeLong(
+    //            asBase,
+    //            _portfolio.head(),
+    //            ""
+    //        );
+    //        _portfolio.handleClosePosition();
+    //    }
+    //    return output;
+    //}
+
     /// @dev Close positions until the targeted amount of output is received.
     /// @param _targetOutput Minimum amount of proceeds to receive.
     /// @return output Total output received from closed positions.
     function _closePositions(
         uint256 _targetOutput
     ) internal returns (uint256 output) {
+        uint256 portfolioValue = IHyperdrive(hyperdrive).previewCloseLong(
+            asBase,
+            IEverlong.Position({
+                maturityTime: IHyperdrive(hyperdrive)
+                    .getCheckpointIdUp(_portfolio.avgMaturityTime)
+                    .toUint128(),
+                bondAmount: _portfolio.totalBonds
+            }),
+            ""
+        );
+        uint256 bondsNeeded = _targetOutput.mulDivDown(
+            _portfolio.totalBonds,
+            portfolioValue
+        );
+
+        IEverlong.Position memory position;
         while (!_portfolio.isEmpty() && output < _targetOutput) {
-            output += IHyperdrive(hyperdrive).closeLong(
-                asBase,
-                _portfolio.head(),
-                ""
-            );
-            _portfolio.handleClosePosition();
+            position = _portfolio.head();
+            if (
+                position.bondAmount > bondsNeeded &&
+                position.bondAmount - bondsNeeded > position.bondAmount / 20
+            ) {
+                output += IHyperdrive(hyperdrive).closeLong(
+                    asBase,
+                    IEverlong.Position({
+                        maturityTime: position.maturityTime,
+                        bondAmount: bondsNeeded.toUint128()
+                    }),
+                    ""
+                );
+                _portfolio.handleClosePosition(bondsNeeded);
+                return output;
+            } else {
+                output += IHyperdrive(hyperdrive).closeLong(
+                    asBase,
+                    position,
+                    ""
+                );
+                _portfolio.handleClosePosition();
+                if (bondsNeeded <= uint256(position.bondAmount)) {
+                    return output;
+                } else {
+                    bondsNeeded -= uint256(position.bondAmount);
+                }
+            }
         }
         return output;
     }
