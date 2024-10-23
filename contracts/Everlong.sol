@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.22;
 
-import { Lib } from "hyperdrive/test/utils/Lib.sol";
-import { console2 as console } from "forge-std/console2.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
@@ -76,7 +74,6 @@ contract Everlong is IEverlong {
     using Portfolio for Portfolio.State;
     using SafeCast for *;
     using SafeERC20 for ERC20;
-    using Lib for *;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Storage                                                 │
