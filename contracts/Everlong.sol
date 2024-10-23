@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.22;
 
+import { console2 as console } from "forge-std/console2.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
@@ -421,6 +422,23 @@ contract Everlong is IEverlong {
             _portfolio.handleClosePosition();
         }
     }
+
+    ///// @dev Close positions until the targeted amount of output is received.
+    ///// @param _targetOutput Minimum amount of proceeds to receive.
+    ///// @return output Total output received from closed positions.
+    //function _closePositions(
+    //    uint256 _targetOutput
+    //) internal returns (uint256 output) {
+    //    while (!_portfolio.isEmpty() && output < _targetOutput) {
+    //        output += IHyperdrive(hyperdrive).closeLong(
+    //            asBase,
+    //            _portfolio.head(),
+    //            ""
+    //        );
+    //        _portfolio.handleClosePosition();
+    //    }
+    //    return output;
+    //}
 
     /// @dev Close positions until the targeted amount of output is received.
     /// @param _targetOutput Target amount of proceeds to receive.
