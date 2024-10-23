@@ -570,6 +570,11 @@ contract Everlong is IEverlong {
 
                 // Update portfolio accounting to include the partial closure.
                 _portfolio.handleClosePosition();
+                if (bondsNeeded <= uint256(position.bondAmount)) {
+                    return output;
+                } else {
+                    bondsNeeded -= uint256(position.bondAmount);
+                }
             }
         }
 
