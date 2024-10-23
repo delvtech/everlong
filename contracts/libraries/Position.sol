@@ -15,14 +15,22 @@ library PositionLibrary {
     using FixedPointMath for uint256;
     using SafeCast for *;
 
-    /// @notice Increase the position's bond count and update the vaultSharePrice
-    ///         to be a weighted average of previous and current prices.
+    /// @notice Increase the position's bond count.
     /// @param _bondAmount Amount to increase the position's bond count by.
     function increase(
         IEverlong.Position storage self,
         uint256 _bondAmount
     ) internal {
         self.bondAmount += _bondAmount.toUint128();
+    }
+
+    /// @notice Decrease the position's bond count.
+    /// @param _bondAmount Amount to increase the position's bond count by.
+    function decrease(
+        IEverlong.Position storage self,
+        uint256 _bondAmount
+    ) internal {
+        self.bondAmount -= _bondAmount.toUint128();
     }
 
     /// @notice Reset the contents of a position.
