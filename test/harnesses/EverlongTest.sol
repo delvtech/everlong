@@ -171,7 +171,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         for (uint128 i = 0; i < everlong.positionCount(); ++i) {
             IEverlong.Position memory p = everlong.positionAt(i);
             console.log(
-                "index: %s - maturityTime: %s - bondAmount: %s",
+                "index: %e - maturityTime: %e - bondAmount: %e",
                 i,
                 p.maturityTime,
                 p.bondAmount
