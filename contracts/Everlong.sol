@@ -250,8 +250,12 @@ contract Everlong is IEverlong {
         }
     }
 
+    // TODO: Do not rebalance on deposit. This change will require updating
+    //       the test suite as well to perform rebalances when time is advanced.
+    //
     /// @dev Attempt rebalancing after a deposit if idle is above max.
     function _afterDeposit(uint256, uint256) internal virtual override {
+        // If there is excess liquidity beyond the max, rebalance.
         if (ERC20(_asset).balanceOf(address(this)) > maxIdleLiquidity()) {
             rebalance();
         }
