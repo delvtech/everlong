@@ -131,6 +131,7 @@ dist
 
 # foundry cache
 forge-cache
+cache
 
 # coverage
 lcov.info

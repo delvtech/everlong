@@ -3,7 +3,7 @@
 ### Build ###
 
 build:
-	forge build --force --sizes
+	forge build --force
 
 ### Test ###
 
