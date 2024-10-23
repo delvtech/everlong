@@ -10,11 +10,6 @@ contract Sandwich is EverlongTest {
     using Lib for *;
     using HyperdriveUtils for *;
 
-    function setUp() public override {
-        super.setUp();
-        deployEverlong();
-    }
-
     /// @dev Tests the short sandwich scenario with no idle liquidity.
     function testFuzz_sandwich_short_instant_no_idle(
         uint256 _shortAmount,
@@ -214,6 +209,8 @@ contract Sandwich is EverlongTest {
             attackerEverlongShares,
             attacker
         );
+
+        everlong.rebalance();
 
         // The bystander redeems from Everlong.
         //

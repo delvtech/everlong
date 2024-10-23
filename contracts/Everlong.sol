@@ -293,8 +293,6 @@ contract Everlong is IEverlong {
 
         // Close more positions until sufficient idle to process withdrawal.
         balance += _closePositions(_assets - balance);
-        console.log("Assets: %e", _assets);
-        console.log("Balance: %e", _calculateTotalAssets());
         _totalAssets = _calculateTotalAssets() - _assets;
     }
 
@@ -335,7 +333,7 @@ contract Everlong is IEverlong {
         emit Rebalanced();
     }
 
-    // TODO: Use cached poolconfig
+    // TODO: Use cached poolconfig.
     //
     /// @notice Returns true if the portfolio can be rebalanced.
     /// @notice The portfolio can be rebalanced if:
@@ -428,12 +426,18 @@ contract Everlong is IEverlong {
             }),
             ""
         );
-        uint256 outputPerBond = portfolioValue.divDown(_portfolio.totalBonds);
-        uint256 bondsNeeded = _targetOutput.divUp(outputPerBond);
+        uint256 bondsNeeded = _targetOutput.mulDivDown(
+            _portfolio.totalBonds,
+            portfolioValue
+        );
+
         IEverlong.Position memory position;
         while (!_portfolio.isEmpty() && output < _targetOutput) {
             position = _portfolio.head();
-            if (position.bondAmount > bondsNeeded) {
+            if (
+                position.bondAmount > bondsNeeded &&
+                position.bondAmount - bondsNeeded > position.bondAmount / 20
+            ) {
                 output += IHyperdrive(hyperdrive).closeLong(
                     asBase,
                     IEverlong.Position({
@@ -442,8 +446,6 @@ contract Everlong is IEverlong {
                     }),
                     ""
                 );
-                console.log("Bond Needed: %e", bondsNeeded);
-                console.log("Bond Amount: %e", position.bondAmount);
                 _portfolio.handleClosePosition(bondsNeeded);
                 return output;
             } else {
@@ -452,8 +454,12 @@ contract Everlong is IEverlong {
                     position,
                     ""
                 );
-                bondsNeeded -= uint256(position.bondAmount);
                 _portfolio.handleClosePosition();
+                if (bondsNeeded <= uint256(position.bondAmount)) {
+                    return output;
+                } else {
+                    bondsNeeded -= uint256(position.bondAmount);
+                }
             }
         }
         return output;
