@@ -232,7 +232,7 @@ contract Everlong is IEverlong {
         assets = convertToAssets(_shares);
 
         // TODO: Hold the vault share price constant.
-        // 
+        //
         // Apply losses incurred by the portfolio.
         uint256 losses = _calculatePortfolioLosses().mulDivDown(
             assets,
@@ -258,7 +258,7 @@ contract Everlong is IEverlong {
     //       the test suite as well to perform rebalances when time is advanced.
     //
     /// @dev Attempt rebalancing after a deposit if idle is above max.
-    function _afterDeposit(uint256, uint256) internal virtual override {
+    function _afterDeposit(uint256 _assets, uint256) internal virtual override {
         // If there is excess liquidity beyond the max, rebalance.
         if (ERC20(_asset).balanceOf(address(this)) > maxIdleLiquidity()) {
             rebalance();
@@ -266,7 +266,7 @@ contract Everlong is IEverlong {
         // A rebalance can't be performed, but `_totalAssets` should still
         // be updated.
         else {
-            _totalAssets = _calculateTotalAssets();
+            _totalAssets += _assets;
         }
     }
 
@@ -300,6 +300,7 @@ contract Everlong is IEverlong {
     // ╰─────────────────────────────────────────────────────────╯
 
     // TODO: Handle case where rebalancing would exceed gas limit
+    // TODO: Handle when Hyperdrive has insufficient liquidity.
     //
     /// @notice Rebalance the everlong portfolio by closing mature positions
     ///         and using the proceeds over target idle to open new positions.
@@ -331,14 +332,22 @@ contract Everlong is IEverlong {
         emit Rebalanced();
     }
 
+    // TODO: Use cached poolconfig
+    //
     /// @notice Returns true if the portfolio can be rebalanced.
     /// @notice The portfolio can be rebalanced if:
     ///         - Any positions are matured.
     ///         - The current idle liquidity is above the target.
     /// @return True if the portfolio can be rebalanced, false otherwise.
     function canRebalance() public view returns (bool) {
+        uint256 balance = ERC20(_asset).balanceOf(address(this));
+        uint256 target = targetIdleLiquidity();
         return (hasMaturedPositions() ||
-            ERC20(_asset).balanceOf(address(this)) > targetIdleLiquidity());
+            (balance > target &&
+                balance - target >
+                IHyperdrive(hyperdrive)
+                    .getPoolConfig()
+                    .minimumTransactionAmount));
     }
 
     // TODO: Use cached poolconfig
@@ -376,7 +385,7 @@ contract Everlong is IEverlong {
         while (!_portfolio.isEmpty()) {
             position = _portfolio.head();
             if (!IHyperdrive(hyperdrive).isMature(position)) {
-                break;
+                return output;
             }
             output += IHyperdrive(hyperdrive).closeLong(asBase, position, "");
             _portfolio.handleClosePosition();

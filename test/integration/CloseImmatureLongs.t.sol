@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import { console2 as console } from "forge-std/console2.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
+import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
 import { EverlongTest } from "../harnesses/EverlongTest.sol";
@@ -19,6 +20,7 @@ contract PricingTest is EverlongTest {
     using FixedPointMath for uint128;
     using FixedPointMath for uint256;
     using Lib for *;
+    using HyperdriveUtils for *;
 
     function test_positive_interest_long_half_term_fees() external {
         // This tests the following scenario:
@@ -180,19 +182,28 @@ contract PricingTest is EverlongTest {
     /// @dev Tests the situation where the closing of an immature position
     ///      results in losses that exceed the amount of assets owed to the
     ///      redeemer who forced the position closure.
-    function test_immature_losses_exceed_assets_owed() external {
+    function testFuzz_immature_losses_exceed_assets_owed(
+        uint256 _depositAmount,
+        uint256 _shareAmount
+    ) external {
         // Deploy Everlong.
         deployEverlong();
 
         // Make a large deposit.
-        depositEverlong(10_000e18, bob);
+        _depositAmount = bound(
+            _depositAmount,
+            hyperdrive.calculateMaxLong() / 100,
+            hyperdrive.calculateMaxLong() / 3
+        );
 
         // Ensure previewRedeem returns zero for a small amount of shares.
-        uint256 assetsOwed = everlong.previewRedeem(1_000);
+        depositEverlong(_depositAmount, bob);
+        _shareAmount = bound(_shareAmount, 0, 1000);
+        uint256 assetsOwed = everlong.previewRedeem(_shareAmount);
         assertEq(assetsOwed, 0);
 
         // Ensure revert when attempting to redeem a small amount of shares.
         vm.expectRevert(IEverlong.RedemptionZeroOutput.selector);
-        redeemEverlong(1_000, bob);
+        redeemEverlong(_shareAmount, bob);
     }
 }

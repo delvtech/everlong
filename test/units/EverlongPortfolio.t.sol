@@ -238,6 +238,8 @@ contract TestEverlongPositions is EverlongTest {
         );
     }
 
+    // TODO: Reduce tolerance on remaining idle liquidity.
+    //
     /// @dev Ensures the following after a rebalance:
     ///      1. Idle liquidity is close to target.
     ///      2. Idle liquidity is not over max.

@@ -64,10 +64,6 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     uint256 internal GOVERNANCE_LP_FEE = 0.15e18;
     uint256 internal GOVERNANCE_ZOMBIE_FEE = 0.03e18;
 
-    function setUp() public virtual override {
-        super.setUp();
-    }
-
     // ╭─────────────────────────────────────────────────────────╮
     // │ Deploy Helpers                                          │
     // ╰─────────────────────────────────────────────────────────╯
