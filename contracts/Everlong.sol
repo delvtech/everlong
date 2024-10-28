@@ -293,6 +293,7 @@ contract Everlong is IEverlong {
 
         // Close more positions until sufficient idle to process withdrawal.
         balance += _closePositions(_assets - balance);
+
         _totalAssets = _calculateTotalAssets() - _assets;
     }
 
