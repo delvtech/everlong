@@ -231,6 +231,8 @@ contract Everlong is IEverlong {
         // Convert the share amount to assets.
         assets = convertToAssets(_shares);
 
+        // TODO: Hold the vault share price constant.
+        // 
         // Apply losses incurred by the portfolio.
         uint256 losses = _calculatePortfolioLosses().mulDivDown(
             assets,
