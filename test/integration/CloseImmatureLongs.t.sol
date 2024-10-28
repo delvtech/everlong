@@ -2,12 +2,11 @@
 pragma solidity ^0.8.20;
 
 import { console2 as console } from "forge-std/console2.sol";
-import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
-import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
+import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
-import { EVERLONG_KIND, EVERLONG_VERSION } from "../../contracts/libraries/Constants.sol";
+import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
 import { EverlongTest } from "../harnesses/EverlongTest.sol";
 import { Packing } from "openzeppelin/utils/Packing.sol";
 
@@ -21,6 +20,7 @@ contract PricingTest is EverlongTest {
     using FixedPointMath for uint128;
     using FixedPointMath for uint256;
     using Lib for *;
+    using HyperdriveUtils for *;
 
     function test_positive_interest_long_half_term_fees() external {
         // This tests the following scenario:
@@ -151,8 +151,8 @@ contract PricingTest is EverlongTest {
 
         // Estimate the proceeds.
         uint256 estimatedProceeds = everlong.previewRedeem(shares);
-        console.log("previewRedeem: %s", estimatedProceeds);
-        console.log("totalAssets:   %s", everlong.totalAssets());
+        console.log("previewRedeem: %e", estimatedProceeds);
+        console.log("totalAssets:   %e", everlong.totalAssets());
 
         // Close the long.
         uint256 baseProceeds = everlong.redeem(shares, bob, bob);
@@ -177,5 +177,33 @@ contract PricingTest is EverlongTest {
             "failed equality"
         );
         vm.stopPrank();
+    }
+
+    /// @dev Tests the situation where the closing of an immature position
+    ///      results in losses that exceed the amount of assets owed to the
+    ///      redeemer who forced the position closure.
+    function testFuzz_immature_losses_exceed_assets_owed(
+        uint256 _depositAmount,
+        uint256 _shareAmount
+    ) external {
+        // Deploy Everlong.
+        deployEverlong();
+
+        // Make a large deposit.
+        _depositAmount = bound(
+            _depositAmount,
+            hyperdrive.calculateMaxLong() / 100,
+            hyperdrive.calculateMaxLong() / 3
+        );
+
+        // Ensure previewRedeem returns zero for a small amount of shares.
+        depositEverlong(_depositAmount, bob);
+        _shareAmount = bound(_shareAmount, 0, 1000);
+        uint256 assetsOwed = everlong.previewRedeem(_shareAmount);
+        assertEq(assetsOwed, 0);
+
+        // Ensure revert when attempting to redeem a small amount of shares.
+        vm.expectRevert(IEverlong.RedemptionZeroOutput.selector);
+        redeemEverlong(_shareAmount, bob);
     }
 }

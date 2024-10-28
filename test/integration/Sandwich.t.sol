@@ -1,0 +1,228 @@
+// SPDX-License-Identifier: Apache-2.0
+pragma solidity 0.8.22;
+
+import { console2 as console } from "forge-std/console2.sol";
+import { Lib } from "hyperdrive/test/utils/Lib.sol";
+import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
+import { EverlongTest } from "../harnesses/EverlongTest.sol";
+
+contract Sandwich is EverlongTest {
+    using Lib for *;
+    using HyperdriveUtils for *;
+
+    function setUp() public override {
+        super.setUp();
+        deployEverlong();
+    }
+
+    /// @dev Tests the short sandwich scenario with no idle liquidity.
+    function testFuzz_sandwich_short_instant_no_idle(
+        uint256 _shortAmount,
+        uint256 _attackerDepositAmount,
+        uint256 _bystanderDepositAmount
+    ) external {
+        TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0;
+        MAX_IDLE_LIQUIDITY_PERCENTAGE = 0;
+        deployEverlong();
+        sandwich_short_instant(
+            _shortAmount,
+            _attackerDepositAmount,
+            _bystanderDepositAmount
+        );
+    }
+
+    /// @dev Tests the short sandwich scenario with idle liquidity.
+    function testFuzz_sandwich_short_instant_idle(
+        uint256 _shortAmount,
+        uint256 _attackerDepositAmount,
+        uint256 _bystanderDepositAmount
+    ) external {
+        TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0.1e18;
+        MAX_IDLE_LIQUIDITY_PERCENTAGE = 0.2e18;
+        deployEverlong();
+        sandwich_short_instant(
+            _shortAmount,
+            _attackerDepositAmount,
+            _bystanderDepositAmount
+        );
+    }
+
+    /// @dev Tests the lp sandwich scenario with no idle liquidity.
+    function testFuzz_sandwich_lp_instant_no_idle(
+        uint256 _lpDeposit,
+        uint256 _attackerDepositAmount,
+        uint256 _bystanderDepositAmount
+    ) external {
+        TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0;
+        MAX_IDLE_LIQUIDITY_PERCENTAGE = 0;
+        deployEverlong();
+        sandwich_lp_instant(
+            _lpDeposit,
+            _attackerDepositAmount,
+            _bystanderDepositAmount
+        );
+    }
+
+    /// @dev Tests the lp sandwich scenario with idle liquidity.
+    function testFuzz_sandwich_lp_instant_idle(
+        uint256 _lpDeposit,
+        uint256 _attackerDepositAmount,
+        uint256 _bystanderDepositAmount
+    ) external {
+        TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0.1e18;
+        MAX_IDLE_LIQUIDITY_PERCENTAGE = 0.2e18;
+        deployEverlong();
+        sandwich_lp_instant(
+            _lpDeposit,
+            _attackerDepositAmount,
+            _bystanderDepositAmount
+        );
+    }
+
+    // TODO: Decrease min range to Hyperdrive `MINIMUM_TRANSACTION_AMOUNT`.
+    //
+    /// @dev Tests the following scenario:
+    ///      1. First an innocent bystander deposits into Everlong. At that time, we
+    ///         also call rebalance to invest Everlong's funds.
+    ///      2. Next, an attacker opens a short. This should decrease Everlong's total
+    ///         assets.
+    ///      3. The attacker then deposits into Everlong. They should receive more
+    ///         shares than the bystander.
+    ///      4. Next, the attacker closes their short. They will lose some money on
+    ///         fees due to this.
+    ///      5. Finally, the attacker withdrawals from Everlong.
+    function sandwich_short_instant(
+        uint256 _shortAmount,
+        uint256 _attackerDepositAmount,
+        uint256 _bystanderDepositAmount
+    ) public {
+        // Alice is the attacker, and Bob is the bystander.
+        address attacker = alice;
+        address bystander = bob;
+
+        // The bystander deposits into Everlong.
+        _bystanderDepositAmount = bound(
+            _bystanderDepositAmount,
+            MINIMUM_TRANSACTION_AMOUNT * 5,
+            hyperdrive.calculateMaxLong() / 3
+        );
+        uint256 bystanderShares = depositEverlong(
+            _bystanderDepositAmount,
+            bystander
+        );
+
+        // The attacker opens a large short.
+        _shortAmount = bound(
+            _shortAmount,
+            MINIMUM_TRANSACTION_AMOUNT * 5,
+            hyperdrive.calculateMaxShort() / 2
+        );
+        (uint256 maturityTime, uint256 attackerShortBasePaid) = openShort(
+            attacker,
+            _shortAmount
+        );
+
+        // The attacker deposits into Everlong.
+        _attackerDepositAmount = bound(
+            _attackerDepositAmount,
+            MINIMUM_TRANSACTION_AMOUNT * 5,
+            hyperdrive.calculateMaxLong() / 3
+        );
+        uint256 attackerShares = depositEverlong(
+            _attackerDepositAmount,
+            attacker
+        );
+
+        // The attacker closes their short position.
+        uint256 attackerShortProceeds = closeShort(
+            attacker,
+            maturityTime,
+            _shortAmount
+        );
+
+        // The attacker redeems their Everlong shares.
+        uint256 attackerEverlongProceeds = redeemEverlong(
+            attackerShares,
+            attacker
+        );
+
+        // The bystander redeems their Everlong shares.
+        redeemEverlong(bystanderShares, bystander);
+
+        // Calculate the amount paid and the proceeds for the attacker.
+        uint256 attackerPaid = _attackerDepositAmount + attackerShortBasePaid;
+        uint256 attackerProceeds = attackerEverlongProceeds +
+            attackerShortProceeds;
+
+        // Ensure the attacker does not profit.
+        assertLt(attackerProceeds, attackerPaid);
+    }
+
+    // TODO: Decrease min range to Hyperdrive `MINIMUM_TRANSACTION_AMOUNT`.
+    //
+    /// @dev Tests the following scenario:
+    ///      1. Attacker adds liquidity.
+    ///      2. Bystander deposits.
+    ///      3. Attacker deposits.
+    ///      4. Attacker removes liquidity.
+    ///      5. Attacker withdraws.
+    ///      6. Bystander withdraws.
+    function sandwich_lp_instant(
+        uint256 _lpDeposit,
+        uint256 _bystanderDeposit,
+        uint256 _attackerDeposit
+    ) public {
+        // Alice is the attacker, and Bob is the bystander.
+        address attacker = alice;
+        address bystander = bob;
+
+        // The attacker adds liquidity to Hyperdrive.
+        _lpDeposit = bound(
+            _lpDeposit,
+            MINIMUM_TRANSACTION_AMOUNT * 5,
+            INITIAL_CONTRIBUTION
+        );
+        uint256 attackerLPShares = addLiquidity(attacker, _lpDeposit);
+
+        // The bystander deposits into Everlong.
+        _bystanderDeposit = bound(
+            _bystanderDeposit,
+            MINIMUM_TRANSACTION_AMOUNT * 5,
+            hyperdrive.calculateMaxLong() / 3
+        );
+        uint256 bystanderEverlongShares = depositEverlong(
+            _bystanderDeposit,
+            bystander
+        );
+
+        // The attacker deposits into Everlong.
+        _attackerDeposit = bound(
+            _attackerDeposit,
+            MINIMUM_TRANSACTION_AMOUNT * 5,
+            hyperdrive.calculateMaxLong() / 3
+        );
+        uint256 attackerEverlongShares = depositEverlong(
+            _attackerDeposit,
+            attacker
+        );
+
+        // The attacker removes liquidity from Hyperdrive.
+        removeLiquidity(attacker, attackerLPShares);
+
+        // The attacker redeems from Everlong.
+        uint256 attackerEverlongProceeds = redeemEverlong(
+            attackerEverlongShares,
+            attacker
+        );
+
+        // The bystander redeems from Everlong.
+        //
+        // While not needed for the assertion below, it's included to ensure
+        // that the attack does not prevent the bystander from redeeming their
+        // shares.
+        redeemEverlong(bystanderEverlongShares, bystander);
+
+        // Ensure that the attacker does not profit from their actions.
+        assertLt(attackerEverlongProceeds, _attackerDeposit);
+    }
+}

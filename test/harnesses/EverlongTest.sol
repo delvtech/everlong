@@ -44,8 +44,8 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     /// @dev Everlong token symbol.
     string internal EVERLONG_SYMBOL = "evTest";
 
-    uint256 internal TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0;
-    uint256 internal MAX_IDLE_LIQUIDITY_PERCENTAGE = 0;
+    uint256 internal TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0.1e18;
+    uint256 internal MAX_IDLE_LIQUIDITY_PERCENTAGE = 0.2e18;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Hyperdrive Configuration                                │
@@ -57,16 +57,12 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     int256 internal VARIABLE_RATE = 0.10e18;
 
     uint256 internal INITIAL_VAULT_SHARE_PRICE = 1e18;
-    uint256 internal INITIAL_CONTRIBUTION = 500_000_000e18;
+    uint256 internal INITIAL_CONTRIBUTION = 2_000_000e18;
 
     uint256 internal CURVE_FEE = 0.01e18;
     uint256 internal FLAT_FEE = 0.0005e18;
     uint256 internal GOVERNANCE_LP_FEE = 0.15e18;
     uint256 internal GOVERNANCE_ZOMBIE_FEE = 0.03e18;
-
-    function setUp() public virtual override {
-        super.setUp();
-    }
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Deploy Helpers                                          │
@@ -136,6 +132,16 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
 
         // Return the amount of shares issued to _depositor for the deposit.
         return shares;
+    }
+
+    function redeemEverlong(
+        uint256 _amount,
+        address _redeemer
+    ) internal returns (uint256 proceeds) {
+        // Make the redemption.
+        vm.startPrank(_redeemer);
+        proceeds = everlong.redeem(_amount, _redeemer, _redeemer);
+        vm.stopPrank();
     }
 
     // TODO: This is gross, will refactor
