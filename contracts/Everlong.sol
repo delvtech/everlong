@@ -248,7 +248,9 @@ contract Everlong is IEverlong {
         // Decrement the assets owed to the redeemer by the amount of losses
         // incurred from closing immature positions.
         else {
-            assets -= losses;
+            unchecked {
+                assets -= losses;
+            }
         }
     }
 
