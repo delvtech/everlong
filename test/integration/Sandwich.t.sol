@@ -216,8 +216,6 @@ contract Sandwich is EverlongTest {
             true
         );
 
-        everlong.rebalance();
-
         // The bystander redeems from Everlong.
         //
         // While not needed for the assertion below, it's included to ensure
