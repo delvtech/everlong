@@ -519,15 +519,6 @@ contract Everlong is IEverlong {
     /// @return value The present portfolio value.
     function _calculateTotalAssets() internal view returns (uint256 value) {
         value = ERC20(_asset).balanceOf(address(this));
-        // uint256 i;
-        // IEverlong.Position memory position;
-        // while (i < _portfolio.positionCount()) {
-        //     position = _portfolio.at(i);
-        //     value += IHyperdrive(hyperdrive)
-        //         .previewCloseLong(asBase, position, "")
-        //         .mulDown(1e18 - maxCloseLongSlippage);
-        //     i++;
-        // }
         if (_portfolio.totalBonds != 0) {
             // NOTE: The maturity time is rounded to the next checkpoint to
             // underestimate the portfolio value.
