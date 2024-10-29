@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.22;
 
+import { console2 as console } from "forge-std/console2.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
@@ -272,9 +273,6 @@ contract Everlong is IEverlong {
     //
     /// @dev Attempt rebalancing after a deposit if idle is above max.
     function _afterDeposit(uint256 _assets, uint256) internal virtual override {
-        // Update `_totalAssets` to include the deposit.
-        _totalAssets += _assets;
-
         // If there is excess liquidity beyond the max, rebalance.
         if (ERC20(_asset).balanceOf(address(this)) > maxIdleLiquidity()) {
             rebalance();
@@ -521,19 +519,30 @@ contract Everlong is IEverlong {
     /// @return value The present portfolio value.
     function _calculateTotalAssets() internal view returns (uint256 value) {
         value = ERC20(_asset).balanceOf(address(this));
+        // uint256 i;
+        // IEverlong.Position memory position;
+        // while (i < _portfolio.positionCount()) {
+        //     position = _portfolio.at(i);
+        //     value += IHyperdrive(hyperdrive)
+        //         .previewCloseLong(asBase, position, "")
+        //         .mulDown(1e18 - maxCloseLongSlippage);
+        //     i++;
+        // }
         if (_portfolio.totalBonds != 0) {
             // NOTE: The maturity time is rounded to the next checkpoint to
             // underestimate the portfolio value.
-            value += IHyperdrive(hyperdrive).previewCloseLong(
-                asBase,
-                IEverlong.Position({
-                    maturityTime: IHyperdrive(hyperdrive)
-                        .getCheckpointIdUp(_portfolio.avgMaturityTime)
-                        .toUint128(),
-                    bondAmount: _portfolio.totalBonds
-                }),
-                ""
-            );
+            value += IHyperdrive(hyperdrive)
+                .previewCloseLong(
+                    asBase,
+                    IEverlong.Position({
+                        maturityTime: IHyperdrive(hyperdrive)
+                            .getCheckpointIdUp(_portfolio.avgMaturityTime)
+                            .toUint128(),
+                        bondAmount: _portfolio.totalBonds
+                    }),
+                    ""
+                )
+                .mulDown(1e18 - maxCloseLongSlippage);
         }
     }
 
