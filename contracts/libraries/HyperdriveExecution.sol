@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-import { console2 as console } from "forge-std/console2.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { HyperdriveMath } from "hyperdrive/contracts/src/libraries/HyperdriveMath.sol";
@@ -174,19 +173,22 @@ library HyperdriveExecutionLibrary {
     /// @dev Close a long with the input position's bond amount and maturity.
     /// @param _asBase Whether to receive hyperdrive's base token as output.
     /// @param _position Position information used to specify the long to close.
+    /// @param _minOutput Minimum amount of assets to receive as output.
+    /// @param _data Extra data to pass to hyperdrive.
     /// @return proceeds The amount of output assets received from closing the long.
     function closeLong(
         IHyperdrive self,
         bool _asBase,
         IEverlong.Position memory _position,
-        bytes memory // unused extradata
+        uint256 _minOutput,
+        bytes memory _data
     ) internal returns (uint256 proceeds) {
         // TODO: Slippage
         proceeds = self.closeLong(
             _position.maturityTime,
             _position.bondAmount,
-            0,
-            IHyperdrive.Options(address(this), _asBase, "")
+            _minOutput,
+            IHyperdrive.Options(address(this), _asBase, _data)
         );
         emit IEverlongEvents.PositionClosed(
             _position.maturityTime,

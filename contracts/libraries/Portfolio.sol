@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-import { console2 as console } from "forge-std/console2.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { IEverlong } from "../interfaces/IEverlong.sol";
@@ -214,15 +213,13 @@ library Portfolio {
             // Ensure there are items in the queue.
             if (frontIndex == self._end) revert QueueEmpty();
 
-            // TODO: Ensure that we're safe to not fully clear storage here.
-            //
             // Remove the position if _amount equals the position's bondAmount.
             if (_amount >= self._q[frontIndex].bondAmount) {
                 value = _removePosition(self);
             }
             // Reduce the position's bondAmount by `_amount`.
             else {
-                self._q[frontIndex].bondAmount -= _amount;
+                self._q[frontIndex].decrease(_amount);
                 // Return updated position.
                 value = self._q[frontIndex];
             }
