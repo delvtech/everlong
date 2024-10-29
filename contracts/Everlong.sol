@@ -431,6 +431,9 @@ contract Everlong is IEverlong {
 
         // Since multiple position's worth of bonds may need to be closed,
         // iterate through each position starting with the most mature.
+        //
+        // For each position, use the expected output of closing the entire
+        // position to estimate the amount of bonds to sell for a partial closure.
         IEverlong.Position memory position;
         uint256 totalPositionValue;
         uint256 expectedValuePerBond;
@@ -439,8 +442,8 @@ contract Everlong is IEverlong {
             // Retrieve the most mature position.
             position = _portfolio.head();
 
-            // Obtain an updated position valuation to accurately estimate
-            // expected output per bond.
+            // Estimate the value of the entire position, and use it to derive
+            // the expected output per bond.
             totalPositionValue = IHyperdrive(hyperdrive).previewCloseLong(
                 asBase,
                 position,
