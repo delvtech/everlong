@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.22;
 
+import { console2 as console } from "forge-std/console2.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
@@ -320,6 +321,9 @@ contract Everlong is IEverlong {
             return;
         }
 
+        // Calculate the new portfolio value and save it.
+        _totalAssets = _calculateTotalAssets();
+
         // Close matured positions.
         closeMaturedPositions(_options.positionClosureLimit);
 
@@ -567,16 +571,18 @@ contract Everlong is IEverlong {
         if (_portfolio.totalBonds != 0) {
             // NOTE: The maturity time is rounded to the next checkpoint to
             // underestimate the portfolio value.
-            value += IHyperdrive(hyperdrive).previewCloseLong(
-                asBase,
-                IEverlong.Position({
-                    maturityTime: IHyperdrive(hyperdrive)
-                        .getCheckpointIdUp(_portfolio.avgMaturityTime)
-                        .toUint128(),
-                    bondAmount: _portfolio.totalBonds
-                }),
-                ""
-            );
+            value += IHyperdrive(hyperdrive)
+                .previewCloseLong(
+                    asBase,
+                    IEverlong.Position({
+                        maturityTime: IHyperdrive(hyperdrive)
+                            .getCheckpointIdUp(_portfolio.avgMaturityTime)
+                            .toUint128(),
+                        bondAmount: _portfolio.totalBonds
+                    }),
+                    ""
+                )
+                .mulDown(1e18 - maxCloseLongSlippage);
         }
     }
 
