@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-import { console2 as console } from "forge-std/console2.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { HyperdriveMath } from "hyperdrive/contracts/src/libraries/HyperdriveMath.sol";
