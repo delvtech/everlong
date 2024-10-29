@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.22;
 
+import { console2 as console } from "forge-std/console2.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
@@ -97,7 +98,7 @@ contract Everlong is IEverlong {
 
     /// @notice Maximum slippage allowed when closing longs with Hyperdrive.
     /// @dev Represented as a percentage with 1e18 signifying 100%.
-    uint256 public constant maxCloseLongSlippage = 0.0001e18;
+    uint256 public constant maxCloseLongSlippage = 0.001e18;
 
     // ───────────────────────── Immutables ──────────────────────
 
@@ -240,7 +241,7 @@ contract Everlong is IEverlong {
         // TODO: Hold the vault share price constant.
         //
         // Apply losses incurred by the portfolio.
-        uint256 losses = _calculatePortfolioLosses().mulDivDown(
+        uint256 losses = _calculatePortfolioLosses().mulDivUp(
             assets,
             _totalAssets
         );
@@ -265,12 +266,11 @@ contract Everlong is IEverlong {
     //
     /// @dev Attempt rebalancing after a deposit if idle is above max.
     function _afterDeposit(uint256 _assets, uint256) internal virtual override {
-        // Update `_totalAssets` to include the deposit.
-        _totalAssets += _assets;
-
         // If there is excess liquidity beyond the max, rebalance.
         if (ERC20(_asset).balanceOf(address(this)) > maxIdleLiquidity()) {
             rebalance();
+        } else {
+            _totalAssets += _assets;
         }
     }
 
@@ -298,8 +298,8 @@ contract Everlong is IEverlong {
             _closePositions(_assets - balance);
         }
 
-        // Decrease the amount of assets under Everlong control by the amount
-        // being withdrawn.
+        // Recalculate the assets under Everlong control less the amount being
+        // withdrawn.
         _totalAssets = _calculateTotalAssets() - _assets;
     }
 
@@ -318,6 +318,9 @@ contract Everlong is IEverlong {
             return;
         }
 
+        // Calculate the new portfolio value and save it.
+        _totalAssets = _calculateTotalAssets();
+
         // Close matured positions.
         _closeMaturedPositions();
 
@@ -333,9 +336,6 @@ contract Everlong is IEverlong {
 
         // Account for the new position in the portfolio.
         _portfolio.handleOpenPosition(maturityTime, bondAmount);
-
-        // Calculate the new portfolio value and save it.
-        _totalAssets = _calculateTotalAssets();
 
         emit Rebalanced();
     }
@@ -459,13 +459,21 @@ contract Everlong is IEverlong {
             bondsNeeded = (_targetOutput - output).divUp(expectedValuePerBond);
 
             // Close only part of the position if there are sufficient bonds
-            // to reach the target output without leaving "dust".
+            // to reach the target output without leaving a small amount left.
+            // For this case, the remaining bonds must be worth at least
+            // Hyperdrive's minimum transaction amount or 1% of the target
+            // output, whichever is greater.
             if (
                 position.bondAmount > bondsNeeded &&
                 (position.bondAmount - bondsNeeded).mulUp(
                     expectedValuePerBond
                 ) >
-                IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount
+                _targetOutput.mulUp(0.01e18).max(
+                    IHyperdrive(hyperdrive)
+                        .getPoolConfig()
+                        .minimumTransactionAmount
+                )
+                // IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount
             ) {
                 // Close part of the position and enforce the slippage guard.
                 // Add the amount of assets received to the total output.
@@ -510,19 +518,30 @@ contract Everlong is IEverlong {
     /// @return value The present portfolio value.
     function _calculateTotalAssets() internal view returns (uint256 value) {
         value = ERC20(_asset).balanceOf(address(this));
+        // uint256 i;
+        // IEverlong.Position memory position;
+        // while (i < _portfolio.positionCount()) {
+        //     position = _portfolio.at(i);
+        //     value += IHyperdrive(hyperdrive)
+        //         .previewCloseLong(asBase, position, "")
+        //         .mulDown(1e18 - maxCloseLongSlippage);
+        //     i++;
+        // }
         if (_portfolio.totalBonds != 0) {
             // NOTE: The maturity time is rounded to the next checkpoint to
             // underestimate the portfolio value.
-            value += IHyperdrive(hyperdrive).previewCloseLong(
-                asBase,
-                IEverlong.Position({
-                    maturityTime: IHyperdrive(hyperdrive)
-                        .getCheckpointIdUp(_portfolio.avgMaturityTime)
-                        .toUint128(),
-                    bondAmount: _portfolio.totalBonds
-                }),
-                ""
-            );
+            value += IHyperdrive(hyperdrive)
+                .previewCloseLong(
+                    asBase,
+                    IEverlong.Position({
+                        maturityTime: IHyperdrive(hyperdrive)
+                            .getCheckpointIdUp(_portfolio.avgMaturityTime)
+                            .toUint128(),
+                        bondAmount: _portfolio.totalBonds
+                    }),
+                    ""
+                )
+                .mulDown(1e18 - maxCloseLongSlippage);
         }
     }
 
