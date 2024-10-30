@@ -10,7 +10,7 @@ import { Portfolio } from "../../contracts/libraries/Portfolio.sol";
 import { EverlongTest } from "../harnesses/EverlongTest.sol";
 
 /// @dev Tests for Everlong position management functionality.
-contract TestEverlongPositions is EverlongTest {
+contract TestEverlongPortfolio is EverlongTest {
     using Portfolio for Portfolio.State;
 
     Portfolio.State public portfolio;
@@ -31,8 +31,6 @@ contract TestEverlongPositions is EverlongTest {
     }
 
     function setUp() public virtual override {
-        TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0.1e18;
-        MAX_IDLE_LIQUIDITY_PERCENTAGE = 0.2e18;
         super.setUp();
         deployEverlong();
     }
@@ -168,7 +166,7 @@ contract TestEverlongPositions is EverlongTest {
         );
 
         // Mature the first position (second will be unmature).
-        advanceTime(POSITION_DURATION, 0);
+        advanceTimeWithCheckpoints(POSITION_DURATION);
 
         // Check that `hasMaturedPositions()` returns true.
         assertTrue(
@@ -222,12 +220,12 @@ contract TestEverlongPositions is EverlongTest {
     function test_canRebalance_with_matured_position() external {
         // Mint some tokens to Everlong for opening longs and rebalance.
         mintApproveEverlongBaseAsset(address(everlong), 100e18);
-        everlong.rebalance();
+        rebalance();
 
         // Increase block.timestamp until position is mature.
         // Ensure Everlong has a matured position.
         // Ensure `canRebalance()` returns true.
-        advanceTime(everlong.positionAt(0).maturityTime, 0);
+        advanceTimeWithCheckpoints(everlong.positionAt(0).maturityTime);
         assertTrue(
             everlong.hasMaturedPositions(),
             "everlong should have matured position after advancing time"
@@ -247,9 +245,11 @@ contract TestEverlongPositions is EverlongTest {
     function test_rebalance_state() external {
         // Mint some tokens to Everlong for opening longs and rebalance.
         mintApproveEverlongBaseAsset(address(everlong), 10_000e18);
-        everlong.rebalance();
-        advanceTime(everlong.positionAt(0).maturityTime, 0);
-        everlong.rebalance();
+        rebalance();
+        advanceTimeWithCheckpointsAndRebalancing(
+            everlong.positionAt(0).maturityTime
+        );
+        rebalance();
 
         // Ensure idle liquidity is close to target.
         assertApproxEqAbs(
@@ -266,5 +266,138 @@ contract TestEverlongPositions is EverlongTest {
 
         // Ensure no matured positions
         assertFalse(everlong.hasMaturedPositions());
+    }
+
+    /// @dev Tests the functionality of `RebalanceOptions.positionClosureLimit`.
+    function test_rebalance_options_positionClosureLimit() external {
+        // Create three positions in Everlong.
+        mintApproveEverlongBaseAsset(address(everlong), 10_000e18);
+        rebalance();
+        advanceTimeWithCheckpoints(POSITION_DURATION / 10);
+        mintApproveEverlongBaseAsset(address(everlong), 10_000e18);
+        rebalance();
+        advanceTimeWithCheckpoints(POSITION_DURATION / 10);
+        mintApproveEverlongBaseAsset(address(everlong), 10_000e18);
+        rebalance();
+        advanceTimeWithCheckpoints(POSITION_DURATION / 10);
+
+        // Fast forward time so they are all mature.
+        advanceTimeWithCheckpoints(POSITION_DURATION * 2);
+
+        // Ensure that Everlong has 3 mature positions.
+        assertEq(everlong.positionCount(), 3);
+        assertTrue(everlong.positionAt(0).maturityTime < block.timestamp);
+        assertTrue(everlong.positionAt(1).maturityTime < block.timestamp);
+        assertTrue(everlong.positionAt(2).maturityTime < block.timestamp);
+
+        // Call rebalance with `positionClosureLimit` set to zero.
+        rebalance(
+            IEverlong.RebalanceOptions({
+                spendingOverride: 0,
+                minOutput: 0,
+                minVaultSharePrice: 0,
+                positionClosureLimit: 0,
+                extraData: ""
+            })
+        );
+
+        // Ensure that Everlong still has 3 matured positions.
+        assertEq(everlong.positionCount(), 3);
+        assertTrue(everlong.positionAt(0).maturityTime < block.timestamp);
+        assertTrue(everlong.positionAt(1).maturityTime < block.timestamp);
+        assertTrue(everlong.positionAt(2).maturityTime < block.timestamp);
+    }
+
+    /// @dev Tests the functionality of `RebalanceOptions.spendingOverride`.
+    function test_rebalance_options_spendingOverride() external {
+        // Mint Everlong some assets.
+        mintApproveEverlongBaseAsset(address(everlong), 10_000e18);
+
+        // Try rebalancing with too low of a `spendingOverride`.
+        vm.startPrank(everlong.admin());
+        vm.expectRevert(IEverlong.SpendingOverrideTooLow.selector);
+        everlong.rebalance(
+            IEverlong.RebalanceOptions({
+                spendingOverride: 1,
+                minOutput: 0,
+                minVaultSharePrice: 0,
+                positionClosureLimit: type(uint256).max,
+                extraData: ""
+            })
+        );
+        vm.stopPrank();
+
+        // Try rebalancing with too high of a `spendingOverride`.
+        uint256 balance = IERC20(everlong.asset()).balanceOf(address(everlong));
+        uint256 targetIdle = everlong.targetIdleLiquidity();
+        vm.startPrank(everlong.admin());
+        vm.expectRevert(IEverlong.SpendingOverrideTooHigh.selector);
+        everlong.rebalance(
+            IEverlong.RebalanceOptions({
+                spendingOverride: (balance - targetIdle) * 2,
+                minOutput: 0,
+                minVaultSharePrice: 0,
+                positionClosureLimit: type(uint256).max,
+                extraData: ""
+            })
+        );
+        vm.stopPrank();
+
+        // Try rebalancing with an acceptable `spendingOverride`.
+        uint256 maxIdle = everlong.maxIdleLiquidity();
+        vm.startPrank(everlong.admin());
+        everlong.rebalance(
+            IEverlong.RebalanceOptions({
+                spendingOverride: (balance - maxIdle) / 2,
+                minOutput: 0,
+                minVaultSharePrice: 0,
+                positionClosureLimit: type(uint256).max,
+                extraData: ""
+            })
+        );
+        vm.stopPrank();
+
+        // Ensure that after rebalancing, the idle liquidity is still greater
+        // than the maximum.
+        assertGt(
+            IERC20(everlong.asset()).balanceOf(address(everlong)),
+            everlong.maxIdleLiquidity()
+        );
+    }
+
+    /// @dev Tests the functionality of `RebalanceOptions.minOutput`.
+    function test_rebalance_options_minOutput() external {
+        // Mint Everlong some assets.
+        mintApproveEverlongBaseAsset(address(everlong), 10_000e18);
+
+        // Rebalancing with an incredibly high `minOutput` should fail.
+        vm.expectRevert();
+        everlong.rebalance(
+            IEverlong.RebalanceOptions({
+                spendingOverride: 0,
+                minOutput: type(uint256).max,
+                minVaultSharePrice: 0,
+                positionClosureLimit: type(uint256).max,
+                extraData: ""
+            })
+        );
+    }
+
+    /// @dev Tests the functionality of `RebalanceOptions.minVaultSharePrice`.
+    function test_rebalance_options_minVaultSharePrice() external {
+        // Mint Everlong some assets.
+        mintApproveEverlongBaseAsset(address(everlong), 10_000e18);
+
+        // Rebalancing with an incredibly high `minVaultSharePrice` should fail.
+        vm.expectRevert();
+        everlong.rebalance(
+            IEverlong.RebalanceOptions({
+                spendingOverride: 0,
+                minOutput: 0,
+                minVaultSharePrice: type(uint256).max,
+                positionClosureLimit: type(uint256).max,
+                extraData: ""
+            })
+        );
     }
 }

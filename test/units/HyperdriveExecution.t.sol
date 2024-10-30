@@ -107,7 +107,7 @@ contract TestHyperdriveExecution is EverlongTest {
         (uint256 maturityTime, uint256 bondAmount) = openLong(alice, amount);
 
         // Advance halfway through the term.
-        advanceTimeWithCheckpoints(POSITION_DURATION / 2, VARIABLE_RATE);
+        advanceTimeWithCheckpointsAndRebalancing(POSITION_DURATION / 2);
 
         // Ensure the preview amount underestimates the actual and is
         // within the tolerance.
@@ -135,7 +135,7 @@ contract TestHyperdriveExecution is EverlongTest {
         (uint256 maturityTime, uint256 bondAmount) = openLong(alice, amount);
 
         // Advance halfway through the term.
-        advanceTimeWithCheckpoints(POSITION_DURATION / 2, VARIABLE_RATE);
+        advanceTimeWithCheckpointsAndRebalancing(POSITION_DURATION / 2);
 
         // Ensure the preview amount underestimates the actual and is
         // within the tolerance.
@@ -160,7 +160,7 @@ contract TestHyperdriveExecution is EverlongTest {
         (uint256 maturityTime, uint256 bondAmount) = openLong(alice, amount);
 
         // Advance halfway through the term.
-        advanceTimeWithCheckpoints(POSITION_DURATION, VARIABLE_RATE);
+        advanceTimeWithCheckpointsAndRebalancing(POSITION_DURATION);
 
         // Ensure the preview amount underestimates the actual and is
         // within the tolerance.

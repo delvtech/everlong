@@ -408,7 +408,7 @@ contract VaultSharePriceManipulation is EverlongTest {
         );
 
         if (params.timeToCloseShort > 0) {
-            advanceTimeWithCheckpoints(params.timeToCloseShort, VARIABLE_RATE);
+            advanceTimeWithCheckpointsAndRebalancing(params.timeToCloseShort);
             if (everlong.canRebalance()) {
                 everlong.rebalance();
             }
@@ -426,9 +426,8 @@ contract VaultSharePriceManipulation is EverlongTest {
         }
 
         if (params.timeToCloseEverlong > 0) {
-            advanceTimeWithCheckpoints(
-                params.timeToCloseEverlong,
-                VARIABLE_RATE
+            advanceTimeWithCheckpointsAndRebalancing(
+                params.timeToCloseEverlong
             );
             if (everlong.canRebalance()) {
                 everlong.rebalance();
@@ -443,9 +442,8 @@ contract VaultSharePriceManipulation is EverlongTest {
         }
 
         if (params.bystanderCloseDelay > 0) {
-            advanceTimeWithCheckpoints(
-                params.bystanderCloseDelay,
-                VARIABLE_RATE
+            advanceTimeWithCheckpointsAndRebalancing(
+                params.bystanderCloseDelay
             );
             if (everlong.canRebalance()) {
                 everlong.rebalance();
