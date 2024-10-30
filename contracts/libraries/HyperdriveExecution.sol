@@ -37,20 +37,48 @@ library HyperdriveExecutionLibrary {
     /// @dev Opens a long with hyperdrive using amount.
     /// @param _asBase Whether to use hyperdrive's base asset.
     /// @param _amount Amount of assets to spend.
+    /// @param _extraData Extra data to pass to hyperdrive.
     /// @return maturityTime Maturity timestamp of the opened position.
     /// @return bondAmount Amount of bonds received.
     function openLong(
         IHyperdrive self,
         bool _asBase,
         uint256 _amount,
-        bytes memory // unused extra data
+        bytes memory _extraData
     ) internal returns (uint256 maturityTime, uint256 bondAmount) {
-        // TODO: Slippage
         (maturityTime, bondAmount) = self.openLong(
             _amount,
             0,
             0,
-            IHyperdrive.Options(address(this), _asBase, "")
+            IHyperdrive.Options(address(this), _asBase, _extraData)
+        );
+        emit IEverlongEvents.PositionOpened(
+            maturityTime.toUint128(),
+            bondAmount.toUint128()
+        );
+    }
+
+    /// @dev Opens a long with hyperdrive using amount.
+    /// @param _asBase Whether to use hyperdrive's base asset.
+    /// @param _amount Amount of assets to spend.
+    /// @param _minOutput Minimum amount of bonds to receive.
+    /// @param _minVaultSharePrice Minimum hyperdrive vault share price.
+    /// @param _extraData Extra data to pass to hyperdrive.
+    /// @return maturityTime Maturity timestamp of the opened position.
+    /// @return bondAmount Amount of bonds received.
+    function openLong(
+        IHyperdrive self,
+        bool _asBase,
+        uint256 _amount,
+        uint256 _minOutput,
+        uint256 _minVaultSharePrice,
+        bytes memory _extraData
+    ) internal returns (uint256 maturityTime, uint256 bondAmount) {
+        (maturityTime, bondAmount) = self.openLong(
+            _amount,
+            _minOutput,
+            _minVaultSharePrice,
+            IHyperdrive.Options(address(this), _asBase, _extraData)
         );
         emit IEverlongEvents.PositionOpened(
             maturityTime.toUint128(),

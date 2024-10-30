@@ -24,6 +24,15 @@ abstract contract IEverlong is
         uint128 bondAmount;
     }
 
+    /// @notice Parameters to specify how a rebalance will be performed.
+    struct RebalanceOptions {
+        uint256 spendingOverride;
+        uint256 minOutput;
+        uint256 minVaultSharePrice;
+        uint256 positionClosureLimit;
+        bytes extraData;
+    }
+
     // ╭─────────────────────────────────────────────────────────╮
     // │ Getters                                                 │
     // ╰─────────────────────────────────────────────────────────╯
@@ -58,4 +67,14 @@ abstract contract IEverlong is
 
     /// @notice Thrown when a redemption results in zero output assets.
     error RedemptionZeroOutput();
+
+    // ── Rebalancing ────────────────────────────────────────────
+
+    /// @notice Thrown when the spending override is below hyperdrive's
+    ///         minimum transaction amount.
+    error SpendingOverrideTooLow();
+
+    /// @notice Thrown when the spending override is above the difference
+    ///         between Everlong's balance and its max idle liquidity.
+    error SpendingOverrideTooHigh();
 }

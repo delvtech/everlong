@@ -5,6 +5,7 @@ pragma solidity ^0.8.20;
 import { console2 as console } from "forge-std/console2.sol";
 import { HyperdriveTest } from "hyperdrive/test/utils/HyperdriveTest.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
+import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol";
 import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
 import { EverlongExposed } from "../exposed/EverlongExposed.sol";
@@ -13,6 +14,7 @@ import { EverlongExposed } from "../exposed/EverlongExposed.sol";
 /// @dev Everlong testing harness contract.
 /// @dev Tests should extend this contract and call its `setUp` function.
 contract EverlongTest is HyperdriveTest, IEverlongEvents {
+    using HyperdriveUtils for *;
     // ── Hyperdrive Storage ──────────────────────────────────────────────
     // address alice
     // address bob
@@ -101,7 +103,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         vm.stopPrank();
 
         // Fast forward and accrue some interest.
-        advanceTimeWithCheckpoints(POSITION_DURATION * 2, VARIABLE_RATE);
+        advanceTimeWithCheckpoints(POSITION_DURATION * 2);
     }
 
     // ╭─────────────────────────────────────────────────────────╮
@@ -111,6 +113,55 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     function depositEverlong(
         uint256 _amount,
         address _depositor
+    ) internal returns (uint256 shares) {
+        return
+            depositEverlong(
+                _amount,
+                _depositor,
+                true,
+                IEverlong.RebalanceOptions({
+                    spendingOverride: 0,
+                    minOutput: 0,
+                    minVaultSharePrice: 0,
+                    positionClosureLimit: type(uint256).max,
+                    extraData: ""
+                })
+            );
+    }
+
+    function depositEverlong(
+        uint256 _amount,
+        address _depositor,
+        bool _shouldRebalance
+    ) internal returns (uint256 shares) {
+        return
+            depositEverlong(
+                _amount,
+                _depositor,
+                _shouldRebalance,
+                IEverlong.RebalanceOptions({
+                    spendingOverride: 0,
+                    minOutput: 0,
+                    minVaultSharePrice: 0,
+                    positionClosureLimit: type(uint256).max,
+                    extraData: ""
+                })
+            );
+    }
+
+    function depositEverlong(
+        uint256 _amount,
+        address _depositor,
+        IEverlong.RebalanceOptions memory _rebalanceOptions
+    ) internal returns (uint256 shares) {
+        return depositEverlong(_amount, _depositor, true, _rebalanceOptions);
+    }
+
+    function depositEverlong(
+        uint256 _amount,
+        address _depositor,
+        bool _shouldRebalance,
+        IEverlong.RebalanceOptions memory _rebalanceOptions
     ) internal returns (uint256 shares) {
         // Resolve the appropriate token.
         ERC20Mintable token = ERC20Mintable(everlong.asset());
@@ -130,18 +181,81 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         shares = everlong.deposit(_amount, _depositor);
         vm.stopPrank();
 
+        // Rebalance if specified.
+        if (_shouldRebalance) {
+            rebalance(_rebalanceOptions);
+        }
+
         // Return the amount of shares issued to _depositor for the deposit.
         return shares;
     }
 
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Redeem Helpers                                          │
+    // ╰─────────────────────────────────────────────────────────╯
+
     function redeemEverlong(
         uint256 _amount,
         address _redeemer
+    ) internal returns (uint256 shares) {
+        return
+            redeemEverlong(
+                _amount,
+                _redeemer,
+                true,
+                IEverlong.RebalanceOptions({
+                    spendingOverride: 0,
+                    minOutput: 0,
+                    minVaultSharePrice: 0,
+                    positionClosureLimit: type(uint256).max,
+                    extraData: ""
+                })
+            );
+    }
+
+    function redeemEverlong(
+        uint256 _amount,
+        address _redeemer,
+        bool _shouldRebalance
+    ) internal returns (uint256 shares) {
+        return
+            redeemEverlong(
+                _amount,
+                _redeemer,
+                _shouldRebalance,
+                IEverlong.RebalanceOptions({
+                    spendingOverride: 0,
+                    minOutput: 0,
+                    minVaultSharePrice: 0,
+                    positionClosureLimit: type(uint256).max,
+                    extraData: ""
+                })
+            );
+    }
+
+    function redeemEverlong(
+        uint256 _amount,
+        address _redeemer,
+        IEverlong.RebalanceOptions memory _rebalanceOptions
+    ) internal returns (uint256 shares) {
+        return redeemEverlong(_amount, _redeemer, true, _rebalanceOptions);
+    }
+
+    function redeemEverlong(
+        uint256 _amount,
+        address _redeemer,
+        bool _shouldRebalance,
+        IEverlong.RebalanceOptions memory _rebalanceOptions
     ) internal returns (uint256 proceeds) {
         // Make the redemption.
         vm.startPrank(_redeemer);
         proceeds = everlong.redeem(_amount, _redeemer, _redeemer);
         vm.stopPrank();
+
+        // Rebalance if specified.
+        if (_shouldRebalance) {
+            rebalance(_rebalanceOptions);
+        }
     }
 
     // TODO: This is gross, will refactor
@@ -158,6 +272,92 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             amount
         );
         vm.stopPrank();
+    }
+
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Rebalancing                                             │
+    // ╰─────────────────────────────────────────────────────────╯
+
+    function rebalance() internal virtual {
+        vm.startPrank(everlong.admin());
+        everlong.rebalance();
+        vm.stopPrank();
+    }
+
+    function rebalance(
+        IEverlong.RebalanceOptions memory _options
+    ) internal virtual {
+        vm.startPrank(everlong.admin());
+        everlong.rebalance(_options);
+        vm.stopPrank();
+    }
+
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ Advance Time Helpers                                    │
+    // ╰─────────────────────────────────────────────────────────╯
+
+    function advanceTimeWithCheckpoints(uint256 _time) internal virtual {
+        advanceTimeWithCheckpoints(_time, VARIABLE_RATE);
+    }
+
+    function advanceTimeWithRebalancing(
+        uint256 _time,
+        uint256 _rebalanceInterval
+    ) internal virtual {
+        uint256 startTimeElapsed = block.timestamp;
+        // Note: if time % _rebalanceInterval != 0 then it ends up
+        // advancing time to the next _rebalanceInterval.
+        while (block.timestamp - startTimeElapsed < _time) {
+            advanceTime(_rebalanceInterval, VARIABLE_RATE);
+            rebalance();
+        }
+    }
+
+    function advanceTimeWithRebalancing(
+        uint256 _time,
+        uint256 _rebalanceInterval,
+        IEverlong.RebalanceOptions memory _options
+    ) internal virtual {
+        uint256 startTimeElapsed = block.timestamp;
+        // Note: if time % _rebalanceInterval != 0 then it ends up
+        // advancing time to the next _rebalanceInterval.
+        while (block.timestamp - startTimeElapsed < _time) {
+            advanceTime(_rebalanceInterval, VARIABLE_RATE);
+            rebalance(_options);
+        }
+    }
+
+    function advanceTimeWithCheckpointsAndRebalancing(
+        uint256 _time
+    ) internal virtual {
+        uint256 startTimeElapsed = block.timestamp;
+        // Note: if time % CHECKPOINT_DURATION != 0 then it ends up
+        // advancing time to the next checkpoint.
+        while (block.timestamp - startTimeElapsed < _time) {
+            advanceTime(CHECKPOINT_DURATION, VARIABLE_RATE);
+            hyperdrive.checkpoint(
+                HyperdriveUtils.latestCheckpoint(hyperdrive),
+                0
+            );
+            rebalance();
+        }
+    }
+
+    function advanceTimeWithCheckpointsAndRebalancing(
+        uint256 _time,
+        IEverlong.RebalanceOptions memory _options
+    ) internal virtual {
+        uint256 startTimeElapsed = block.timestamp;
+        // Note: if time % CHECKPOINT_DURATION != 0 then it ends up
+        // advancing time to the next checkpoint.
+        while (block.timestamp - startTimeElapsed < _time) {
+            advanceTime(CHECKPOINT_DURATION, VARIABLE_RATE);
+            hyperdrive.checkpoint(
+                HyperdriveUtils.latestCheckpoint(hyperdrive),
+                0
+            );
+            rebalance(_options);
+        }
     }
 
     // ╭─────────────────────────────────────────────────────────╮

@@ -50,7 +50,7 @@ contract PartialClosures is EverlongTest {
             0.9e18
         );
         uint256 aliceRedeemAmount = aliceShares.mulDown(_redemptionPercentage);
-        redeemEverlong(aliceRedeemAmount, alice);
+        redeemEverlong(aliceRedeemAmount, alice, false);
         uint256 positionBondsAfterRedeem = everlong.totalBonds();
 
         // Ensure Everlong still has a position open.
@@ -92,9 +92,8 @@ contract PartialClosures is EverlongTest {
         uint256 aliceShares = depositEverlong(aliceDepositAmount, alice);
 
         // Time advances towards the end of the term.
-        advanceTimeWithCheckpoints(
-            POSITION_DURATION.mulDown(0.9e18),
-            VARIABLE_RATE
+        advanceTimeWithCheckpointsAndRebalancing(
+            POSITION_DURATION.mulDown(0.8e18)
         );
 
         // Alice deposits again into Everlong.

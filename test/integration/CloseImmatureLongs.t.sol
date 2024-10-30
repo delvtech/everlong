@@ -144,10 +144,10 @@ contract CloseImmatureLongs is EverlongTest {
         uint256 basePaid = 10_000e18;
         ERC20Mintable(everlong.asset()).mint(basePaid);
         ERC20Mintable(everlong.asset()).approve(address(everlong), basePaid);
-        uint256 shares = everlong.deposit(basePaid, bob);
+        uint256 shares = depositEverlong(basePaid, bob);
 
         // half term passes
-        advanceTimeWithCheckpoints(POSITION_DURATION / 2, variableInterest);
+        advanceTimeWithCheckpointsAndRebalancing(POSITION_DURATION / 2);
 
         // Estimate the proceeds.
         uint256 estimatedProceeds = everlong.previewRedeem(shares);
@@ -155,7 +155,7 @@ contract CloseImmatureLongs is EverlongTest {
         console.log("totalAssets:   %e", everlong.totalAssets());
 
         // Close the long.
-        uint256 baseProceeds = everlong.redeem(shares, bob, bob);
+        uint256 baseProceeds = redeemEverlong(shares, bob);
         console.log("actual:    %s", baseProceeds);
         console.log(
             "assets:    %s",
