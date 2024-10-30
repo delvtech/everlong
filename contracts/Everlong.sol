@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.22;
 
-import { console2 as console } from "forge-std/console2.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
@@ -321,9 +320,6 @@ contract Everlong is IEverlong {
             return;
         }
 
-        // Calculate the new portfolio value and save it.
-        _totalAssets = _calculateTotalAssets();
-
         // Close matured positions.
         closeMaturedPositions(_options.positionClosureLimit);
 
@@ -471,6 +467,9 @@ contract Everlong is IEverlong {
 
             // Update portfolio accounting to reflect the closed position.
             _portfolio.handleClosePosition();
+
+            // Increment the counter tracking the number of positions closed.
+            ++count;
         }
     }
 
