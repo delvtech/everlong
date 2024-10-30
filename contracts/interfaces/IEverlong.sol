@@ -24,6 +24,8 @@ abstract contract IEverlong is
         uint128 bondAmount;
     }
 
+    // TODO: Revisit position closure limit to see what position duration would
+    //       be needed to run out of gas.
     /// @notice Parameters to specify how a rebalance will be performed.
     struct RebalanceOptions {
         uint256 spendingOverride;
