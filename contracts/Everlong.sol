@@ -6,6 +6,7 @@ import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMat
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { ERC20 } from "openzeppelin/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import { FixedPointMathLib } from "solady/utils/FixedPointMathLib.sol";
 import { IEverlong } from "./interfaces/IEverlong.sol";
 import { EVERLONG_KIND, EVERLONG_VERSION, ONE } from "./libraries/Constants.sol";
 import { HyperdriveExecutionLibrary } from "./libraries/HyperdriveExecution.sol";
@@ -79,6 +80,32 @@ contract Everlong is IEverlong {
     // │ Storage                                                 │
     // ╰─────────────────────────────────────────────────────────╯
 
+    // ───────────────────────── Constants ───────────────────────
+
+    /// @notice Kind of everlong.
+    string public constant override kind = EVERLONG_KIND;
+
+    /// @notice Version of everlong.
+    string public constant override version = EVERLONG_VERSION;
+
+    /// @notice Virtual shares are used to mitigate inflation attacks.
+    bool public constant useVirtualShares = true;
+
+    /// @notice Used to reduce the feasibility of an inflation attack.
+    /// TODO: Determine the appropriate value for our case. Current value
+    ///       was picked arbitrarily.
+    uint8 public constant decimalsOffset = 3;
+
+    /// @notice Maximum slippage allowed when closing longs with Hyperdrive.
+    /// @dev Represented as a percentage with 1e18 signifying 100%.
+    uint256 public constant maxCloseLongSlippage = 0.001e18;
+
+    /// @notice Amount of additional bonds to close during a partial position
+    ///         closure to avoid rounding errors. Represented as a percentage
+    ///         of the positions total  amount of bonds where 0.1e18 represents
+    ///         a 10% buffer.
+    uint256 public constant partialPositionClosureBuffer = 0.001e18;
+
     // ───────────────────────── Immutables ──────────────────────
 
     /// @dev Name of the Everlong token.
@@ -105,20 +132,6 @@ contract Everlong is IEverlong {
 
     /// @notice Maximum percentage of assets to leave uninvested.
     uint256 public immutable maxIdleLiquidityPercentage;
-
-    /// @notice Kind of everlong.
-    string public constant override kind = EVERLONG_KIND;
-
-    /// @notice Version of everlong.
-    string public constant override version = EVERLONG_VERSION;
-
-    /// @notice Virtual shares are used to mitigate inflation attacks.
-    bool public constant useVirtualShares = true;
-
-    /// @notice Used to reduce the feasibility of an inflation attack.
-    /// TODO: Determine the appropriate value for our case. Current value
-    ///       was picked arbitrarily.
-    uint8 public constant decimalsOffset = 3;
 
     // ─────────────────────────── State ────────────────────────
 
@@ -234,7 +247,7 @@ contract Everlong is IEverlong {
         // TODO: Hold the vault share price constant.
         //
         // Apply losses incurred by the portfolio.
-        uint256 losses = _calculatePortfolioLosses().mulDivDown(
+        uint256 losses = _calculatePortfolioLosses().mulDivUp(
             assets,
             _totalAssets
         );
@@ -262,10 +275,7 @@ contract Everlong is IEverlong {
         // If there is excess liquidity beyond the max, rebalance.
         if (ERC20(_asset).balanceOf(address(this)) > maxIdleLiquidity()) {
             rebalance();
-        }
-        // A rebalance can't be performed, but `_totalAssets` should still
-        // be updated.
-        else {
+        } else {
             _totalAssets += _assets;
         }
     }
@@ -281,17 +291,21 @@ contract Everlong is IEverlong {
             revert IEverlong.RedemptionZeroOutput();
         }
 
-        // If we have enough balance to service the withdrawal after closing
-        // any matured positions, there's no need to close immature positions.
+        // TODO: Determine if we want to close enough positions to leave the
+        //       correct amount of idle liquidity after the withdrawal is
+        //       processed. Doing so at this time would likely result in less
+        //       overall gas usage.
+        //
+        // If we do not have enough balance to service the withdrawal after
+        // closing any matured positions, close more positions.
         uint256 balance = ERC20(_asset).balanceOf(address(this)) +
             _closeMaturedPositions();
-        if (_assets <= balance) {
-            return;
+        if (_assets > balance) {
+            _closePositions(_assets - balance);
         }
 
-        // Close more positions until sufficient idle to process withdrawal.
-        balance += _closePositions(_assets - balance);
-
+        // Recalculate the assets under Everlong control less the amount being
+        // withdrawn.
         _totalAssets = _calculateTotalAssets() - _assets;
     }
 
@@ -310,6 +324,9 @@ contract Everlong is IEverlong {
             return;
         }
 
+        // Calculate the new portfolio value and save it.
+        _totalAssets = _calculateTotalAssets();
+
         // Close matured positions.
         _closeMaturedPositions();
 
@@ -326,13 +343,10 @@ contract Everlong is IEverlong {
         // Account for the new position in the portfolio.
         _portfolio.handleOpenPosition(maturityTime, bondAmount);
 
-        // Calculate the new portfolio value and save it.
-        _totalAssets = _calculateTotalAssets();
-
         emit Rebalanced();
     }
 
-    // TODO: Use cached poolconfig
+    // TODO: Use cached poolconfig.
     //
     /// @notice Returns true if the portfolio can be rebalanced.
     /// @notice The portfolio can be rebalanced if:
@@ -350,16 +364,27 @@ contract Everlong is IEverlong {
                     .minimumTransactionAmount));
     }
 
-    // TODO: Use cached poolconfig
-    //
     /// @notice Returns the target amount of funds to keep idle in Everlong.
     /// @dev If the target amount is lower than Hyperdrive's minimum,
     ///      then Hyperdrive's minimum becomes the target.
-    /// @return assets Target amount of idle assets.
-    function targetIdleLiquidity() public view returns (uint256 assets) {
-        assets = targetIdleLiquidityPercentage.mulDown(_totalAssets).max(
-            IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount
-        );
+    /// @return Target amount of idle assets.
+    function targetIdleLiquidity() public view returns (uint256) {
+        return _calculateTargetIdleLiquidity(_totalAssets);
+    }
+
+    // TODO: Use cached poolconfig
+    //
+    /// @dev Calculates the target amount of idle funds given the input amount
+    ///      of assets.
+    /// @param _assets Total assets to calculate the target from.
+    /// @return Target amount of idle assets.
+    function _calculateTargetIdleLiquidity(
+        uint256 _assets
+    ) internal view returns (uint256) {
+        return
+            targetIdleLiquidityPercentage.mulDown(_assets).max(
+                IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount
+            );
     }
 
     // TODO: Use cached poolconfig
@@ -387,25 +412,102 @@ contract Everlong is IEverlong {
             if (!IHyperdrive(hyperdrive).isMature(position)) {
                 return output;
             }
-            output += IHyperdrive(hyperdrive).closeLong(asBase, position, "");
+            output += IHyperdrive(hyperdrive).closeLong(
+                asBase,
+                position,
+                0,
+                ""
+            );
             _portfolio.handleClosePosition();
         }
     }
 
     /// @dev Close positions until the targeted amount of output is received.
-    /// @param _targetOutput Minimum amount of proceeds to receive.
+    /// @param _targetOutput Target amount of proceeds to receive.
     /// @return output Total output received from closed positions.
     function _closePositions(
         uint256 _targetOutput
     ) internal returns (uint256 output) {
+        // Round `_targetOutput` up to Hyperdrive's minimum transaction amount.
+        _targetOutput = _targetOutput.max(
+            IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount
+        );
+
+        // Since multiple position's worth of bonds may need to be closed,
+        // iterate through each position starting with the most mature.
+        //
+        // For each position, use the expected output of closing the entire
+        // position to estimate the amount of bonds to sell for a partial closure.
+        IEverlong.Position memory position;
+        uint256 totalPositionValue;
         while (!_portfolio.isEmpty() && output < _targetOutput) {
-            output += IHyperdrive(hyperdrive).closeLong(
+            // Retrieve the most mature position.
+            position = _portfolio.head();
+
+            // Calculate the value of the entire position, and use it to derive
+            // the expected output for partial closures.
+            totalPositionValue = IHyperdrive(hyperdrive).previewCloseLong(
                 asBase,
-                _portfolio.head(),
+                position,
                 ""
             );
-            _portfolio.handleClosePosition();
+
+            // Close only part of the position if there are sufficient bonds
+            // to reach the target output without leaving a small amount left.
+            // For this case, the remaining bonds must be worth at least
+            // Hyperdrive's minimum transaction amount.
+            if (
+                totalPositionValue >
+                (_targetOutput -
+                    output +
+                    IHyperdrive(hyperdrive)
+                        .getPoolConfig()
+                        .minimumTransactionAmount).mulUp(
+                        1e18 + partialPositionClosureBuffer
+                    )
+            ) {
+                // Calculate the amount of bonds to close from the position.
+                uint256 bondsNeeded = uint256(position.bondAmount).mulDivUp(
+                    (_targetOutput - output).mulUp(
+                        1e18 + partialPositionClosureBuffer
+                    ),
+                    totalPositionValue
+                );
+
+                // Close part of the position and enforce the slippage guard.
+                // Add the amount of assets received to the total output.
+                output += IHyperdrive(hyperdrive).closeLong(
+                    asBase,
+                    IEverlong.Position({
+                        maturityTime: position.maturityTime,
+                        bondAmount: bondsNeeded.toUint128()
+                    }),
+                    0,
+                    ""
+                );
+
+                // Update portfolio accounting to include the partial closure.
+                _portfolio.handleClosePosition(bondsNeeded);
+
+                // No more closures are needed.
+                return output;
+            }
+            // Close the entire position.
+            else {
+                // Close the entire position and increase the cumulative output.
+                output += IHyperdrive(hyperdrive).closeLong(
+                    asBase,
+                    position,
+                    0,
+                    ""
+                );
+
+                // Update portfolio accounting to include the partial closure.
+                _portfolio.handleClosePosition();
+            }
         }
+
+        // The target has been reached or no more positions remain.
         return output;
     }
 
