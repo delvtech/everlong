@@ -452,7 +452,8 @@ contract Everlong is IEverlong {
             );
 
             // Calculate the amount of bonds that must be closed.
-            // Round up to overestimate the amount of bonds.
+            // 
+            // NOTE: Round up to overestimate the amount of bonds.
             bondsNeeded = (_targetOutput - output).divUp(expectedValuePerBond);
 
             // Close only part of the position if there are sufficient bonds
