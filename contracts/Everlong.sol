@@ -326,6 +326,7 @@ contract Everlong is IEverlong {
         // If Everlong has sufficient idle, open a new position.
         if (canOpenPosition()) {
             // Calculate how much idle to spend on the position.
+            // A value of 0 for spendingLimit indicates no limit.
             uint256 balance = IERC20(_asset).balanceOf(address(this));
             uint256 target = targetIdleLiquidity();
             uint256 toSpend = (
@@ -334,7 +335,7 @@ contract Everlong is IEverlong {
                     : _options.spendingLimit.min(balance - target)
             );
 
-            // If spending limit is above hyperdrive's minimum, open a new
+            // If toSpend is above hyperdrive's minimum, open a new
             // position.
             // Leave an extra wei for the approval to keep the slot warm.
             if (
