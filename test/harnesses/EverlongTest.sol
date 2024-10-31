@@ -123,7 +123,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
                     spendingOverride: 0,
                     minOutput: 0,
                     minVaultSharePrice: 0,
-                    positionClosureLimit: type(uint256).max,
+                    positionClosureLimit: 0,
                     extraData: ""
                 })
             );
@@ -143,7 +143,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
                     spendingOverride: 0,
                     minOutput: 0,
                     minVaultSharePrice: 0,
-                    positionClosureLimit: type(uint256).max,
+                    positionClosureLimit: 0,
                     extraData: ""
                 })
             );
@@ -207,7 +207,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
                     spendingOverride: 0,
                     minOutput: 0,
                     minVaultSharePrice: 0,
-                    positionClosureLimit: type(uint256).max,
+                    positionClosureLimit: 0,
                     extraData: ""
                 })
             );
@@ -227,7 +227,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
                     spendingOverride: 0,
                     minOutput: 0,
                     minVaultSharePrice: 0,
-                    positionClosureLimit: type(uint256).max,
+                    positionClosureLimit: 0,
                     extraData: ""
                 })
             );

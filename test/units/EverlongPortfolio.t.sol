@@ -236,6 +236,15 @@ contract TestEverlongPortfolio is EverlongTest {
         );
     }
 
+    /// @dev Ensures that rebalance reverts when called by a non-admin
+    function test_rebalance_failure_unauthorized() external {
+        // Attempt calling rebalance as Dan (not the admin).
+        vm.startPrank(dan);
+        vm.expectRevert(IEverlong.Unauthorized.selector);
+        everlong.rebalance();
+        vm.stopPrank();
+    }
+
     // TODO: Reduce tolerance on remaining idle liquidity.
     //
     /// @dev Ensures the following after a rebalance:
@@ -290,22 +299,22 @@ contract TestEverlongPortfolio is EverlongTest {
         assertTrue(everlong.positionAt(1).maturityTime < block.timestamp);
         assertTrue(everlong.positionAt(2).maturityTime < block.timestamp);
 
-        // Call rebalance with `positionClosureLimit` set to zero.
+        // Call rebalance with `positionClosureLimit` set to one.
         rebalance(
             IEverlong.RebalanceOptions({
                 spendingOverride: 0,
                 minOutput: 0,
                 minVaultSharePrice: 0,
-                positionClosureLimit: 0,
+                positionClosureLimit: 1,
                 extraData: ""
             })
         );
 
-        // Ensure that Everlong still has 3 matured positions.
+        // Ensure that Everlong still has 3 positions, the first 2 mature.
         assertEq(everlong.positionCount(), 3);
         assertTrue(everlong.positionAt(0).maturityTime < block.timestamp);
         assertTrue(everlong.positionAt(1).maturityTime < block.timestamp);
-        assertTrue(everlong.positionAt(2).maturityTime < block.timestamp);
+        assertTrue(everlong.positionAt(2).maturityTime > block.timestamp);
     }
 
     /// @dev Tests the functionality of `RebalanceOptions.spendingOverride`.
@@ -321,7 +330,7 @@ contract TestEverlongPortfolio is EverlongTest {
                 spendingOverride: 1,
                 minOutput: 0,
                 minVaultSharePrice: 0,
-                positionClosureLimit: type(uint256).max,
+                positionClosureLimit: 0,
                 extraData: ""
             })
         );
@@ -337,7 +346,7 @@ contract TestEverlongPortfolio is EverlongTest {
                 spendingOverride: (balance - targetIdle) * 2,
                 minOutput: 0,
                 minVaultSharePrice: 0,
-                positionClosureLimit: type(uint256).max,
+                positionClosureLimit: 0,
                 extraData: ""
             })
         );
@@ -351,7 +360,7 @@ contract TestEverlongPortfolio is EverlongTest {
                 spendingOverride: (balance - maxIdle) / 2,
                 minOutput: 0,
                 minVaultSharePrice: 0,
-                positionClosureLimit: type(uint256).max,
+                positionClosureLimit: 0,
                 extraData: ""
             })
         );
@@ -377,7 +386,7 @@ contract TestEverlongPortfolio is EverlongTest {
                 spendingOverride: 0,
                 minOutput: type(uint256).max,
                 minVaultSharePrice: 0,
-                positionClosureLimit: type(uint256).max,
+                positionClosureLimit: 0,
                 extraData: ""
             })
         );
@@ -395,7 +404,7 @@ contract TestEverlongPortfolio is EverlongTest {
                 spendingOverride: 0,
                 minOutput: 0,
                 minVaultSharePrice: type(uint256).max,
-                positionClosureLimit: type(uint256).max,
+                positionClosureLimit: 0,
                 extraData: ""
             })
         );

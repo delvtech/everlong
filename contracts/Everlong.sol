@@ -311,7 +311,7 @@ contract Everlong is IEverlong {
                 spendingOverride: 0,
                 minOutput: 0,
                 minVaultSharePrice: 0,
-                positionClosureLimit: type(uint256).max,
+                positionClosureLimit: 0,
                 extraData: ""
             })
         );
@@ -468,16 +468,22 @@ contract Everlong is IEverlong {
     /// @return output Amount of assets received from the closed positions.
     function closeMaturedPositions(
         uint256 _limit
-    ) external onlyAdmin returns (uint256 output) {
+    ) external returns (uint256 output) {
         output = _closeMaturedPositions(_limit);
     }
 
     /// @dev Close only matured positions in the portfolio.
     /// @param _limit The maximum number of positions to close.
+    ///               A value of zero indicates no limit.
     /// @return output Proceeds of closing the matured positions.
     function _closeMaturedPositions(
         uint256 _limit
     ) internal returns (uint256 output) {
+        // A value of zero for `_limit` indicates no limit.
+        if (_limit == 0) {
+            _limit = type(uint256).max;
+        }
+
         // Iterate through positions from most to least mature.
         // Exit if:
         // - There are no more positions.
