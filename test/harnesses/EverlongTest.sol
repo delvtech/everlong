@@ -49,6 +49,15 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     uint256 internal TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0.1e18;
     uint256 internal MAX_IDLE_LIQUIDITY_PERCENTAGE = 0.2e18;
 
+    IEverlong.RebalanceOptions internal DEFAULT_REBALANCE_OPTIONS =
+        IEverlong.RebalanceOptions({
+            spendingOverride: 0,
+            minOutput: 0,
+            minVaultSharePrice: 0,
+            positionClosureLimit: 0,
+            extraData: ""
+        });
+
     // ╭─────────────────────────────────────────────────────────╮
     // │ Hyperdrive Configuration                                │
     // ╰─────────────────────────────────────────────────────────╯
@@ -110,6 +119,10 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     // │ Deposit Helpers                                         │
     // ╰─────────────────────────────────────────────────────────╯
 
+    /// @dev Deposit into Everlong.
+    /// @param _amount Amount of assets to deposit.
+    /// @param _depositor Address to deposit as.
+    /// @return shares Amount of shares received from the deposit.
     function depositEverlong(
         uint256 _amount,
         address _depositor
@@ -118,7 +131,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             depositEverlong(
                 _amount,
                 _depositor,
-                true,
+                false,
                 IEverlong.RebalanceOptions({
                     spendingOverride: 0,
                     minOutput: 0,
@@ -129,6 +142,11 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             );
     }
 
+    /// @dev Deposit into Everlong.
+    /// @param _amount Amount of assets to deposit.
+    /// @param _depositor Address to deposit as.
+    /// @param _shouldRebalance Whether to rebalance after the deposit is made.
+    /// @return shares Amount of shares received from the deposit.
     function depositEverlong(
         uint256 _amount,
         address _depositor,
@@ -149,6 +167,11 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             );
     }
 
+    /// @dev Deposit into Everlong and rebalance after the deposit.
+    /// @param _amount Amount of assets to deposit.
+    /// @param _depositor Address to deposit as.
+    /// @param _rebalanceOptions Options to pass to the rebalance call.
+    /// @return shares Amount of shares received from the deposit.
     function depositEverlong(
         uint256 _amount,
         address _depositor,
@@ -157,12 +180,14 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         return depositEverlong(_amount, _depositor, true, _rebalanceOptions);
     }
 
+    // NOTE: Core functionality for all `depositEverlong(..)` overloads.
+    //       This is the most verbose, probably don't want to call it directly.
     function depositEverlong(
         uint256 _amount,
         address _depositor,
         bool _shouldRebalance,
         IEverlong.RebalanceOptions memory _rebalanceOptions
-    ) internal returns (uint256 shares) {
+    ) private returns (uint256 shares) {
         // Resolve the appropriate token.
         ERC20Mintable token = ERC20Mintable(everlong.asset());
 
@@ -194,53 +219,70 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     // │ Redeem Helpers                                          │
     // ╰─────────────────────────────────────────────────────────╯
 
+    /// @dev Redeem shares from Everlong.
+    /// @param _shares Amount of shares to redeem.
+    /// @param _redeemer Address to redeem as.
+    /// @return assets Amount of assets received from the redemption.
     function redeemEverlong(
-        uint256 _amount,
+        uint256 _shares,
         address _redeemer
-    ) internal returns (uint256 shares) {
-        return
-            redeemEverlong(
-                _amount,
-                _redeemer,
-                true,
-                IEverlong.RebalanceOptions({
-                    spendingOverride: 0,
-                    minOutput: 0,
-                    minVaultSharePrice: 0,
-                    positionClosureLimit: 0,
-                    extraData: ""
-                })
-            );
+    ) internal returns (uint256 assets) {
+        assets = redeemEverlong(
+            _shares,
+            _redeemer,
+            true,
+            IEverlong.RebalanceOptions({
+                spendingOverride: 0,
+                minOutput: 0,
+                minVaultSharePrice: 0,
+                positionClosureLimit: 0,
+                extraData: ""
+            })
+        );
+        return assets;
     }
 
+    /// @dev Redeem shares from Everlong.
+    /// @param _shares Amount of shares to redeem.
+    /// @param _redeemer Address to redeem as.
+    /// @param _shouldRebalance Whether to rebalance after the redeem is made.
+    /// @return assets Amount of assets received from the redemption.
     function redeemEverlong(
-        uint256 _amount,
+        uint256 _shares,
         address _redeemer,
         bool _shouldRebalance
-    ) internal returns (uint256 shares) {
-        return
-            redeemEverlong(
-                _amount,
-                _redeemer,
-                _shouldRebalance,
-                IEverlong.RebalanceOptions({
-                    spendingOverride: 0,
-                    minOutput: 0,
-                    minVaultSharePrice: 0,
-                    positionClosureLimit: 0,
-                    extraData: ""
-                })
-            );
+    ) internal returns (uint256 assets) {
+        assets = redeemEverlong(
+            _shares,
+            _redeemer,
+            _shouldRebalance,
+            IEverlong.RebalanceOptions({
+                spendingOverride: 0,
+                minOutput: 0,
+                minVaultSharePrice: 0,
+                positionClosureLimit: 0,
+                extraData: ""
+            })
+        );
+        return assets;
     }
 
+    /// @dev Redeem shares from Everlong.
+    /// @param _shares Amount of shares to redeem.
+    /// @param _redeemer Address to redeem as.
+    /// @param _rebalanceOptions Options to pass to the rebalance call.
+    /// @return assets Amount of assets received from the redemption.
     function redeemEverlong(
-        uint256 _amount,
+        uint256 _shares,
         address _redeemer,
         IEverlong.RebalanceOptions memory _rebalanceOptions
-    ) internal returns (uint256 shares) {
-        return redeemEverlong(_amount, _redeemer, true, _rebalanceOptions);
+    ) internal returns (uint256 assets) {
+        assets = redeemEverlong(_shares, _redeemer, true, _rebalanceOptions);
+        return assets;
     }
 
+    // NOTE: Core functionality for all `redeemEverlong(..)` overloads.
+    //       This is the most verbose, probably don't want to call it directly.
     function redeemEverlong(
         uint256 _amount,
         address _redeemer,
@@ -258,18 +300,18 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         }
     }
 
-    // TODO: This is gross, will refactor
-    /// @dev Mint base token to the provided address a
-    ///      and approve the Everlong contract.
+    /// @dev Mint base token to the provided address and approve Everlong.
+    /// @param _recipient Receiver of the minted assets.
+    /// @param _amount Amount of assets to mint.
     function mintApproveEverlongBaseAsset(
-        address recipient,
-        uint256 amount
+        address _recipient,
+        uint256 _amount
     ) internal {
-        ERC20Mintable(hyperdrive.baseToken()).mint(recipient, amount);
-        vm.startPrank(recipient);
+        ERC20Mintable(hyperdrive.baseToken()).mint(_recipient, _amount);
+        vm.startPrank(_recipient);
         ERC20Mintable(hyperdrive.baseToken()).approve(
             address(everlong),
-            amount
+            _amount
         );
         vm.stopPrank();
     }
@@ -278,12 +320,15 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     // │ Rebalancing                                             │
     // ╰─────────────────────────────────────────────────────────╯
 
+    /// @dev Call `everlong.rebalance(...)` as the admin with default options.
     function rebalance() internal virtual {
         vm.startPrank(everlong.admin());
-        everlong.rebalance();
+        everlong.rebalance(DEFAULT_REBALANCE_OPTIONS);
         vm.stopPrank();
     }
 
+    /// @dev Call `everlong.rebalance(...)` as the admin with provided options.
+    /// @param _options Rebalance options to pass to Everlong.
     function rebalance(
         IEverlong.RebalanceOptions memory _options
     ) internal virtual {
@@ -296,10 +341,17 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     // │ Advance Time Helpers                                    │
     // ╰─────────────────────────────────────────────────────────╯
 
+    /// @dev Advance time by the specified amount at the global variable rate.
+    /// @param _time Amount of time to advance.
     function advanceTimeWithCheckpoints(uint256 _time) internal virtual {
         advanceTimeWithCheckpoints(_time, VARIABLE_RATE);
     }
 
+    /// @dev Advance time and rebalance on the specified interval.
+    /// @dev If time % _rebalanceInterval != 0 then it ends up advancing time
+    ///      to the next _rebalanceInterval.
+    /// @param _time Amount of time to advance.
+    /// @param _rebalanceInterval Amount of time between rebalances.
     function advanceTimeWithRebalancing(
         uint256 _time,
         uint256 _rebalanceInterval
@@ -313,6 +365,12 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         }
     }
 
+    /// @dev Advance time and rebalance on the specified interval.
+    /// @dev If time % _rebalanceInterval != 0 then it ends up advancing time
+    ///      to the next _rebalanceInterval.
+    /// @param _time Amount of time to advance.
+    /// @param _rebalanceInterval Amount of time between rebalances.
+    /// @param _options Rebalance options to pass to Everlong.
     function advanceTimeWithRebalancing(
         uint256 _time,
         uint256 _rebalanceInterval,
@@ -327,6 +385,10 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         }
     }
 
+    /// @dev Advance time, create checkpoints, and rebalance at checkpoints.
+    /// @dev If time % _rebalanceInterval != 0 then it ends up advancing time
+    ///      to the next _rebalanceInterval.
+    /// @param _time Amount of time to advance.
     function advanceTimeWithCheckpointsAndRebalancing(
         uint256 _time
     ) internal virtual {
@@ -343,6 +405,11 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         }
     }
 
+    /// @dev Advance time, create checkpoints, and rebalance at checkpoints.
+    /// @dev If time % _rebalanceInterval != 0 then it ends up advancing time
+    ///      to the next _rebalanceInterval.
+    /// @param _time Amount of time to advance.
+    /// @param _options Rebalance options to pass to Everlong.
     function advanceTimeWithCheckpointsAndRebalancing(
         uint256 _time,
         IEverlong.RebalanceOptions memory _options
@@ -379,20 +446,5 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         }
         console.log("--------------------------------------------");
         /* solhint-enable no-console */
-    }
-
-    /// @dev Asserts that the position at the specified index is equal
-    ///      to the input `position`.
-    /// @param _index Index of the position to compare.
-    /// @param _position Input position to validate against
-    /// @param _error Message to display for failing assertions.
-    function assertPosition(
-        uint256 _index,
-        IEverlong.Position memory _position,
-        string memory _error
-    ) public view virtual {
-        IEverlong.Position memory p = everlong.positionAt(_index);
-        assertEq(_position.maturityTime, p.maturityTime, _error);
-        assertEq(_position.bondAmount, p.bondAmount, _error);
     }
 }

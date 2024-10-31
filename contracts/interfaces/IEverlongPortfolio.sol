@@ -12,9 +12,6 @@ interface IEverlongPortfolio {
     /// @param _options Options to control the rebalance behavior.
     function rebalance(IEverlong.RebalanceOptions memory _options) external;
 
-    /// @notice Rebalances the Everlong bond portfolio if needed.
-    function rebalance() external;
-
     /// @notice Closes mature positions in the Everlong portfolio.
     /// @param _limit The maximum number of positions to close.
     /// @return output Amount of assets received from the closed positions.

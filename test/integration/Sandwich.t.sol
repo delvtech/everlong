@@ -103,7 +103,8 @@ contract Sandwich is EverlongTest {
         );
         uint256 bystanderShares = depositEverlong(
             _bystanderDepositAmount,
-            bystander
+            bystander,
+            true
         );
 
         // The attacker opens a large short.
@@ -125,7 +126,8 @@ contract Sandwich is EverlongTest {
         );
         uint256 attackerShares = depositEverlong(
             _attackerDepositAmount,
-            attacker
+            attacker,
+            true
         );
 
         // The attacker closes their short position.
@@ -138,11 +140,12 @@ contract Sandwich is EverlongTest {
         // The attacker redeems their Everlong shares.
         uint256 attackerEverlongProceeds = redeemEverlong(
             attackerShares,
-            attacker
+            attacker,
+            true
         );
 
         // The bystander redeems their Everlong shares.
-        redeemEverlong(bystanderShares, bystander);
+        redeemEverlong(bystanderShares, bystander, true);
 
         // Calculate the amount paid and the proceeds for the attacker.
         uint256 attackerPaid = _attackerDepositAmount + attackerShortBasePaid;
@@ -187,7 +190,8 @@ contract Sandwich is EverlongTest {
         );
         uint256 bystanderEverlongShares = depositEverlong(
             _bystanderDeposit,
-            bystander
+            bystander,
+            true
         );
 
         // The attacker deposits into Everlong.
@@ -198,7 +202,8 @@ contract Sandwich is EverlongTest {
         );
         uint256 attackerEverlongShares = depositEverlong(
             _attackerDeposit,
-            attacker
+            attacker,
+            true
         );
 
         // The attacker removes liquidity from Hyperdrive.
@@ -207,7 +212,8 @@ contract Sandwich is EverlongTest {
         // The attacker redeems from Everlong.
         uint256 attackerEverlongProceeds = redeemEverlong(
             attackerEverlongShares,
-            attacker
+            attacker,
+            true
         );
 
         // The bystander redeems from Everlong.
@@ -215,7 +221,7 @@ contract Sandwich is EverlongTest {
         // While not needed for the assertion below, it's included to ensure
         // that the attack does not prevent the bystander from redeeming their
         // shares.
-        redeemEverlong(bystanderEverlongShares, bystander);
+        redeemEverlong(bystanderEverlongShares, bystander, true);
 
         // Ensure that the attacker does not profit from their actions.
         assertLt(attackerEverlongProceeds, _attackerDeposit);

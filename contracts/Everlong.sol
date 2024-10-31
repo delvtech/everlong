@@ -292,7 +292,7 @@ contract Everlong is IEverlong {
         // If we do not have enough balance to service the withdrawal after
         // closing any matured positions, close more positions.
         uint256 balance = IERC20(_asset).balanceOf(address(this)) +
-            _closeMaturedPositions(type(uint256).max);
+            closeMaturedPositions(type(uint256).max);
         if (_assets > balance) {
             _closePositions(_assets - balance);
         }
@@ -306,52 +306,22 @@ contract Everlong is IEverlong {
     // │ Rebalancing                                             │
     // ╰─────────────────────────────────────────────────────────╯
 
-    // NOTE: Errors from hyperdrive are not handled. The keeper must configure
-    //       the correct parameters to avoid issues with insufficient liquidity
-    //       and running out of gas from mature position closures.
-    //
     /// @notice Rebalance the everlong portfolio by closing mature positions
     ///         and using the proceeds over target idle to open new positions.
-    function rebalance() external onlyAdmin {
-        _rebalance(
-            IEverlong.RebalanceOptions({
-                spendingOverride: 0,
-                minOutput: 0,
-                minVaultSharePrice: 0,
-                positionClosureLimit: 0,
-                extraData: ""
-            })
-        );
-    }
-
-    // NOTE: Errors from hyperdrive are not handled. The keeper must configure
-    //       the correct parameters to avoid issues with insufficient liquidity
-    //       and running out of gas from mature position closures.
-    //
-    /// @notice Rebalance the everlong portfolio by closing mature positions
-    ///         and using the proceeds over target idle to open new positions.
+    /// @dev Errors from hyperdrive are not handled. The keeper must configure
+    ///      the correct parameters to avoid issues with insufficient liquidity
+    ///      and running out of gas from mature position closures.
     /// @param _options Options to control the rebalance behavior.
     function rebalance(
         IEverlong.RebalanceOptions memory _options
     ) external onlyAdmin {
-        _rebalance(_options);
-    }
-
-    // NOTE: Errors from hyperdrive are not handled. The keeper must configure
-    //       the correct parameters to avoid issues with insufficient liquidity
-    //       and running out of gas from mature position closures.
-    //
-    /// @dev Rebalance the everlong portfolio by closing mature positions
-    ///         and using the proceeds over target idle to open new positions.
-    /// @param _options Options to control the rebalance behavior.
-    function _rebalance(IEverlong.RebalanceOptions memory _options) internal {
         // Early return if no rebalancing is needed.
         if (!canRebalance()) {
             return;
         }
 
         // Close matured positions.
-        _closeMaturedPositions(_options.positionClosureLimit);
+        closeMaturedPositions(_options.positionClosureLimit);
 
         // If Everlong has sufficient idle, open a new position.
         if (canOpenPosition()) {
@@ -467,13 +437,13 @@ contract Everlong is IEverlong {
     // │ Hyperdrive                                              │
     // ╰─────────────────────────────────────────────────────────╯
 
-    /// @dev Close only matured positions in the portfolio.
+    /// @notice Close only matured positions in the portfolio.
     /// @param _limit The maximum number of positions to close.
     ///               A value of zero indicates no limit.
     /// @return output Proceeds of closing the matured positions.
-    function _closeMaturedPositions(
+    function closeMaturedPositions(
         uint256 _limit
-    ) internal returns (uint256 output) {
+    ) public returns (uint256 output) {
         // A value of zero for `_limit` indicates no limit.
         if (_limit == 0) {
             _limit = type(uint256).max;
@@ -485,8 +455,7 @@ contract Everlong is IEverlong {
         // - The current position is not mature.
         // - The limit on closed positions has been reached.
         IEverlong.Position memory position;
-        uint256 count = 0;
-        while (!_portfolio.isEmpty() && count < _limit) {
+        for (uint256 count; !_portfolio.isEmpty() && count < _limit; ++count) {
             // Retrieve the most mature position.
             position = _portfolio.head();
 
@@ -507,9 +476,6 @@ contract Everlong is IEverlong {
 
             // Update portfolio accounting to reflect the closed position.
             _portfolio.handleClosePosition();
-
-            // Increment the counter tracking the number of positions closed.
-            ++count;
         }
     }
 

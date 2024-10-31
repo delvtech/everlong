@@ -24,7 +24,7 @@ contract TestEverlongPortfolio is EverlongTest {
         uint256 _index,
         IEverlong.Position memory _position,
         string memory _error
-    ) public view override {
+    ) public view {
         IEverlong.Position memory p = portfolio.at(_index);
         assertEq(_position.maturityTime, p.maturityTime, _error);
         assertEq(_position.bondAmount, p.bondAmount, _error);
@@ -241,7 +241,7 @@ contract TestEverlongPortfolio is EverlongTest {
         // Attempt calling rebalance as Dan (not the admin).
         vm.startPrank(dan);
         vm.expectRevert(IEverlong.Unauthorized.selector);
-        everlong.rebalance();
+        everlong.rebalance(DEFAULT_REBALANCE_OPTIONS);
         vm.stopPrank();
     }
 
