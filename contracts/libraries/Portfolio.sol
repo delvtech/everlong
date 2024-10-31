@@ -207,22 +207,20 @@ library Portfolio {
         State storage self,
         uint128 _amount
     ) internal returns (IEverlong.Position memory value) {
-        unchecked {
-            uint128 frontIndex = self._begin;
+        uint128 frontIndex = self._begin;
 
-            // Ensure there are items in the queue.
-            if (frontIndex == self._end) revert QueueEmpty();
+        // Ensure there are items in the queue.
+        if (frontIndex == self._end) revert QueueEmpty();
 
-            // Remove the position if _amount equals the position's bondAmount.
-            if (_amount >= self._q[frontIndex].bondAmount) {
-                value = _removePosition(self);
-            }
-            // Reduce the position's bondAmount by `_amount`.
-            else {
-                self._q[frontIndex].decrease(_amount);
-                // Return updated position.
-                value = self._q[frontIndex];
-            }
+        // Remove the position if _amount equals the position's bondAmount.
+        if (_amount >= self._q[frontIndex].bondAmount) {
+            value = _removePosition(self);
+        }
+        // Reduce the position's bondAmount by `_amount`.
+        else {
+            self._q[frontIndex].decrease(_amount);
+            // Return updated position.
+            value = self._q[frontIndex];
         }
     }
 
