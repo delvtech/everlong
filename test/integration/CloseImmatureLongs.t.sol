@@ -15,7 +15,7 @@ uint256 constant HYPERDRIVE_LONG_EXPOSURE_LONGS_OUTSTANDING_SLOT = 3;
 uint256 constant HYPERDRIVE_SHARE_ADJUSTMENT_SHORTS_OUTSTANDING_SLOT = 4;
 
 /// @dev Tests pricing functionality for the portfolio and unmatured positions.
-contract CloseImmatureLongs is EverlongTest {
+contract TestCloseImmatureLongs is EverlongTest {
     using Packing for bytes32;
     using FixedPointMath for uint128;
     using FixedPointMath for uint256;
