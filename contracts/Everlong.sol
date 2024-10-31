@@ -403,8 +403,6 @@ contract Everlong is IEverlong {
     // │ Hyperdrive                                              │
     // ╰─────────────────────────────────────────────────────────╯
 
-    // TODO: Decide if we want to put a slippage guard here.
-    //
     /// @dev Close only matured positions in the portfolio.
     /// @return output Proceeds of closing the matured positions.
     function _closeMaturedPositions() internal returns (uint256 output) {
