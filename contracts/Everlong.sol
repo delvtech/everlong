@@ -470,7 +470,6 @@ contract Everlong is IEverlong {
                         .getPoolConfig()
                         .minimumTransactionAmount
                 )
-                // IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount
             ) {
                 // Close part of the position and enforce the slippage guard.
                 // Add the amount of assets received to the total output.
