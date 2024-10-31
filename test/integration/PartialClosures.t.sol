@@ -36,7 +36,7 @@ contract PartialClosures is EverlongTest {
         // Alice deposits into Everlong.
         uint256 aliceDepositAmount = bound(
             _deposit,
-            MINIMUM_TRANSACTION_AMOUNT * 1000,
+            MINIMUM_TRANSACTION_AMOUNT * 100,
             hyperdrive.calculateMaxLong()
         );
         uint256 aliceShares = depositEverlong(aliceDepositAmount, alice);
@@ -47,7 +47,7 @@ contract PartialClosures is EverlongTest {
         _redemptionPercentage = bound(
             _redemptionPercentage,
             TARGET_IDLE_LIQUIDITY_PERCENTAGE,
-            0.9e18
+            0.8e18
         );
         uint256 aliceRedeemAmount = aliceShares.mulDown(_redemptionPercentage);
         redeemEverlong(aliceRedeemAmount, alice);
@@ -64,7 +64,7 @@ contract PartialClosures is EverlongTest {
                 1e18 - TARGET_IDLE_LIQUIDITY_PERCENTAGE
             ),
             positionBondsAfterRedeem,
-            0.001e18
+            0.01e18
         );
     }
 

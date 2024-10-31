@@ -6,6 +6,7 @@ import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMat
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { ERC20 } from "openzeppelin/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import { FixedPointMathLib } from "solady/utils/FixedPointMathLib.sol";
 import { IEverlong } from "./interfaces/IEverlong.sol";
 import { EVERLONG_KIND, EVERLONG_VERSION, ONE } from "./libraries/Constants.sol";
 import { HyperdriveExecutionLibrary } from "./libraries/HyperdriveExecution.sol";
@@ -98,6 +99,12 @@ contract Everlong is IEverlong {
     /// @notice Maximum slippage allowed when closing longs with Hyperdrive.
     /// @dev Represented as a percentage with 1e18 signifying 100%.
     uint256 public constant maxCloseLongSlippage = 0.001e18;
+
+    /// @notice Amount of additional bonds to close during a partial position
+    ///         closure to avoid rounding errors. Represented as a percentage
+    ///         of the positions total  amount of bonds where 0.1e18 represents
+    ///         a 10% buffer.
+    uint256 public constant partialPositionClosureBuffer = 0.001e18;
 
     // ───────────────────────── Immutables ──────────────────────
 
@@ -433,45 +440,40 @@ contract Everlong is IEverlong {
         // position to estimate the amount of bonds to sell for a partial closure.
         IEverlong.Position memory position;
         uint256 totalPositionValue;
-        uint256 expectedValuePerBond;
-        uint256 bondsNeeded;
         while (!_portfolio.isEmpty() && output < _targetOutput) {
             // Retrieve the most mature position.
             position = _portfolio.head();
 
-            // Estimate the value of the entire position, and use it to derive
-            // the expected output per bond.
+            // Calculate the value of the entire position, and use it to derive
+            // the expected output for partial closures.
             totalPositionValue = IHyperdrive(hyperdrive).previewCloseLong(
                 asBase,
                 position,
                 ""
             );
-            expectedValuePerBond = totalPositionValue.mulDivDown(
-                1e18 - maxCloseLongSlippage,
-                position.bondAmount
-            );
-
-            // Calculate the amount of bonds that must be closed.
-            // 
-            // NOTE: Round up to overestimate the amount of bonds.
-            bondsNeeded = (_targetOutput - output).divUp(expectedValuePerBond);
 
             // Close only part of the position if there are sufficient bonds
             // to reach the target output without leaving a small amount left.
             // For this case, the remaining bonds must be worth at least
-            // Hyperdrive's minimum transaction amount or 1% of the target
-            // output, whichever is greater.
+            // Hyperdrive's minimum transaction amount.
             if (
-                position.bondAmount > bondsNeeded &&
-                (position.bondAmount - bondsNeeded).mulUp(
-                    expectedValuePerBond
-                ) >
-                _targetOutput.mulUp(0.01e18).max(
+                totalPositionValue >
+                (_targetOutput -
+                    output +
                     IHyperdrive(hyperdrive)
                         .getPoolConfig()
-                        .minimumTransactionAmount
-                )
+                        .minimumTransactionAmount).mulUp(
+                        1e18 + partialPositionClosureBuffer
+                    )
             ) {
+                // Calculate the amount of bonds to close from the position.
+                uint256 bondsNeeded = uint256(position.bondAmount).mulDivUp(
+                    (_targetOutput - output).mulUp(
+                        1e18 + partialPositionClosureBuffer
+                    ),
+                    totalPositionValue
+                );
+
                 // Close part of the position and enforce the slippage guard.
                 // Add the amount of assets received to the total output.
                 output += IHyperdrive(hyperdrive).closeLong(
@@ -480,7 +482,7 @@ contract Everlong is IEverlong {
                         maturityTime: position.maturityTime,
                         bondAmount: bondsNeeded.toUint128()
                     }),
-                    expectedValuePerBond.mulDown(bondsNeeded),
+                    0,
                     ""
                 );
 
@@ -492,12 +494,11 @@ contract Everlong is IEverlong {
             }
             // Close the entire position.
             else {
-                // Close the entire position and enforce the slippage guard.
-                // Add the amount of assets received to the total output.
+                // Close the entire position and increase the cumulative output.
                 output += IHyperdrive(hyperdrive).closeLong(
                     asBase,
                     position,
-                    expectedValuePerBond.mulDown(position.bondAmount),
+                    0,
                     ""
                 );
 
@@ -518,18 +519,16 @@ contract Everlong is IEverlong {
         if (_portfolio.totalBonds != 0) {
             // NOTE: The maturity time is rounded to the next checkpoint to
             // underestimate the portfolio value.
-            value += IHyperdrive(hyperdrive)
-                .previewCloseLong(
-                    asBase,
-                    IEverlong.Position({
-                        maturityTime: IHyperdrive(hyperdrive)
-                            .getCheckpointIdUp(_portfolio.avgMaturityTime)
-                            .toUint128(),
-                        bondAmount: _portfolio.totalBonds
-                    }),
-                    ""
-                )
-                .mulDown(1e18 - maxCloseLongSlippage);
+            value += IHyperdrive(hyperdrive).previewCloseLong(
+                asBase,
+                IEverlong.Position({
+                    maturityTime: IHyperdrive(hyperdrive)
+                        .getCheckpointIdUp(_portfolio.avgMaturityTime)
+                        .toUint128(),
+                    bondAmount: _portfolio.totalBonds
+                }),
+                ""
+            );
         }
     }
 
