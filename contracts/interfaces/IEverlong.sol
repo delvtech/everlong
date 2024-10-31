@@ -31,7 +31,7 @@ abstract contract IEverlong is
     struct RebalanceOptions {
         /// @notice Limit on the amount of idle to spend on a new position.
         /// @dev A value of zero indicates no limit.
-        uint256 spendingOverride;
+        uint256 spendingLimit;
         /// @notice Minimum amount of bonds to receive when opening a position.
         uint256 minOutput;
         /// @notice Minimum vault share price when opening a position.
@@ -77,14 +77,4 @@ abstract contract IEverlong is
 
     /// @notice Thrown when a redemption results in zero output assets.
     error RedemptionZeroOutput();
-
-    // ── Rebalancing ────────────────────────────────────────────
-
-    /// @notice Thrown when the spending override is below hyperdrive's
-    ///         minimum transaction amount.
-    error SpendingOverrideTooLow();
-
-    /// @notice Thrown when the spending override is above the difference
-    ///         between Everlong's balance and its max idle liquidity.
-    error SpendingOverrideTooHigh();
 }

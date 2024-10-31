@@ -302,7 +302,7 @@ contract TestEverlongPortfolio is EverlongTest {
         // Call rebalance with `positionClosureLimit` set to one.
         rebalance(
             IEverlong.RebalanceOptions({
-                spendingOverride: 0,
+                spendingLimit: 0,
                 minOutput: 0,
                 minVaultSharePrice: 0,
                 positionClosureLimit: 1,
@@ -317,61 +317,39 @@ contract TestEverlongPortfolio is EverlongTest {
         assertTrue(everlong.positionAt(2).maturityTime > block.timestamp);
     }
 
-    /// @dev Tests the functionality of `RebalanceOptions.spendingOverride`.
-    function test_rebalance_options_spendingOverride() external {
+    /// @dev Tests the functionality of `RebalanceOptions.spendingLimit`.
+    function test_rebalance_options_spendingLimit() external {
         // Mint Everlong some assets.
         mintApproveEverlongBaseAsset(address(everlong), 10_000e18);
 
-        // Try rebalancing with too low of a `spendingOverride`.
-        vm.startPrank(everlong.admin());
-        vm.expectRevert(IEverlong.SpendingOverrideTooLow.selector);
-        everlong.rebalance(
+        // Try rebalancing with too low of a `spendingLimit`. No positions
+        // should be created.
+        rebalance(
             IEverlong.RebalanceOptions({
-                spendingOverride: 1,
+                spendingLimit: 1,
                 minOutput: 0,
                 minVaultSharePrice: 0,
                 positionClosureLimit: 0,
                 extraData: ""
             })
         );
-        vm.stopPrank();
+        assertEq(everlong.positionCount(), 0);
 
-        // Try rebalancing with too high of a `spendingOverride`.
-        uint256 balance = IERC20(everlong.asset()).balanceOf(address(everlong));
+        // Try rebalancing with too high of a `spendingLimit`. A position should
+        // be created and idle liquidity should be within 1% of target.
         uint256 targetIdle = everlong.targetIdleLiquidity();
-        vm.startPrank(everlong.admin());
-        vm.expectRevert(IEverlong.SpendingOverrideTooHigh.selector);
-        everlong.rebalance(
+        rebalance(
             IEverlong.RebalanceOptions({
-                spendingOverride: (balance - targetIdle) * 2,
+                spendingLimit: type(uint256).max,
                 minOutput: 0,
                 minVaultSharePrice: 0,
                 positionClosureLimit: 0,
                 extraData: ""
             })
         );
-        vm.stopPrank();
-
-        // Try rebalancing with an acceptable `spendingOverride`.
-        uint256 maxIdle = everlong.maxIdleLiquidity();
-        vm.startPrank(everlong.admin());
-        everlong.rebalance(
-            IEverlong.RebalanceOptions({
-                spendingOverride: (balance - maxIdle) / 2,
-                minOutput: 0,
-                minVaultSharePrice: 0,
-                positionClosureLimit: 0,
-                extraData: ""
-            })
-        );
-        vm.stopPrank();
-
-        // Ensure that after rebalancing, the idle liquidity is still greater
-        // than the maximum.
-        assertGt(
-            IERC20(everlong.asset()).balanceOf(address(everlong)),
-            everlong.maxIdleLiquidity()
-        );
+        uint256 balance = IERC20(everlong.asset()).balanceOf(address(everlong));
+        assertEq(everlong.positionCount(), 1);
+        assertApproxEqRel(balance, targetIdle, 0.01e18);
     }
 
     /// @dev Tests the functionality of `RebalanceOptions.minOutput`.
@@ -383,7 +361,7 @@ contract TestEverlongPortfolio is EverlongTest {
         vm.expectRevert();
         everlong.rebalance(
             IEverlong.RebalanceOptions({
-                spendingOverride: 0,
+                spendingLimit: 0,
                 minOutput: type(uint256).max,
                 minVaultSharePrice: 0,
                 positionClosureLimit: 0,
@@ -401,7 +379,7 @@ contract TestEverlongPortfolio is EverlongTest {
         vm.expectRevert();
         everlong.rebalance(
             IEverlong.RebalanceOptions({
-                spendingOverride: 0,
+                spendingLimit: 0,
                 minOutput: 0,
                 minVaultSharePrice: type(uint256).max,
                 positionClosureLimit: 0,

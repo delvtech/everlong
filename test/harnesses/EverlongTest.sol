@@ -51,7 +51,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
 
     IEverlong.RebalanceOptions internal DEFAULT_REBALANCE_OPTIONS =
         IEverlong.RebalanceOptions({
-            spendingOverride: 0,
+            spendingLimit: 0,
             minOutput: 0,
             minVaultSharePrice: 0,
             positionClosureLimit: 0,
@@ -133,7 +133,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
                 _depositor,
                 false,
                 IEverlong.RebalanceOptions({
-                    spendingOverride: 0,
+                    spendingLimit: 0,
                     minOutput: 0,
                     minVaultSharePrice: 0,
                     positionClosureLimit: 0,
@@ -158,7 +158,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
                 _depositor,
                 _shouldRebalance,
                 IEverlong.RebalanceOptions({
-                    spendingOverride: 0,
+                    spendingLimit: 0,
                     minOutput: 0,
                     minVaultSharePrice: 0,
                     positionClosureLimit: 0,
@@ -232,7 +232,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             _redeemer,
             true,
             IEverlong.RebalanceOptions({
-                spendingOverride: 0,
+                spendingLimit: 0,
                 minOutput: 0,
                 minVaultSharePrice: 0,
                 positionClosureLimit: 0,
@@ -257,7 +257,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             _redeemer,
             _shouldRebalance,
             IEverlong.RebalanceOptions({
-                spendingOverride: 0,
+                spendingLimit: 0,
                 minOutput: 0,
                 minVaultSharePrice: 0,
                 positionClosureLimit: 0,

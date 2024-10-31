@@ -328,43 +328,33 @@ contract Everlong is IEverlong {
             // Calculate how much idle to spend on the position.
             uint256 balance = IERC20(_asset).balanceOf(address(this));
             uint256 target = targetIdleLiquidity();
-            uint256 toSpend = balance - target;
-            if (_options.spendingOverride != 0) {
-                // Spending override must not be less than Hyperdrive's
-                // minimum transaction amount.
-                if (
-                    _options.spendingOverride <
-                    IHyperdrive(hyperdrive)
-                        .getPoolConfig()
-                        .minimumTransactionAmount
-                ) {
-                    revert SpendingOverrideTooLow();
-                }
+            uint256 toSpend = (
+                _options.spendingLimit == 0
+                    ? balance - target
+                    : _options.spendingLimit.min(balance - target)
+            );
 
-                // Spending override must not be greater than the difference
-                // between Everlong's balance and the max idle liquidity.
-                if (_options.spendingOverride > toSpend) {
-                    revert SpendingOverrideTooHigh();
-                }
+            // If spending limit is above hyperdrive's minimum, open a new
+            // position.
+            // Leave an extra wei for the approval to keep the slot warm.
+            if (
+                toSpend >=
+                IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount
+            ) {
+                IERC20(_asset).forceApprove(address(hyperdrive), toSpend + 1);
+                (uint256 maturityTime, uint256 bondAmount) = IHyperdrive(
+                    hyperdrive
+                ).openLong(
+                        asBase,
+                        toSpend,
+                        _options.minOutput,
+                        _options.minVaultSharePrice,
+                        _options.extraData
+                    );
 
-                // Apply the spending override.
-                toSpend = _options.spendingOverride;
+                // Account for the new position in the portfolio.
+                _portfolio.handleOpenPosition(maturityTime, bondAmount);
             }
-
-            // Open a new position. Leave an extra wei for the approval to keep
-            // the slot warm.
-            IERC20(_asset).forceApprove(address(hyperdrive), toSpend + 1);
-            (uint256 maturityTime, uint256 bondAmount) = IHyperdrive(hyperdrive)
-                .openLong(
-                    asBase,
-                    toSpend,
-                    _options.minOutput,
-                    _options.minVaultSharePrice,
-                    _options.extraData
-                );
-
-            // Account for the new position in the portfolio.
-            _portfolio.handleOpenPosition(maturityTime, bondAmount);
         }
 
         // Calculate an updated portfolio value and save it.
