@@ -64,7 +64,7 @@ contract PartialClosures is EverlongTest {
                 1e18 - TARGET_IDLE_LIQUIDITY_PERCENTAGE
             ),
             positionBondsAfterRedeem,
-            0.001e18
+            0.01e18
         );
     }
 

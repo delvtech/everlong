@@ -519,18 +519,16 @@ contract Everlong is IEverlong {
         if (_portfolio.totalBonds != 0) {
             // NOTE: The maturity time is rounded to the next checkpoint to
             // underestimate the portfolio value.
-            value += IHyperdrive(hyperdrive)
-                .previewCloseLong(
-                    asBase,
-                    IEverlong.Position({
-                        maturityTime: IHyperdrive(hyperdrive)
-                            .getCheckpointIdUp(_portfolio.avgMaturityTime)
-                            .toUint128(),
-                        bondAmount: _portfolio.totalBonds
-                    }),
-                    ""
-                )
-                .mulDown(1e18 - maxCloseLongSlippage);
+            value += IHyperdrive(hyperdrive).previewCloseLong(
+                asBase,
+                IEverlong.Position({
+                    maturityTime: IHyperdrive(hyperdrive)
+                        .getCheckpointIdUp(_portfolio.avgMaturityTime)
+                        .toUint128(),
+                    bondAmount: _portfolio.totalBonds
+                }),
+                ""
+            );
         }
     }
 
