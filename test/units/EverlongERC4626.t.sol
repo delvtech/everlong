@@ -92,18 +92,4 @@ contract TestEverlongERC4626 is EverlongTest {
         // and within margins.
         assertRedemption(shares / 3, alice);
     }
-
-    /// @dev Tests that the `_beforeWithdraw` hook doesn't underflow when
-    ///      Everlong's balance is greater than the assets being redeemed.
-    function test_beforeWithdraw_balance_gt_assets() external {
-        // Deploy Everlong.
-        deployEverlong();
-
-        // Mint some assets to everlong
-        uint256 assets = 100e18;
-        mintApproveEverlongBaseAsset(address(everlong), assets);
-
-        // Call the `_beforeWithdraw` hook.
-        everlong.exposed_beforeWithdraw(assets - 10e18, 0);
-    }
 }

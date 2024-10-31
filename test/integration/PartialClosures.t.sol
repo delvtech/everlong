@@ -9,7 +9,7 @@ import { EverlongTest } from "../harnesses/EverlongTest.sol";
 import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
 import { HyperdriveExecutionLibrary } from "../../contracts/libraries/HyperdriveExecution.sol";
 
-contract PartialClosures is EverlongTest {
+contract TestPartialClosures is EverlongTest {
     using FixedPointMath for uint256;
     using Lib for *;
     using HyperdriveUtils for *;

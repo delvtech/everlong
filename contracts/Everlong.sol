@@ -98,7 +98,7 @@ contract Everlong is IEverlong {
 
     /// @notice Maximum slippage allowed when closing longs with Hyperdrive.
     /// @dev Represented as a percentage with 1e18 signifying 100%.
-    uint256 public constant maxCloseLongSlippage = 0.001e18;
+    uint256 public constant maxCloseLongSlippage = 0.0001e18;
 
     /// @notice Amount of additional bonds to close during a partial position
     ///         closure to avoid rounding errors. Represented as a percentage
@@ -236,6 +236,8 @@ contract Everlong is IEverlong {
 
     /// @notice Returns an approximate lower bound on the amount of assets
     ///         received from redeeming the specified amount of shares.
+    /// @dev Losses and gains to the portfolio since the last `_totalAssets`
+    ///      update are applied proportionally.
     /// @param _shares Amount of shares to redeem.
     /// @return assets Amount of assets that will be received.
     function previewRedeem(
@@ -244,36 +246,28 @@ contract Everlong is IEverlong {
         // Convert the share amount to assets.
         assets = convertToAssets(_shares);
 
-        // TODO: Hold the vault share price constant.
-        //
-        // Apply losses incurred by the portfolio.
-        uint256 losses = _calculatePortfolioLosses().mulDivUp(
-            assets,
-            _totalAssets
-        );
-
-        // If the losses from closing immature positions exceeds the assets
-        // owed to the redeemer, set the assets owed to zero.
-        if (losses > assets) {
-            // NOTE: We return zero since `previewRedeem` must not revert.
-            assets = 0;
-        }
-        // Decrement the assets owed to the redeemer by the amount of losses
-        // incurred from closing immature positions.
-        else {
+        // Calculate and apply unrealized portfolio losses.
+        // Losses are rounded up.
+        uint256 lastTotalAssets = _totalAssets;
+        uint256 currentTotalAssets = _calculateTotalAssets();
+        if (_totalAssets > currentTotalAssets) {
             unchecked {
-                assets -= losses;
+                assets -= (lastTotalAssets - currentTotalAssets).mulDivUp(
+                    assets,
+                    lastTotalAssets
+                );
             }
         }
     }
 
-    /// @dev Attempt rebalancing after a deposit if idle is above max.
+    /// @dev Increase Everlong's total assets by the amount deposited.
     function _afterDeposit(uint256 _assets, uint256) internal virtual override {
         // Add the deposit to Everlong's assets.
         _totalAssets += _assets;
     }
 
-    /// @dev Frees sufficient assets for a withdrawal by closing positions.
+    /// @dev Frees sufficient assets for a withdrawal by closing positions and
+    ///      update Everlong's total assets accounting.
     /// @param _assets Amount of assets owed to the withdrawer.
     function _beforeWithdraw(
         uint256 _assets,
@@ -297,9 +291,8 @@ contract Everlong is IEverlong {
             _closePositions(_assets - balance);
         }
 
-        // Recalculate the assets under Everlong control less the amount being
-        // withdrawn.
-        _totalAssets = _calculateTotalAssets() - _assets;
+        // Decrement the assets under Everlong control by withdrawal amount.
+        _totalAssets -= _assets;
     }
 
     // ╭─────────────────────────────────────────────────────────╮
@@ -474,6 +467,10 @@ contract Everlong is IEverlong {
     }
 
     /// @dev Close positions until the targeted amount of output is received.
+    /// @dev It is possible for this function to successfully return without
+    ///      having received the target amount of assets. In practice, this
+    ///      does not occur due to slippage guards and underestimation
+    ///      of Everlong's portfolio value.
     /// @param _targetOutput Target amount of proceeds to receive.
     /// @return output Total output received from closed positions.
     function _closePositions(
@@ -505,6 +502,7 @@ contract Everlong is IEverlong {
 
             // Close only part of the position if there are sufficient bonds
             // to reach the target output without leaving a small amount left.
+            //
             // For this case, the remaining bonds must be worth at least
             // Hyperdrive's minimum transaction amount.
             if (
@@ -583,18 +581,6 @@ contract Everlong is IEverlong {
                 )
                 .mulDown(1e18 - maxCloseLongSlippage);
         }
-    }
-
-    /// @dev Calculates the amount of losses the portfolio has incurred since
-    ///      `_totalAssets` was last calculated. If no losses have been incurred
-    ///      return 0.
-    /// @return Amount of losses incurred by the portfolio (if any).
-    function _calculatePortfolioLosses() internal view returns (uint256) {
-        uint256 newTotalAssets = _calculateTotalAssets();
-        if (_totalAssets > newTotalAssets) {
-            return _totalAssets - newTotalAssets;
-        }
-        return 0;
     }
 
     // ╭─────────────────────────────────────────────────────────╮
