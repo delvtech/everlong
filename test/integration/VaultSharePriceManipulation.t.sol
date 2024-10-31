@@ -385,10 +385,10 @@ contract VaultSharePriceManipulation is EverlongTest {
         }
 
         // Initial deposit is made into everlong.
-        depositEverlong(params.initialDeposit, celine);
+        depositEverlong(params.initialDeposit, celine, true);
 
         // Innocent bystander deposits into everlong.
-        depositEverlong(params.bystanderDeposit, alice);
+        depositEverlong(params.bystanderDeposit, alice, true);
 
         // Attacker opens a short on hyperdrive.
         uint256 bobShortMaturityTime;
@@ -404,13 +404,14 @@ contract VaultSharePriceManipulation is EverlongTest {
         // Attacker deposits into everlong.
         uint256 bobEverlongShares = depositEverlong(
             params.sandwichDeposit,
-            bob
+            bob,
+            true
         );
 
         if (params.timeToCloseShort > 0) {
-            advanceTimeWithCheckpoints(params.timeToCloseShort, VARIABLE_RATE);
+            advanceTimeWithCheckpointsAndRebalancing(params.timeToCloseShort);
             if (everlong.canRebalance()) {
-                everlong.rebalance();
+                everlong.rebalance(DEFAULT_REBALANCE_OPTIONS);
             }
         }
 
@@ -426,29 +427,26 @@ contract VaultSharePriceManipulation is EverlongTest {
         }
 
         if (params.timeToCloseEverlong > 0) {
-            advanceTimeWithCheckpoints(
-                params.timeToCloseEverlong,
-                VARIABLE_RATE
+            advanceTimeWithCheckpointsAndRebalancing(
+                params.timeToCloseEverlong
             );
             if (everlong.canRebalance()) {
-                everlong.rebalance();
+                everlong.rebalance(DEFAULT_REBALANCE_OPTIONS);
             }
         }
 
         // Attacker redeems from everlong.
-        // uint256 bobProceedsEverlong = redeemEverlong(bobEverlongShares, bob);
-        redeemEverlong(bobEverlongShares, bob);
+        redeemEverlong(bobEverlongShares, bob, true);
         if (everlong.canRebalance()) {
-            everlong.rebalance();
+            everlong.rebalance(DEFAULT_REBALANCE_OPTIONS);
         }
 
         if (params.bystanderCloseDelay > 0) {
-            advanceTimeWithCheckpoints(
-                params.bystanderCloseDelay,
-                VARIABLE_RATE
+            advanceTimeWithCheckpointsAndRebalancing(
+                params.bystanderCloseDelay
             );
             if (everlong.canRebalance()) {
-                everlong.rebalance();
+                everlong.rebalance(DEFAULT_REBALANCE_OPTIONS);
             }
         }
 

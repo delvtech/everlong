@@ -4,7 +4,7 @@ pragma solidity 0.8.22;
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
-import { ERC20 } from "openzeppelin/token/ERC20/ERC20.sol";
+import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { FixedPointMathLib } from "solady/utils/FixedPointMathLib.sol";
 import { IEverlong } from "./interfaces/IEverlong.sol";
@@ -74,7 +74,7 @@ contract Everlong is IEverlong {
     using HyperdriveExecutionLibrary for IHyperdrive;
     using Portfolio for Portfolio.State;
     using SafeCast for *;
-    using SafeERC20 for ERC20;
+    using SafeERC20 for IERC20;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Storage                                                 │
@@ -267,17 +267,10 @@ contract Everlong is IEverlong {
         }
     }
 
-    // TODO: Do not rebalance on deposit. This change will require updating
-    //       the test suite as well to perform rebalances when time is advanced.
-    //
     /// @dev Attempt rebalancing after a deposit if idle is above max.
     function _afterDeposit(uint256 _assets, uint256) internal virtual override {
-        // If there is excess liquidity beyond the max, rebalance.
-        if (ERC20(_asset).balanceOf(address(this)) > maxIdleLiquidity()) {
-            rebalance();
-        } else {
-            _totalAssets += _assets;
-        }
+        // Add the deposit to Everlong's assets.
+        _totalAssets += _assets;
     }
 
     /// @dev Frees sufficient assets for a withdrawal by closing positions.
@@ -298,8 +291,8 @@ contract Everlong is IEverlong {
         //
         // If we do not have enough balance to service the withdrawal after
         // closing any matured positions, close more positions.
-        uint256 balance = ERC20(_asset).balanceOf(address(this)) +
-            _closeMaturedPositions();
+        uint256 balance = IERC20(_asset).balanceOf(address(this)) +
+            closeMaturedPositions(type(uint256).max);
         if (_assets > balance) {
             _closePositions(_assets - balance);
         }
@@ -313,35 +306,60 @@ contract Everlong is IEverlong {
     // │ Rebalancing                                             │
     // ╰─────────────────────────────────────────────────────────╯
 
-    // TODO: Handle case where rebalancing would exceed gas limit
-    // TODO: Handle when Hyperdrive has insufficient liquidity.
-    //
     /// @notice Rebalance the everlong portfolio by closing mature positions
     ///         and using the proceeds over target idle to open new positions.
-    function rebalance() public override {
+    /// @dev Errors from hyperdrive are not handled. The keeper must configure
+    ///      the correct parameters to avoid issues with insufficient liquidity
+    ///      and running out of gas from mature position closures.
+    /// @param _options Options to control the rebalance behavior.
+    function rebalance(
+        IEverlong.RebalanceOptions memory _options
+    ) external onlyAdmin {
         // Early return if no rebalancing is needed.
         if (!canRebalance()) {
             return;
         }
 
-        // Calculate the new portfolio value and save it.
-        _totalAssets = _calculateTotalAssets();
-
         // Close matured positions.
-        _closeMaturedPositions();
+        closeMaturedPositions(_options.positionClosureLimit);
 
-        // Amount to spend is the current balance less the target idle.
-        uint256 toSpend = ERC20(_asset).balanceOf(address(this)) -
-            targetIdleLiquidity();
+        // If Everlong has sufficient idle, open a new position.
+        if (canOpenPosition()) {
+            // Calculate how much idle to spend on the position.
+            // A value of 0 for spendingLimit indicates no limit.
+            uint256 balance = IERC20(_asset).balanceOf(address(this));
+            uint256 target = targetIdleLiquidity();
+            uint256 toSpend = (
+                _options.spendingLimit == 0
+                    ? balance - target
+                    : _options.spendingLimit.min(balance - target)
+            );
 
-        // Open a new position. Leave an extra wei for the approval to keep
-        // the slot warm.
-        ERC20(_asset).forceApprove(address(hyperdrive), toSpend + 1);
-        (uint256 maturityTime, uint256 bondAmount) = IHyperdrive(hyperdrive)
-            .openLong(asBase, toSpend, "");
+            // If toSpend is above hyperdrive's minimum, open a new
+            // position.
+            // Leave an extra wei for the approval to keep the slot warm.
+            if (
+                toSpend >=
+                IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount
+            ) {
+                IERC20(_asset).forceApprove(address(hyperdrive), toSpend + 1);
+                (uint256 maturityTime, uint256 bondAmount) = IHyperdrive(
+                    hyperdrive
+                ).openLong(
+                        asBase,
+                        toSpend,
+                        _options.minOutput,
+                        _options.minVaultSharePrice,
+                        _options.extraData
+                    );
 
-        // Account for the new position in the portfolio.
-        _portfolio.handleOpenPosition(maturityTime, bondAmount);
+                // Account for the new position in the portfolio.
+                _portfolio.handleOpenPosition(maturityTime, bondAmount);
+            }
+        }
+
+        // Calculate an updated portfolio value and save it.
+        _totalAssets = _calculateTotalAssets();
 
         emit Rebalanced();
     }
@@ -354,14 +372,21 @@ contract Everlong is IEverlong {
     ///         - The current idle liquidity is above the target.
     /// @return True if the portfolio can be rebalanced, false otherwise.
     function canRebalance() public view returns (bool) {
-        uint256 balance = ERC20(_asset).balanceOf(address(this));
-        uint256 target = targetIdleLiquidity();
-        return (hasMaturedPositions() ||
-            (balance > target &&
-                balance - target >
+        return hasMaturedPositions() || canOpenPosition();
+    }
+
+    /// @notice Returns whether Everlong has sufficient idle liquidity to open
+    ///         a new position.
+    /// @return True if a new position can be opened, false otherwise.
+    function canOpenPosition() public view returns (bool) {
+        uint256 balance = IERC20(_asset).balanceOf(address(this));
+        uint256 max = maxIdleLiquidity();
+        return
+            balance > max &&
+            (balance - max >
                 IHyperdrive(hyperdrive)
                     .getPoolConfig()
-                    .minimumTransactionAmount));
+                    .minimumTransactionAmount);
     }
 
     /// @notice Returns the target amount of funds to keep idle in Everlong.
@@ -403,21 +428,44 @@ contract Everlong is IEverlong {
     // │ Hyperdrive                                              │
     // ╰─────────────────────────────────────────────────────────╯
 
-    /// @dev Close only matured positions in the portfolio.
+    /// @notice Close only matured positions in the portfolio.
+    /// @param _limit The maximum number of positions to close.
+    ///               A value of zero indicates no limit.
     /// @return output Proceeds of closing the matured positions.
-    function _closeMaturedPositions() internal returns (uint256 output) {
+    function closeMaturedPositions(
+        uint256 _limit
+    ) public returns (uint256 output) {
+        // A value of zero for `_limit` indicates no limit.
+        if (_limit == 0) {
+            _limit = type(uint256).max;
+        }
+
+        // Iterate through positions from most to least mature.
+        // Exit if:
+        // - There are no more positions.
+        // - The current position is not mature.
+        // - The limit on closed positions has been reached.
         IEverlong.Position memory position;
-        while (!_portfolio.isEmpty()) {
+        for (uint256 count; !_portfolio.isEmpty() && count < _limit; ++count) {
+            // Retrieve the most mature position.
             position = _portfolio.head();
+
+            // If the position is not mature, return the output received thus
+            // far.
             if (!IHyperdrive(hyperdrive).isMature(position)) {
                 return output;
             }
+
+            // Close the position add the amount of assets received to the
+            // cumulative output.
             output += IHyperdrive(hyperdrive).closeLong(
                 asBase,
                 position,
                 0,
                 ""
             );
+
+            // Update portfolio accounting to reflect the closed position.
             _portfolio.handleClosePosition();
         }
     }
@@ -515,7 +563,7 @@ contract Everlong is IEverlong {
     ///      bonds and the weighted average maturity of all positions.
     /// @return value The present portfolio value.
     function _calculateTotalAssets() internal view returns (uint256 value) {
-        value = ERC20(_asset).balanceOf(address(this));
+        value = IERC20(_asset).balanceOf(address(this));
         if (_portfolio.totalBonds != 0) {
             // NOTE: The maturity time is rounded to the next checkpoint to
             // underestimate the portfolio value.

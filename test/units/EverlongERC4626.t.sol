@@ -33,7 +33,7 @@ contract TestEverlongERC4626 is EverlongTest {
 
         // Deposit into everlong.
         uint256 amount = 250e18;
-        uint256 shares = depositEverlong(amount, alice);
+        uint256 shares = depositEverlong(amount, alice, true);
 
         // Ensure that previewRedeem output is at most equal to actual output
         // and within margins.
@@ -48,7 +48,7 @@ contract TestEverlongERC4626 is EverlongTest {
 
         // Deposit into everlong.
         uint256 amount = 250e18;
-        uint256 shares = depositEverlong(amount, alice);
+        uint256 shares = depositEverlong(amount, alice, true);
 
         // Ensure that previewRedeem output is at most equal to actual output
         // and within margins.
@@ -64,10 +64,10 @@ contract TestEverlongERC4626 is EverlongTest {
 
         // Deposit into everlong.
         uint256 amount = 250e18;
-        uint256 shares = depositEverlong(amount, alice);
+        uint256 shares = depositEverlong(amount, alice, true);
 
         // Fast forward to halfway through maturity.
-        advanceTime(POSITION_DURATION / 2, VARIABLE_RATE);
+        advanceTimeWithCheckpointsAndRebalancing(POSITION_DURATION / 2);
 
         // Ensure that previewRedeem output is at most equal to actual output
         // and within margins.
@@ -83,10 +83,10 @@ contract TestEverlongERC4626 is EverlongTest {
 
         // Deposit into everlong.
         uint256 amount = 250e18;
-        uint256 shares = depositEverlong(amount, alice);
+        uint256 shares = depositEverlong(amount, alice, true);
 
         // Fast forward to halfway through maturity.
-        advanceTime(POSITION_DURATION / 2, VARIABLE_RATE);
+        advanceTimeWithCheckpointsAndRebalancing(POSITION_DURATION / 2);
 
         // Ensure that previewRedeem output is at most equal to actual output
         // and within margins.

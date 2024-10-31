@@ -39,7 +39,7 @@ contract PartialClosures is EverlongTest {
             MINIMUM_TRANSACTION_AMOUNT * 100,
             hyperdrive.calculateMaxLong()
         );
-        uint256 aliceShares = depositEverlong(aliceDepositAmount, alice);
+        uint256 aliceShares = depositEverlong(aliceDepositAmount, alice, true);
         uint256 positionBondsAfterDeposit = everlong.totalBonds();
 
         // Alice redeems a significant enough portion of her shares to require
@@ -89,16 +89,15 @@ contract PartialClosures is EverlongTest {
 
         // Alice deposits into Everlong.
         uint256 aliceDepositAmount = 10_000e18;
-        uint256 aliceShares = depositEverlong(aliceDepositAmount, alice);
+        uint256 aliceShares = depositEverlong(aliceDepositAmount, alice, true);
 
         // Time advances towards the end of the term.
-        advanceTimeWithCheckpoints(
-            POSITION_DURATION.mulDown(0.9e18),
-            VARIABLE_RATE
+        advanceTimeWithCheckpointsAndRebalancing(
+            POSITION_DURATION.mulDown(0.8e18)
         );
 
         // Alice deposits again into Everlong.
-        aliceShares += depositEverlong(aliceDepositAmount, alice);
+        aliceShares += depositEverlong(aliceDepositAmount, alice, true);
 
         // Ensure Everlong has two positions and that the bond prices differ
         // by greater than Everlong's max closeLong slippage.
@@ -121,7 +120,7 @@ contract PartialClosures is EverlongTest {
         // This should succeed.
         uint256 redeemPercentage = 0.75e18;
         uint256 aliceRedeemAmount = aliceShares.mulDown(redeemPercentage);
-        redeemEverlong(aliceRedeemAmount, alice);
+        redeemEverlong(aliceRedeemAmount, alice, true);
 
         // Ensure Everlong has one position left.
         assertEq(everlong.positionCount(), 1);

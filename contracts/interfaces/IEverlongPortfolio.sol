@@ -9,7 +9,15 @@ interface IEverlongPortfolio {
     // ╰─────────────────────────────────────────────────────────╯
 
     /// @notice Rebalances the Everlong bond portfolio if needed.
-    function rebalance() external;
+    /// @param _options Options to control the rebalance behavior.
+    function rebalance(IEverlong.RebalanceOptions memory _options) external;
+
+    /// @notice Closes mature positions in the Everlong portfolio.
+    /// @param _limit The maximum number of positions to close.
+    /// @return output Amount of assets received from the closed positions.
+    function closeMaturedPositions(
+        uint256 _limit
+    ) external returns (uint256 output);
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Getters                                                 │
@@ -34,6 +42,11 @@ interface IEverlongPortfolio {
     /// @notice Determines whether Everlong's portfolio can currently be rebalanced.
     /// @return True if the portfolio can be rebalanced, false otherwise.
     function canRebalance() external view returns (bool);
+
+    /// @notice Returns whether Everlong has sufficient idle liquidity to open
+    ///         a new position.
+    /// @return True if a new position can be opened, false otherwise.
+    function canOpenPosition() external view returns (bool);
 
     /// @notice Returns the target percentage of idle liquidity to maintain.
     /// @dev Expressed as a fraction of ONE.

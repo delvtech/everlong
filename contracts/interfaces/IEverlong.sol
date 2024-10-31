@@ -24,6 +24,25 @@ abstract contract IEverlong is
         uint128 bondAmount;
     }
 
+    // TODO: Revisit position closure limit to see what POSITION_DURATION would
+    //       be needed to run out of gas.
+    //
+    /// @notice Parameters to specify how a rebalance will be performed.
+    struct RebalanceOptions {
+        /// @notice Limit on the amount of idle to spend on a new position.
+        /// @dev A value of zero indicates no limit.
+        uint256 spendingLimit;
+        /// @notice Minimum amount of bonds to receive when opening a position.
+        uint256 minOutput;
+        /// @notice Minimum vault share price when opening a position.
+        uint256 minVaultSharePrice;
+        /// @notice Maximum amount of mature positions that can be closed.
+        /// @dev A value of zero indicates no limit.
+        uint256 positionClosureLimit;
+        /// @notice Passed to hyperdrive `openLong()` and `closeLong()`.
+        bytes extraData;
+    }
+
     // ╭─────────────────────────────────────────────────────────╮
     // │ Getters                                                 │
     // ╰─────────────────────────────────────────────────────────╯

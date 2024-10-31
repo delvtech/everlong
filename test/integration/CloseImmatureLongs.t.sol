@@ -144,10 +144,10 @@ contract CloseImmatureLongs is EverlongTest {
         uint256 basePaid = 10_000e18;
         ERC20Mintable(everlong.asset()).mint(basePaid);
         ERC20Mintable(everlong.asset()).approve(address(everlong), basePaid);
-        uint256 shares = everlong.deposit(basePaid, bob);
+        uint256 shares = depositEverlong(basePaid, bob, true);
 
         // half term passes
-        advanceTimeWithCheckpoints(POSITION_DURATION / 2, variableInterest);
+        advanceTimeWithCheckpointsAndRebalancing(POSITION_DURATION / 2);
 
         // Estimate the proceeds.
         uint256 estimatedProceeds = everlong.previewRedeem(shares);
@@ -155,7 +155,7 @@ contract CloseImmatureLongs is EverlongTest {
         console.log("totalAssets:   %e", everlong.totalAssets());
 
         // Close the long.
-        uint256 baseProceeds = everlong.redeem(shares, bob, bob);
+        uint256 baseProceeds = redeemEverlong(shares, bob, true);
         console.log("actual:    %s", baseProceeds);
         console.log(
             "assets:    %s",
@@ -197,13 +197,13 @@ contract CloseImmatureLongs is EverlongTest {
         );
 
         // Ensure previewRedeem returns zero for a small amount of shares.
-        depositEverlong(_depositAmount, bob);
+        depositEverlong(_depositAmount, bob, true);
         _shareAmount = bound(_shareAmount, 0, 1000);
         uint256 assetsOwed = everlong.previewRedeem(_shareAmount);
         assertEq(assetsOwed, 0);
 
         // Ensure revert when attempting to redeem a small amount of shares.
         vm.expectRevert(IEverlong.RedemptionZeroOutput.selector);
-        redeemEverlong(_shareAmount, bob);
+        redeemEverlong(_shareAmount, bob, true);
     }
 }
