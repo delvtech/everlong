@@ -329,7 +329,7 @@ contract TestEverlongPortfolio is EverlongTest {
                 spendingLimit: 1,
                 minOutput: 0,
                 minVaultSharePrice: 0,
-                positionClosureLimit: 0,
+                positionClosureLimit: 1,
                 extraData: ""
             })
         );

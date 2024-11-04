@@ -19,6 +19,13 @@ interface IEverlongPortfolio {
         uint256 _limit
     ) external returns (uint256 output);
 
+    /// @notice Closes mature positions in the Everlong portfolio.
+    /// @param _limit The maximum number of positions to close.
+    /// @return output Amount of assets received from the closed positions.
+    function closeMaturedPositions(
+        uint256 _limit
+    ) external returns (uint256 output);
+
     // ╭─────────────────────────────────────────────────────────╮
     // │ Getters                                                 │
     // ╰─────────────────────────────────────────────────────────╯

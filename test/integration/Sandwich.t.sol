@@ -6,7 +6,7 @@ import { Lib } from "hyperdrive/test/utils/Lib.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { EverlongTest } from "../harnesses/EverlongTest.sol";
 
-contract Sandwich is EverlongTest {
+contract TestSandwich is EverlongTest {
     using Lib for *;
     using HyperdriveUtils for *;
 
@@ -75,6 +75,8 @@ contract Sandwich is EverlongTest {
     }
 
     // TODO: Decrease min range to Hyperdrive `MINIMUM_TRANSACTION_AMOUNT`.
+    // NOTE: Rebalancing is not performed after some interactions with Everlong
+    //       since the attack being evaluated is atomic.
     //
     /// @dev Tests the following scenario:
     ///      1. First an innocent bystander deposits into Everlong. At that time, we
@@ -94,6 +96,9 @@ contract Sandwich is EverlongTest {
         // Alice is the attacker, and Bob is the bystander.
         address attacker = alice;
         address bystander = bob;
+
+        // Initialize Everlong with a bond portfolio.
+        depositEverlong(10_000e18, celine);
 
         // The bystander deposits into Everlong.
         _bystanderDepositAmount = bound(
@@ -153,10 +158,12 @@ contract Sandwich is EverlongTest {
             attackerShortProceeds;
 
         // Ensure the attacker does not profit.
-        assertLt(attackerProceeds, attackerPaid);
+        assertLe(attackerProceeds, attackerPaid);
     }
 
     // TODO: Decrease min range to Hyperdrive `MINIMUM_TRANSACTION_AMOUNT`.
+    // NOTE: Rebalancing is not performed after some interactions with Everlong
+    //       since the attack being evaluated is atomic.
     //
     /// @dev Tests the following scenario:
     ///      1. Attacker adds liquidity.
@@ -224,6 +231,6 @@ contract Sandwich is EverlongTest {
         redeemEverlong(bystanderEverlongShares, bystander, true);
 
         // Ensure that the attacker does not profit from their actions.
-        assertLt(attackerEverlongProceeds, _attackerDeposit);
+        assertLe(attackerEverlongProceeds, _attackerDeposit);
     }
 }

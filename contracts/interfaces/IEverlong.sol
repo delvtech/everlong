@@ -77,4 +77,14 @@ abstract contract IEverlong is
 
     /// @notice Thrown when a redemption results in zero output assets.
     error RedemptionZeroOutput();
+
+    // ── Rebalancing ────────────────────────────────────────────
+
+    /// @notice Thrown when the spending override is below hyperdrive's
+    ///         minimum transaction amount.
+    error SpendingOverrideTooLow();
+
+    /// @notice Thrown when the spending override is above the difference
+    ///         between Everlong's balance and its max idle liquidity.
+    error SpendingOverrideTooHigh();
 }
