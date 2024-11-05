@@ -16,3 +16,6 @@
 [submodule "lib/tokenized-strategy"]
 	path = lib/tokenized-strategy
 	url = https://github.com/yearn/tokenized-strategy
+[submodule "lib/vault-periphery"]
+	path = lib/vault-periphery
+	url = https://github.com/yearn/vault-periphery
