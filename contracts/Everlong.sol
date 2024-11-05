@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.22;
 
+import { console2 as console } from "forge-std/console2.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
@@ -248,6 +249,9 @@ contract Everlong is IEverlong {
             _totalAssets
         );
 
+        // TODO: Fairly certain we don't need this check since losses are
+        //       distributed.
+        //
         // If the losses from closing immature positions exceeds the assets
         // owed to the redeemer, set the assets owed to zero.
         if (losses > assets) {
@@ -261,6 +265,23 @@ contract Everlong is IEverlong {
                 assets -= losses;
             }
         }
+    }
+
+    /// @notice Returns an approximate lower bound on the amount of shares
+    ///         needed to withdraw the specified amount of assets.
+    /// @param _assets Amount of assets to withdraw.
+    /// @return shares Amount of shares needed for the withdrawal.
+    function previewWithdraw(
+        uint256 _assets
+    ) public view virtual override returns (uint256 shares) {
+        // Apply losses by solving for the amount of pre-loss assets that
+        // after applying losses equals `_assets`.
+        //
+        //  _assets' = _assets / (1 - losses/totalAssets)
+        _assets = _assets.divUp(
+            ONE - _calculatePortfolioLosses().divUp(_totalAssets)
+        );
+        shares = super.previewWithdraw(_assets);
     }
 
     /// @dev Attempt rebalancing after a deposit if idle is above max.

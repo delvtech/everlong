@@ -106,4 +106,29 @@ contract TestEverlongERC4626 is EverlongTest {
         // Call the `_beforeWithdraw` hook.
         everlong.exposed_beforeWithdraw(assets - 10e18, 0);
     }
+
+    // FIXME: Convert into fuzz test
+    function test_previewWithdraw_previewRedeem_parity() external {
+        // Deploy Everlong.
+        deployEverlong();
+
+        uint256 aliceDeposit = 10_0000e18;
+        uint256 aliceShares = depositEverlong(aliceDeposit, alice);
+
+        uint256 bobDeposit = 5_000e18;
+        uint256 bobShares = depositEverlong(bobDeposit, bob);
+
+        redeemEverlong(bobShares, bob);
+
+        openShort(celine, 30_000e18);
+
+        uint256 withdrawalShares = aliceShares / 10;
+        uint256 previewRedeemResult = everlong.previewRedeem(withdrawalShares);
+        uint256 previewWithdrawResult = everlong.previewWithdraw(
+            previewRedeemResult
+        );
+
+        assertGe(previewWithdrawResult, withdrawalShares);
+        assertApproxEqRel(withdrawalShares, previewWithdrawResult, 0.0001e18);
+    }
 }
