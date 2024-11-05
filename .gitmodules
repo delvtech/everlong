@@ -10,3 +10,6 @@
 [submodule "lib/hyperdrive"]
 	path = lib/hyperdrive
 	url = https://github.com/delvtech/hyperdrive
+[submodule "lib/yearn-vaults-v3"]
+	path = lib/yearn-vaults-v3
+	url = https://github.com/yearn/yearn-vaults-v3
