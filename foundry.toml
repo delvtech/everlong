@@ -18,7 +18,8 @@ remappings = [
   'hyperdrive/=lib/hyperdrive',
   'openzeppelin/=lib/openzeppelin-contracts/contracts',
   'solady/=lib/solady/src',
-  'yearn-vaults/=lib/yearn-vaults-v3/contracts',
+  'strategy/=lib/tokenized-strategy/src',
+  'vault/=lib/yearn-vaults-v3/contracts',
 ]
 # gas limit - max u64
 gas_limit = "18446744073709551615"
