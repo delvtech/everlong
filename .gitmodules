@@ -21,4 +21,3 @@
 [submodule "lib/vault-periphery"]
 	path = lib/vault-periphery
 	url = https://github.com/yearn/vault-periphery
-  branch = master
