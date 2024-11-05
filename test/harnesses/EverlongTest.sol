@@ -14,8 +14,8 @@ import { Strategy, ERC20 } from "../../contracts/Strategy.sol";
 import { StrategyFactory } from "../../contracts/StrategyFactory.sol";
 import { IStrategy } from "tokenized-strategy/interfaces/IStrategy.sol";
 import { TokenizedStrategy } from "./TokenizedStrategy.sol";
-import { RoleManagerFactory } from "vault-periphery/managers/RoleManagerFactory.sol";
-import { RoleManager } from "vault-periphery/managers/RoleManager.sol";
+import { IRoleManagerFactory } from "../../contracts/interfaces/IRoleManagerFactory.sol";
+import { IRoleManager } from "../../contracts/interfaces/IRoleManager.sol";
 
 // TODO: Refactor this to include an instance of `Everlong` with exposed internal functions.
 /// @dev Everlong testing harness contract.
@@ -67,9 +67,10 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             extraData: ""
         });
 
-    RoleManagerFactory internal roleManagerFactory =
-        RoleManagerFactory(0xca12459a931643BF28388c67639b3F352fe9e5Ce);
-    RoleManager internal roleManager;
+    IRoleManagerFactory internal roleManagerFactory =
+        IRoleManagerFactory(0xca12459a931643BF28388c67639b3F352fe9e5Ce);
+    IRoleManager internal roleManager;
+    address internal vault;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Hyperdrive Configuration                                │
@@ -155,17 +156,29 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
 
         // Deploy Everlong
         vm.startPrank(deployer);
-        // deployCodeTo(
-        //     "TokenizedStrategy.sol:TokenizedStrategy",
-        //     abi.encode(address(0)),
-        //     0x254A93feff3BEeF9cA004E913bB5443754e8aB19
-        // );
+
+        // Deploy the RoleManager from the RoleManagerFactory.
+        roleManager = IRoleManager(
+            roleManagerFactory.newProject("Everlong", deployer, deployer)
+        );
+
+        // Deploy the Vault from the RoleManager.
+        vault = roleManager.newVault(
+            address(hyperdrive.baseToken()),
+            0,
+            EVERLONG_NAME,
+            EVERLONG_SYMBOL
+        );
+
+        // Deploy the StrategyFactory.
         strategyFactory = new StrategyFactory(
             deployer,
             deployer,
             deployer,
             deployer
         );
+
+        // Deploy the Strategy.
         everlong = EverlongExposed(
             address(
                 strategyFactory.newStrategy(
@@ -177,6 +190,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             )
         );
         IEverlongStrategy(address(everlong)).acceptManagement();
+
         vm.stopPrank();
 
         // Fast forward and accrue some interest.
