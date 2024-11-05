@@ -7,9 +7,11 @@
 [submodule "lib/openzeppelin-contracts"]
 	path = lib/openzeppelin-contracts
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+  branch = v5.1.0
 [submodule "lib/hyperdrive"]
 	path = lib/hyperdrive
 	url = https://github.com/delvtech/hyperdrive
+  branch = v1.0.19
 [submodule "lib/tokenized-strategy"]
 	path = lib/tokenized-strategy
 	url = https://github.com/yearn/tokenized-strategy
@@ -17,6 +19,8 @@
 [submodule "lib/vault-periphery"]
 	path = lib/vault-periphery
 	url = https://github.com/yearn/vault-periphery
+  branch = master
 [submodule "lib/yearn-vaults-v3"]
 	path = lib/yearn-vaults-v3
 	url = https://github.com/yearn/yearn-vaults-v3
+  branch = v3.0.4
