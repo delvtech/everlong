@@ -96,10 +96,6 @@ contract Everlong is IEverlong {
     ///       was picked arbitrarily.
     uint8 public constant decimalsOffset = 3;
 
-    /// @notice Maximum slippage allowed when closing longs with Hyperdrive.
-    /// @dev Represented as a percentage with 1e18 signifying 100%.
-    uint256 public constant maxCloseLongSlippage = 0.001e18;
-
     /// @notice Amount of additional bonds to close during a partial position
     ///         closure to avoid rounding errors. Represented as a percentage
     ///         of the positions total  amount of bonds where 0.1e18 represents

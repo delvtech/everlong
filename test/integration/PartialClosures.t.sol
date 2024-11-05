@@ -9,7 +9,7 @@ import { EverlongTest } from "../harnesses/EverlongTest.sol";
 import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
 import { HyperdriveExecutionLibrary } from "../../contracts/libraries/HyperdriveExecution.sol";
 
-contract PartialClosures is EverlongTest {
+contract TestPartialClosures is EverlongTest {
     using FixedPointMath for uint256;
     using Lib for *;
     using HyperdriveUtils for *;
@@ -50,7 +50,7 @@ contract PartialClosures is EverlongTest {
             0.8e18
         );
         uint256 aliceRedeemAmount = aliceShares.mulDown(_redemptionPercentage);
-        redeemEverlong(aliceRedeemAmount, alice);
+        redeemEverlong(aliceRedeemAmount, alice, false);
         uint256 positionBondsAfterRedeem = everlong.totalBonds();
 
         // Ensure Everlong still has a position open.
@@ -112,7 +112,7 @@ contract PartialClosures is EverlongTest {
             .divDown(newPosition.bondAmount);
         assertGt(
             (oldBondPrice - newBondPrice).divDown(oldBondPrice),
-            everlong.maxCloseLongSlippage()
+            everlong.partialPositionClosureBuffer()
         );
 
         // Alice redeems enough shares to require closing the first and part

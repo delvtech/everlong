@@ -6,7 +6,7 @@ import { Lib } from "hyperdrive/test/utils/Lib.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { EverlongTest } from "../harnesses/EverlongTest.sol";
 
-contract Sandwich is EverlongTest {
+contract TestSandwich is EverlongTest {
     using Lib for *;
     using HyperdriveUtils for *;
 

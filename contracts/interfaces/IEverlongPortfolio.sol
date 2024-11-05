@@ -67,4 +67,11 @@ interface IEverlongPortfolio {
     /// @dev Expressed in assets.
     /// @return The max amount of idle liquidity to maintain.
     function maxIdleLiquidity() external view returns (uint256);
+
+    /// @notice Amount of additional bonds to close during a partial position
+    ///         closure to avoid rounding errors. Represented as a percentage
+    ///         of the positions total  amount of bonds where 0.1e18 represents
+    ///         a 10% buffer.
+    /// @return The buffer for partial position closures.
+    function partialPositionClosureBuffer() external view returns (uint256);
 }
