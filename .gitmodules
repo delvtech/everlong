@@ -17,7 +17,7 @@
 [submodule "lib/tokenized-strategy"]
 	path = lib/tokenized-strategy
 	url = https://github.com/yearn/tokenized-strategy
-  branch = v3.0.3
+  branch = v3.0.4
 [submodule "lib/vault-periphery"]
 	path = lib/vault-periphery
 	url = https://github.com/yearn/vault-periphery

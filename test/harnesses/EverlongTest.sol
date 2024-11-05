@@ -155,11 +155,11 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
 
         // Deploy Everlong
         vm.startPrank(deployer);
-        deployCodeTo(
-            "TokenizedStrategy.sol:TokenizedStrategy",
-            abi.encode(address(0)),
-            0x254A93feff3BEeF9cA004E913bB5443754e8aB19
-        );
+        // deployCodeTo(
+        //     "TokenizedStrategy.sol:TokenizedStrategy",
+        //     abi.encode(address(0)),
+        //     0x254A93feff3BEeF9cA004E913bB5443754e8aB19
+        // );
         strategyFactory = new StrategyFactory(
             deployer,
             deployer,
