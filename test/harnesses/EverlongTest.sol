@@ -8,7 +8,12 @@ import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol";
 import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
+import { IEverlongStrategy } from "../../contracts/interfaces/IEverlongStrategy.sol";
 import { EverlongExposed } from "../exposed/EverlongExposed.sol";
+import { Strategy, ERC20 } from "../../contracts/Strategy.sol";
+import { StrategyFactory } from "../../contracts/StrategyFactory.sol";
+import { IStrategy } from "tokenized-strategy/interfaces/IStrategy.sol";
+import { TokenizedStrategy } from "./TokenizedStrategy.sol";
 
 // TODO: Refactor this to include an instance of `Everlong` with exposed internal functions.
 /// @dev Everlong testing harness contract.
@@ -36,6 +41,8 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     // IHyperdriveGovernedRegistry   registry
     // IHyperdriveCheckpointRewarder checkpointRewarder
     // IHyperdrive                   hyperdrive
+
+    StrategyFactory internal strategyFactory;
 
     /// @dev Everlong instance to test.
     EverlongExposed internal everlong;
@@ -79,6 +86,42 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     // │ Deploy Helpers                                          │
     // ╰─────────────────────────────────────────────────────────╯
 
+    ///// @dev Deploy the Everlong instance with default underlying, name,
+    /////      and symbol.
+    //function deployEverlong() internal {
+    //    // Deploy the hyperdrive instance.
+    //    deploy(
+    //        deployer,
+    //        FIXED_RATE,
+    //        INITIAL_VAULT_SHARE_PRICE,
+    //        CURVE_FEE,
+    //        FLAT_FEE,
+    //        GOVERNANCE_LP_FEE,
+    //        GOVERNANCE_ZOMBIE_FEE
+    //    );
+    //
+    //    // Seed liquidity for the hyperdrive instance.
+    //    if (HYPERDRIVE_INITIALIZER == address(0)) {
+    //        HYPERDRIVE_INITIALIZER = deployer;
+    //    }
+    //    initialize(HYPERDRIVE_INITIALIZER, FIXED_RATE, INITIAL_CONTRIBUTION);
+    //
+    //    vm.startPrank(deployer);
+    //    everlong = new EverlongExposed(
+    //        EVERLONG_NAME,
+    //        EVERLONG_SYMBOL,
+    //        hyperdrive.decimals(),
+    //        address(hyperdrive),
+    //        true,
+    //        TARGET_IDLE_LIQUIDITY_PERCENTAGE,
+    //        MAX_IDLE_LIQUIDITY_PERCENTAGE
+    //    );
+    //    vm.stopPrank();
+    //
+    //    // Fast forward and accrue some interest.
+    //    advanceTimeWithCheckpoints(POSITION_DURATION * 2);
+    //}
+
     /// @dev Deploy the Everlong instance with default underlying, name,
     ///      and symbol.
     function deployEverlong() internal {
@@ -99,16 +142,30 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         }
         initialize(HYPERDRIVE_INITIALIZER, FIXED_RATE, INITIAL_CONTRIBUTION);
 
+        // Deploy Everlong
         vm.startPrank(deployer);
-        everlong = new EverlongExposed(
-            EVERLONG_NAME,
-            EVERLONG_SYMBOL,
-            hyperdrive.decimals(),
-            address(hyperdrive),
-            true,
-            TARGET_IDLE_LIQUIDITY_PERCENTAGE,
-            MAX_IDLE_LIQUIDITY_PERCENTAGE
+        deployCodeTo(
+            "TokenizedStrategy.sol",
+            abi.encode(address(0)),
+            0x254A93feff3BEeF9cA004E913bB5443754e8aB19
         );
+        strategyFactory = new StrategyFactory(
+            deployer,
+            deployer,
+            deployer,
+            deployer
+        );
+        everlong = EverlongExposed(
+            address(
+                strategyFactory.newStrategy(
+                    address(hyperdrive.baseToken()),
+                    EVERLONG_NAME,
+                    address(hyperdrive),
+                    true
+                )
+            )
+        );
+        IEverlongStrategy(address(everlong)).acceptManagement();
         vm.stopPrank();
 
         // Fast forward and accrue some interest.
@@ -208,7 +265,10 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
 
         // Rebalance if specified.
         if (_shouldRebalance) {
-            rebalance(_rebalanceOptions);
+            vm.startPrank(deployer);
+            IStrategy(address(everlong)).tend();
+            vm.stopPrank();
+            // rebalance(_rebalanceOptions);
         }
 
         // Return the amount of shares issued to _depositor for the deposit.
@@ -296,7 +356,10 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
 
         // Rebalance if specified.
         if (_shouldRebalance) {
-            rebalance(_rebalanceOptions);
+            vm.startPrank(deployer);
+            IStrategy(address(everlong)).tend();
+            vm.stopPrank();
+            // rebalance(_rebalanceOptions);
         }
     }
 
@@ -322,8 +385,11 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
 
     /// @dev Call `everlong.rebalance(...)` as the admin with default options.
     function rebalance() internal virtual {
-        vm.startPrank(everlong.admin());
-        everlong.rebalance(DEFAULT_REBALANCE_OPTIONS);
+        // vm.startPrank(everlong.admin());
+        // everlong.rebalance(DEFAULT_REBALANCE_OPTIONS);
+        // vm.stopPrank();
+        vm.startPrank(deployer);
+        IStrategy(address(everlong)).tend();
         vm.stopPrank();
     }
 
@@ -332,8 +398,11 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     function rebalance(
         IEverlong.RebalanceOptions memory _options
     ) internal virtual {
-        vm.startPrank(everlong.admin());
-        everlong.rebalance(_options);
+        // vm.startPrank(everlong.admin());
+        // everlong.rebalance(_options);
+        // vm.stopPrank();
+        vm.startPrank(deployer);
+        IStrategy(address(everlong)).tend();
         vm.stopPrank();
     }
 

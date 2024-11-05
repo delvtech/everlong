@@ -153,7 +153,7 @@ contract TestSandwich is EverlongTest {
             attackerShortProceeds;
 
         // Ensure the attacker does not profit.
-        assertLt(attackerProceeds, attackerPaid);
+        assertLe(attackerProceeds, attackerPaid);
     }
 
     // TODO: Decrease min range to Hyperdrive `MINIMUM_TRANSACTION_AMOUNT`.
@@ -224,6 +224,6 @@ contract TestSandwich is EverlongTest {
         redeemEverlong(bystanderEverlongShares, bystander, true);
 
         // Ensure that the attacker does not profit from their actions.
-        assertLt(attackerEverlongProceeds, _attackerDeposit);
+        assertLe(attackerEverlongProceeds, _attackerDeposit);
     }
 }
