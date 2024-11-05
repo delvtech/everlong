@@ -20,7 +20,6 @@ remappings = [
   'solady/=lib/solady/src',
   'tokenized-strategy/=lib/tokenized-strategy/src',
   'vault-periphery/=lib/vault-periphery/src',
-  'yearn-vaults-v3/=lib/yearn-vaults-v3/contracts',
 ]
 # gas limit - max u64
 gas_limit = "18446744073709551615"

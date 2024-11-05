@@ -10,14 +10,10 @@
 [submodule "lib/hyperdrive"]
 	path = lib/hyperdrive
 	url = https://github.com/delvtech/hyperdrive
-[submodule "lib/yearn-vaults-v3"]
-	path = lib/yearn-vaults-v3
-	url = https://github.com/yearn/yearn-vaults-v3
-  branch = v3.0.3
 [submodule "lib/tokenized-strategy"]
 	path = lib/tokenized-strategy
 	url = https://github.com/yearn/tokenized-strategy
-  branch = v3.0.3
+  branch = v3.0.4
 [submodule "lib/vault-periphery"]
 	path = lib/vault-periphery
 	url = https://github.com/yearn/vault-periphery
