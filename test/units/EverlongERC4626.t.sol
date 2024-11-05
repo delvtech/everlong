@@ -62,6 +62,8 @@ contract TestEverlongERC4626 is EverlongTest {
         // Deploy the everlong instance.
         deployEverlong();
 
+        console.log("address: %s", everlong.asset());
+
         // Deposit into everlong.
         uint256 amount = 250e18;
         uint256 shares = depositEverlong(amount, alice, true);
