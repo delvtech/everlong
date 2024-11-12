@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.22;
 
+import { console2 as console } from "forge-std/console2.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
@@ -49,21 +50,11 @@ contract Strategy is BaseStrategy {
         asBase = _asBase;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                NEEDED TO BE OVERRIDDEN BY STRATEGIST
-    //////////////////////////////////////////////////////////////*/
+    // ╭─────────────────────────────────────────────────────────╮
+    // │ STRATEGY OVERRIDES                                      │
+    // ╰─────────────────────────────────────────────────────────╯
 
-    /**
-     * @dev Can deploy up to '_amount' of 'asset' in the yield source.
-     *
-     * This function is called at the end of a {deposit} or {mint}
-     * call. Meaning that unless a whitelist is implemented it will
-     * be entirely permissionless and thus can be sandwiched or otherwise
-     * manipulated.
-     *
-     * @param _amount The amount of 'asset' that the strategy can attempt
-     * to deposit in the yield source.
-     */
+    /// @inheritdoc BaseStrategy
     function _deployFunds(uint256 _amount) internal override {
         // If amount to spend is above hyperdrive's minimum, open a new
         // position.
@@ -81,27 +72,7 @@ contract Strategy is BaseStrategy {
         }
     }
 
-    /**
-     * @dev Should attempt to free the '_amount' of 'asset'.
-     *
-     * NOTE: The amount of 'asset' that is already loose has already
-     * been accounted for.
-     *
-     * This function is called during {withdraw} and {redeem} calls.
-     * Meaning that unless a whitelist is implemented it will be
-     * entirely permissionless and thus can be sandwiched or otherwise
-     * manipulated.
-     *
-     * Should not rely on asset.balanceOf(address(this)) calls other than
-     * for diff accounting purposes.
-     *
-     * Any difference between `_amount` and what is actually freed will be
-     * counted as a loss and passed on to the withdrawer. This means
-     * care should be taken in times of illiquidity. It may be better to revert
-     * if withdraws are simply illiquid so not to realize incorrect losses.
-     *
-     * @param _amount, The amount of 'asset' to be freed.
-     */
+    /// @inheritdoc BaseStrategy
     function _freeFunds(uint256 _amount) internal override {
         uint256 output = _closeMaturedPositions(0);
         if (_amount > output) {
@@ -109,139 +80,30 @@ contract Strategy is BaseStrategy {
         }
     }
 
-    /**
-     * @dev Internal function to harvest all rewards, redeploy any idle
-     * funds and return an accurate accounting of all funds currently
-     * held by the Strategy.
-     *
-     * This should do any needed harvesting, rewards selling, accrual,
-     * redepositing etc. to get the most accurate view of current assets.
-     *
-     * NOTE: All applicable assets including loose assets should be
-     * accounted for in this function.
-     *
-     * Care should be taken when relying on oracles or swap values rather
-     * than actual amounts as all Strategy profit/loss accounting will
-     * be done based on this returned value.
-     *
-     * This can still be called post a shutdown, a strategist can check
-     * `TokenizedStrategy.isShutdown()` to decide if funds should be
-     * redeployed or simply realize any profits/losses.
-     *
-     * @return _totalAssets A trusted and accurate account for the total
-     * amount of 'asset' the strategy currently holds including idle funds.
-     */
+    /// @inheritdoc BaseStrategy
     function _harvestAndReport()
         internal
         override
         returns (uint256 _totalAssets)
     {
-        // TODO: Implement harvesting logic and accurate accounting EX:
-        //
-        //      if(!TokenizedStrategy.isShutdown()) {
-        //          _claimAndSellRewards();
-        //      }
-        //      _totalAssets = aToken.balanceOf(address(this)) + asset.balanceOf(address(this));
-        //
         _closeMaturedPositions(0);
         _totalAssets = _calculateTotalAssets();
     }
 
-    /*//////////////////////////////////////////////////////////////
-                    OPTIONAL TO OVERRIDE BY STRATEGIST
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Gets the max amount of `asset` that can be withdrawn.
-     * @dev Defaults to an unlimited amount for any address. But can
-     * be overridden by strategists.
-     *
-     * This function will be called before any withdraw or redeem to enforce
-     * any limits desired by the strategist. This can be used for illiquid
-     * or sandwichable strategies.
-     *
-     *   EX:
-     *       return asset.balanceOf(yieldSource);
-     *
-     * This does not need to take into account the `_owner`'s share balance
-     * or conversion rates from shares to assets.
-     *
-     * @param . The address that is withdrawing from the strategy.
-     * @return . The available amount that can be withdrawn in terms of `asset`
-     */
-    // function availableWithdrawLimit(
-    //     address /*_owner*/
-    // ) public view override returns (uint256) {
-    //     // NOTE: Withdraw limitations such as liquidity constraints should be accounted for HERE
-    //     //  rather than _freeFunds in order to not count them as losses on withdraws.
-    //
-    //     // TODO: If desired implement withdraw limit logic and any needed state variables.
-    //
-    //     // EX:
-    //     // if(yieldSource.notShutdown()) {
-    //     //    return asset.balanceOf(address(this)) + asset.balanceOf(yieldSource);
-    //     // }
-    //
-    //     return
-    //         IHyperdrive(IEverlong(address(asset)).hyperdrive())
-    //             .calculateMaxLong();
-    // }
-
-    /**
-     * @notice Gets the max amount of `asset` that an address can deposit.
-     * @dev Defaults to an unlimited amount for any address. But can
-     * be overridden by strategists.
-     *
-     * This function will be called before any deposit or mints to enforce
-     * any limits desired by the strategist. This can be used for either a
-     * traditional deposit limit or for implementing a whitelist etc.
-     *
-     *   EX:
-     *      if(isAllowed[_owner]) return super.availableDepositLimit(_owner);
-     *
-     * This does not need to take into account any conversion rates
-     * from shares to assets. But should know that any non max uint256
-     * amounts may be converted to shares. So it is recommended to keep
-     * custom amounts low enough as not to cause overflow when multiplied
-     * by `totalSupply`.
-     *
-     * @param . The address that is depositing into the strategy.
-     * @return . The available amount the `_owner` can deposit in terms of `asset`
-     *
-     */
+    /// @inheritdoc BaseStrategy
     function availableDepositLimit(
         address
     ) public view override returns (uint256) {
-        // TODO: If desired Implement deposit limit logic and any needed state variables .
-
-        // EX:
-        //     uint256 totalAssets = TokenizedStrategy.totalAssets();
-        //     return totalAssets >= depositLimit ? 0 : depositLimit - totalAssets;
-        return IHyperdrive(hyperdrive).calculateMaxLong();
+        // return IHyperdrive(hyperdrive).calculateMaxLong();
+        return type(uint256).max - 1;
     }
 
-    /**
-     * @dev Optional function for strategist to override that can
-     *  be called in between reports.
-     *
-     * If '_tend' is used tendTrigger() will also need to be overridden.
-     *
-     * This call can only be called by a permissioned role so may be
-     * through protected relays.
-     *
-     * This can be used to harvest and compound rewards, deposit idle funds,
-     * perform needed position maintenance or anything else that doesn't need
-     * a full report for.
-     *
-     *   EX: A strategy that can not deposit funds without getting
-     *       sandwiched can use the tend when a certain threshold
-     *       of idle to totalAssets has been reached.
-     *
-     * This will have no effect on PPS of the strategy till report() is called.
-     *
-     * @param _totalIdle The current amount of idle funds that are available to deploy.
-     *
-     */
+    /// @inheritdoc BaseStrategy
+    function _tendTrigger() internal view override returns (bool) {
+        return canRebalance();
+    }
+
+    /// @inheritdoc BaseStrategy
     function _tend(uint256 _totalIdle) internal override {
         // Early return if no rebalancing is needed.
         if (!canRebalance()) {
@@ -432,7 +294,7 @@ contract Strategy is BaseStrategy {
         value = ERC20(asset).balanceOf(address(this));
         if (_portfolio.totalBonds != 0) {
             // NOTE: The maturity time is rounded to the next checkpoint to
-            // underestimate the portfolio value.
+            //       underestimate the portfolio value.
             value += IHyperdrive(hyperdrive).previewCloseLong(
                 asBase,
                 IEverlong.Position({
@@ -446,45 +308,18 @@ contract Strategy is BaseStrategy {
         }
     }
 
-    /**
-     * @dev Optional trigger to override if tend() will be used by the strategy.
-     * This must be implemented if the strategy hopes to invoke _tend().
-     *
-     * @return . Should return true if tend() should be called by keeper or false if not.
-     *
-     */
-    function _tendTrigger() internal view override returns (bool) {
-        return IEverlong(address(asset)).canRebalance();
+    /// @notice Retrieve the position at the specified location in the queue.
+    /// @param _index Index in the queue to retrieve the position.
+    /// @return The position at the specified location.
+    function positionAt(
+        uint256 _index
+    ) external view returns (IEverlong.Position memory) {
+        return _portfolio.at(_index);
     }
 
-    /**
-     * @dev Optional function for a strategist to override that will
-     * allow management to manually withdraw deployed funds from the
-     * yield source if a strategy is shutdown.
-     *
-     * This should attempt to free `_amount`, noting that `_amount` may
-     * be more than is currently deployed.
-     *
-     * NOTE: This will not realize any profits or losses. A separate
-     * {report} will be needed in order to record any profit/loss. If
-     * a report may need to be called after a shutdown it is important
-     * to check if the strategy is shutdown during {_harvestAndReport}
-     * so that it does not simply re-deploy all funds that had been freed.
-     *
-     * EX:
-     *   if(freeAsset > 0 && !TokenizedStrategy.isShutdown()) {
-     *       depositFunds...
-     *    }
-     *
-     * @param _amount The amount of asset to attempt to free.
-     *
-    function _emergencyWithdraw(uint256 _amount) internal override {
-        TODO: If desired implement simple logic to free deployed funds.
-
-        EX:
-            _amount = min(_amount, aToken.balanceOf(address(this)));
-            _freeFunds(_amount);
+    /// @notice Returns how many positions are currently in the queue.
+    /// @return The queue's position count.
+    function positionCount() external view returns (uint256) {
+        return _portfolio.positionCount();
     }
-
-    */
 }

@@ -16,6 +16,12 @@ import { IStrategy } from "tokenized-strategy/interfaces/IStrategy.sol";
 import { TokenizedStrategy } from "./TokenizedStrategy.sol";
 import { IRoleManagerFactory } from "../../contracts/interfaces/IRoleManagerFactory.sol";
 import { IRoleManager } from "../../contracts/interfaces/IRoleManager.sol";
+import { IVault } from "yearn-vaults-v3/interfaces/IVault.sol";
+import { Roles } from "yearn-vaults-v3/interfaces/Roles.sol";
+import { IVaultFactory } from "yearn-vaults-v3/interfaces/IVaultFactory.sol";
+import { DebtAllocator } from "vault-periphery/debtAllocators/DebtAllocator.sol";
+import { Registry } from "vault-periphery/registry/Registry.sol";
+import { ReleaseRegistry } from "vault-periphery/registry/ReleaseRegistry.sol";
 
 // TODO: Refactor this to include an instance of `Everlong` with exposed internal functions.
 /// @dev Everlong testing harness contract.
@@ -67,10 +73,19 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             extraData: ""
         });
 
+    // ── YEARN ──────────────────────────────────────────────────
+
     IRoleManagerFactory internal roleManagerFactory =
         IRoleManagerFactory(0xca12459a931643BF28388c67639b3F352fe9e5Ce);
+    IVaultFactory internal vaultFactory =
+        IVaultFactory(0x770D0d1Fb036483Ed4AbB6d53c1C88fb277D812F); // v3.0.4 vault factory
+    // IVaultFactory internal vaultFactory =
+    //     IVaultFactory(0x444045c5C13C246e117eD36437303cac8E250aB0); // v3.0.2 vault factory
     IRoleManager internal roleManager;
-    address internal vault;
+    DebtAllocator internal debtAllocator;
+    Registry internal yearnRegistry;
+    IVault internal vault;
+    IEverlongStrategy internal strategy;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ Hyperdrive Configuration                                │
@@ -133,6 +148,17 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     //    // Fast forward and accrue some interest.
     //    advanceTimeWithCheckpoints(POSITION_DURATION * 2);
     //}
+    //
+
+    /// @dev Deploy the yearn vault RoleManager and store the addresses of all
+    ///      the components.
+    function deployRoleManager() internal {
+        roleManager = IRoleManager(
+            roleManagerFactory.newProject("Everlong", deployer, deployer)
+        );
+        debtAllocator = DebtAllocator(roleManager.getDebtAllocator());
+        yearnRegistry = Registry(roleManager.getRegistry());
+    }
 
     /// @dev Deploy the Everlong instance with default underlying, name,
     ///      and symbol.
@@ -158,16 +184,15 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         vm.startPrank(deployer);
 
         // Deploy the RoleManager from the RoleManagerFactory.
-        roleManager = IRoleManager(
-            roleManagerFactory.newProject("Everlong", deployer, deployer)
-        );
-
-        // Deploy the Vault from the RoleManager.
-        vault = roleManager.newVault(
-            address(hyperdrive.baseToken()),
-            0,
-            EVERLONG_NAME,
-            EVERLONG_SYMBOL
+        deployRoleManager();
+        vault = IVault(
+            // Deploy the Vault from the RoleManager.
+            roleManager.newVault(
+                address(hyperdrive.baseToken()),
+                0,
+                EVERLONG_NAME,
+                EVERLONG_SYMBOL
+            )
         );
 
         // Deploy the StrategyFactory.
@@ -179,7 +204,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         );
 
         // Deploy the Strategy.
-        everlong = EverlongExposed(
+        strategy = IEverlongStrategy(
             address(
                 strategyFactory.newStrategy(
                     address(hyperdrive.baseToken()),
@@ -189,12 +214,70 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
                 )
             )
         );
-        IEverlongStrategy(address(everlong)).acceptManagement();
+
+        // Add the Strategy to the Vault.
+        debtAllocator.setMinimumWait(1);
+        debtAllocator.setMinimumChange(address(vault), 1);
+        debtAllocator.setStrategyDebtRatio(
+            address(vault),
+            address(strategy),
+            10_000
+        );
+
+        console.log(
+            "Latest Vault: %s",
+            roleManager.latestVault(address(hyperdrive.baseToken()))
+        );
+
+        // Set the Everlong variable.
+        everlong = EverlongExposed(address(vault));
 
         vm.stopPrank();
 
         // Fast forward and accrue some interest.
         advanceTimeWithCheckpoints(POSITION_DURATION * 2);
+
+        console.log(
+            "Vault Balance: %e",
+            ERC20Mintable(everlong.asset()).balanceOf(address(everlong))
+        );
+        console.log(
+            "Strategy Balance: %e",
+            ERC20Mintable(everlong.asset()).balanceOf(address(strategy))
+        );
+
+        depositEverlong(10_000e18, alice, true);
+
+        console.log(
+            "Vault Balance: %e",
+            ERC20Mintable(everlong.asset()).balanceOf(address(everlong))
+        );
+        console.log(
+            "Strategy Balance: %e",
+            ERC20Mintable(everlong.asset()).balanceOf(address(strategy))
+        );
+
+        vm.warp(block.timestamp + 1 days);
+        vm.prank(deployer);
+        debtAllocator.update_debt(address(vault), address(strategy), 10_000e18);
+        revert("ahh");
+
+        console.log(
+            "Vault Balance: %e",
+            ERC20Mintable(everlong.asset()).balanceOf(address(everlong))
+        );
+        console.log(
+            "Strategy Balance: %e",
+            ERC20Mintable(everlong.asset()).balanceOf(address(strategy))
+        );
+
+        vm.prank(deployer);
+        debtAllocator.update_debt(address(vault), address(strategy), 10_000e18);
+
+        console.log(
+            "Balance: %e",
+            ERC20Mintable(everlong.asset()).balanceOf(address(hyperdrive))
+        );
     }
 
     // ╭─────────────────────────────────────────────────────────╮
@@ -291,7 +374,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         // Rebalance if specified.
         if (_shouldRebalance) {
             vm.startPrank(deployer);
-            IStrategy(address(everlong)).tend();
+            strategy.tend();
             vm.stopPrank();
             // rebalance(_rebalanceOptions);
         }
@@ -382,7 +465,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         // Rebalance if specified.
         if (_shouldRebalance) {
             vm.startPrank(deployer);
-            IStrategy(address(everlong)).tend();
+            strategy.tend();
             vm.stopPrank();
             // rebalance(_rebalanceOptions);
         }
@@ -414,7 +497,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         // everlong.rebalance(DEFAULT_REBALANCE_OPTIONS);
         // vm.stopPrank();
         vm.startPrank(deployer);
-        IStrategy(address(everlong)).tend();
+        strategy.tend();
         vm.stopPrank();
     }
 
@@ -427,7 +510,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         // everlong.rebalance(_options);
         // vm.stopPrank();
         vm.startPrank(deployer);
-        IStrategy(address(everlong)).tend();
+        strategy.tend();
         vm.stopPrank();
     }
 

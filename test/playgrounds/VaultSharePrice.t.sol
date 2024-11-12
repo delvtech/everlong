@@ -18,7 +18,7 @@ contract TestVaultSharePrice is EverlongTest {
 
     function test_vault_share_price_deposit_redeem() external {
         // Skip this test unless disabled manually.
-        vm.skip(true);
+        // vm.skip(true);
 
         deployEverlong();
 
@@ -41,7 +41,7 @@ contract TestVaultSharePrice is EverlongTest {
 
         // Celine makes a deposit.
         uint256 celineDeposit = 10_000e18;
-        uint256 celineShares = depositEverlong(celineDeposit, celine);
+        uint256 celineShares = depositEverlong(celineDeposit, celine, true);
         console.log(
             "Vault Share Price 3: %e",
             everlong.totalAssets().divDown(everlong.totalSupply())

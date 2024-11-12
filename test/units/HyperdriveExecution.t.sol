@@ -20,10 +20,6 @@ contract TestHyperdriveExecution is EverlongTest {
 
     Portfolio.State public portfolio;
 
-    function setUp() public virtual override {
-        super.setUp();
-    }
-
     function test_previewOpenLong() external {
         // Deploy the everlong instance.
         deployEverlong();
