@@ -16,8 +16,8 @@ contract TestSandwich is EverlongTest {
         uint256 _attackerDepositAmount,
         uint256 _bystanderDepositAmount
     ) external {
-        TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0;
-        MAX_IDLE_LIQUIDITY_PERCENTAGE = 0;
+        TARGET_IDLE_LIQUIDITY_BASIS_POINTS = 0;
+        MIN_IDLE_LIQUIDITY_BASIS_POINTS = 0;
         deployEverlong();
         sandwich_short_instant(
             _shortAmount,
@@ -32,8 +32,8 @@ contract TestSandwich is EverlongTest {
         uint256 _attackerDepositAmount,
         uint256 _bystanderDepositAmount
     ) external {
-        TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0.1e18;
-        MAX_IDLE_LIQUIDITY_PERCENTAGE = 0.2e18;
+        TARGET_IDLE_LIQUIDITY_BASIS_POINTS = 1_000;
+        MIN_IDLE_LIQUIDITY_BASIS_POINTS = 2_000;
         deployEverlong();
         sandwich_short_instant(
             _shortAmount,
@@ -48,8 +48,8 @@ contract TestSandwich is EverlongTest {
         uint256 _attackerDepositAmount,
         uint256 _bystanderDepositAmount
     ) external {
-        TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0;
-        MAX_IDLE_LIQUIDITY_PERCENTAGE = 0;
+        TARGET_IDLE_LIQUIDITY_BASIS_POINTS = 0;
+        MIN_IDLE_LIQUIDITY_BASIS_POINTS = 0;
         deployEverlong();
         sandwich_lp_instant(
             _lpDeposit,
@@ -64,8 +64,8 @@ contract TestSandwich is EverlongTest {
         uint256 _attackerDepositAmount,
         uint256 _bystanderDepositAmount
     ) external {
-        TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0.1e18;
-        MAX_IDLE_LIQUIDITY_PERCENTAGE = 0.2e18;
+        TARGET_IDLE_LIQUIDITY_BASIS_POINTS = 1_000;
+        MIN_IDLE_LIQUIDITY_BASIS_POINTS = 2_000;
         deployEverlong();
         sandwich_lp_instant(
             _lpDeposit,
@@ -101,7 +101,7 @@ contract TestSandwich is EverlongTest {
             MINIMUM_TRANSACTION_AMOUNT * 5,
             hyperdrive.calculateMaxLong() / 3
         );
-        uint256 bystanderShares = depositEverlong(
+        uint256 bystanderShares = depositStrategy(
             _bystanderDepositAmount,
             bystander,
             true
@@ -124,7 +124,7 @@ contract TestSandwich is EverlongTest {
             MINIMUM_TRANSACTION_AMOUNT * 5,
             hyperdrive.calculateMaxLong() / 3
         );
-        uint256 attackerShares = depositEverlong(
+        uint256 attackerShares = depositStrategy(
             _attackerDepositAmount,
             attacker,
             true
@@ -138,14 +138,14 @@ contract TestSandwich is EverlongTest {
         );
 
         // The attacker redeems their Everlong shares.
-        uint256 attackerEverlongProceeds = redeemEverlong(
+        uint256 attackerEverlongProceeds = redeemStrategy(
             attackerShares,
             attacker,
             true
         );
 
         // The bystander redeems their Everlong shares.
-        redeemEverlong(bystanderShares, bystander, true);
+        redeemStrategy(bystanderShares, bystander, true);
 
         // Calculate the amount paid and the proceeds for the attacker.
         uint256 attackerPaid = _attackerDepositAmount + attackerShortBasePaid;
@@ -188,7 +188,7 @@ contract TestSandwich is EverlongTest {
             MINIMUM_TRANSACTION_AMOUNT * 5,
             hyperdrive.calculateMaxLong() / 3
         );
-        uint256 bystanderEverlongShares = depositEverlong(
+        uint256 bystanderEverlongShares = depositStrategy(
             _bystanderDeposit,
             bystander,
             true
@@ -200,7 +200,7 @@ contract TestSandwich is EverlongTest {
             MINIMUM_TRANSACTION_AMOUNT * 5,
             hyperdrive.calculateMaxLong() / 3
         );
-        uint256 attackerEverlongShares = depositEverlong(
+        uint256 attackerEverlongShares = depositStrategy(
             _attackerDeposit,
             attacker,
             true
@@ -210,7 +210,7 @@ contract TestSandwich is EverlongTest {
         removeLiquidity(attacker, attackerLPShares);
 
         // The attacker redeems from Everlong.
-        uint256 attackerEverlongProceeds = redeemEverlong(
+        uint256 attackerEverlongProceeds = redeemStrategy(
             attackerEverlongShares,
             attacker,
             true
@@ -221,7 +221,7 @@ contract TestSandwich is EverlongTest {
         // While not needed for the assertion below, it's included to ensure
         // that the attack does not prevent the bystander from redeeming their
         // shares.
-        redeemEverlong(bystanderEverlongShares, bystander, true);
+        redeemStrategy(bystanderEverlongShares, bystander, true);
 
         // Ensure that the attacker does not profit from their actions.
         assertLe(attackerEverlongProceeds, _attackerDeposit);

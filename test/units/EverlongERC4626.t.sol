@@ -17,9 +17,9 @@ contract TestEverlongERC4626 is EverlongTest {
         uint256 _shares,
         address _redeemer
     ) public returns (uint256 assets) {
-        uint256 preview = everlong.previewRedeem(_shares);
+        uint256 preview = vault.previewRedeem(_shares);
         vm.startPrank(_redeemer);
-        assets = everlong.redeem(_shares, _redeemer, _redeemer);
+        assets = vault.redeem(_shares, _redeemer, _redeemer);
         vm.stopPrank();
         assertLe(preview, assets);
         assertApproxEqAbs(preview, assets, 1e9);
@@ -33,7 +33,7 @@ contract TestEverlongERC4626 is EverlongTest {
 
         // Deposit into everlong.
         uint256 amount = 250e18;
-        uint256 shares = depositEverlong(amount, alice, true);
+        uint256 shares = depositStrategy(amount, alice, true);
 
         // Ensure that previewRedeem output is at most equal to actual output
         // and within margins.
@@ -48,7 +48,7 @@ contract TestEverlongERC4626 is EverlongTest {
 
         // Deposit into everlong.
         uint256 amount = 250e18;
-        uint256 shares = depositEverlong(amount, alice, true);
+        uint256 shares = depositStrategy(amount, alice, true);
 
         // Ensure that previewRedeem output is at most equal to actual output
         // and within margins.
@@ -64,7 +64,7 @@ contract TestEverlongERC4626 is EverlongTest {
 
         // Deposit into everlong.
         uint256 amount = 250e18;
-        uint256 shares = depositEverlong(amount, alice, true);
+        uint256 shares = depositStrategy(amount, alice, true);
 
         // Fast forward to halfway through maturity.
         advanceTimeWithCheckpointsAndRebalancing(POSITION_DURATION / 2);
@@ -83,7 +83,7 @@ contract TestEverlongERC4626 is EverlongTest {
 
         // Deposit into everlong.
         uint256 amount = 250e18;
-        uint256 shares = depositEverlong(amount, alice, true);
+        uint256 shares = depositStrategy(amount, alice, true);
 
         // Fast forward to halfway through maturity.
         advanceTimeWithCheckpointsAndRebalancing(POSITION_DURATION / 2);
@@ -93,38 +93,24 @@ contract TestEverlongERC4626 is EverlongTest {
         assertRedemption(shares / 3, alice);
     }
 
-    /// @dev Tests that the `_beforeWithdraw` hook doesn't underflow when
-    ///      Everlong's balance is greater than the assets being redeemed.
-    function test_beforeWithdraw_balance_gt_assets() external {
-        // Deploy Everlong.
-        deployEverlong();
-
-        // Mint some assets to everlong
-        uint256 assets = 100e18;
-        mintApproveEverlongBaseAsset(address(everlong), assets);
-
-        // Call the `_beforeWithdraw` hook.
-        everlong.exposed_beforeWithdraw(assets - 10e18, 0);
-    }
-
     // FIXME: Convert into fuzz test
     function test_previewWithdraw_previewRedeem_parity() external {
         // Deploy Everlong.
         deployEverlong();
 
         uint256 aliceDeposit = 10_0000e18;
-        uint256 aliceShares = depositEverlong(aliceDeposit, alice);
+        uint256 aliceShares = depositStrategy(aliceDeposit, alice);
 
         uint256 bobDeposit = 5_000e18;
-        uint256 bobShares = depositEverlong(bobDeposit, bob);
+        uint256 bobShares = depositStrategy(bobDeposit, bob);
 
-        redeemEverlong(bobShares, bob);
+        redeemStrategy(bobShares, bob);
 
         openShort(celine, 30_000e18);
 
         uint256 withdrawalShares = aliceShares / 10;
-        uint256 previewRedeemResult = everlong.previewRedeem(withdrawalShares);
-        uint256 previewWithdrawResult = everlong.previewWithdraw(
+        uint256 previewRedeemResult = vault.previewRedeem(withdrawalShares);
+        uint256 previewWithdrawResult = vault.previewWithdraw(
             previewRedeemResult
         );
 

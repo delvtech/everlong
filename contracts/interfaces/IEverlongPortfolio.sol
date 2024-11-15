@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-import { IEverlong } from "./IEverlong.sol";
+import { IEverlongStrategy } from "./IEverlongStrategy.sol";
 
 interface IEverlongPortfolio {
     // ╭─────────────────────────────────────────────────────────╮
@@ -10,7 +10,9 @@ interface IEverlongPortfolio {
 
     /// @notice Rebalances the Everlong bond portfolio if needed.
     /// @param _options Options to control the rebalance behavior.
-    function rebalance(IEverlong.RebalanceOptions memory _options) external;
+    function rebalance(
+        IEverlongStrategy.RebalanceOptions memory _options
+    ) external;
 
     /// @notice Closes mature positions in the Everlong portfolio.
     /// @param _limit The maximum number of positions to close.
@@ -33,11 +35,19 @@ interface IEverlongPortfolio {
     /// @return The position.
     function positionAt(
         uint256 _index
-    ) external view returns (IEverlong.Position memory);
+    ) external view returns (IEverlongStrategy.Position memory);
 
     /// @notice Determines whether any positions are matured.
     /// @return True if any positions are matured, false otherwise.
     function hasMaturedPositions() external view returns (bool);
+
+    /// @notice Weighted average maturity timestamp of the portfolio.
+    /// @return Weighted average maturity timestamp of the portfolio.
+    function avgMaturityTime() external view returns (uint128);
+
+    /// @notice Total quantity of bonds held in the portfolio.
+    /// @return Total quantity of bonds held in the portfolio.
+    function totalBonds() external view returns (uint128);
 
     /// @notice Determines whether Everlong's portfolio can currently be rebalanced.
     /// @return True if the portfolio can be rebalanced, false otherwise.

@@ -1,14 +1,28 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.22;
 
-import { Strategy } from "./Strategy.sol";
+import { EverlongStrategy } from "./EverlongStrategy.sol";
 import { IEverlongStrategy } from "./interfaces/IEverlongStrategy.sol";
+import { IEverlongStrategyFactory } from "./interfaces/IEverlongStrategyFactory.sol";
+import { EVERLONG_KIND, EVERLONG_VERSION } from "./libraries/Constants.sol";
 
-contract StrategyFactory {
-    event NewStrategy(address indexed strategy, address indexed asset);
+/// @author DELV
+/// @title EverlongStrategyFactory
+/// @notice A factory for creating Everlong instances.
+/// @custom:disclaimer The language used in this code is for coding convenience
+///                    only, and is not intended to, and does not, have any
+///                    particular legal or regulatory significance.
+contract EverlongStrategyFactory is IEverlongStrategyFactory {
+    /// @inheritdoc IEverlongStrategyFactory
+    string public constant name = "EverlongStrategyFactory";
+
+    /// @inheritdoc IEverlongStrategyFactory
+    string public constant kind = EVERLONG_KIND;
+
+    /// @inheritdoc IEverlongStrategyFactory
+    string public constant version = EVERLONG_VERSION;
 
     address public immutable emergencyAdmin;
-
     address public management;
     address public performanceFeeRecipient;
     address public keeper;
@@ -43,7 +57,7 @@ contract StrategyFactory {
     ) external virtual returns (address) {
         // tokenized strategies available setters.
         IEverlongStrategy _newStrategy = IEverlongStrategy(
-            address(new Strategy(_asset, _name, _hyperdrive, _asBase))
+            address(new EverlongStrategy(_asset, _name, _hyperdrive, _asBase))
         );
 
         _newStrategy.setPerformanceFeeRecipient(performanceFeeRecipient);

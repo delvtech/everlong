@@ -9,7 +9,7 @@ import { YieldSpaceMath } from "hyperdrive/contracts/src/libraries/YieldSpaceMat
 import { ERC20 } from "openzeppelin/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { Packing } from "openzeppelin/utils/Packing.sol";
-import { IEverlong } from "../interfaces/IEverlong.sol";
+import { IEverlongStrategy } from "../interfaces/IEverlongStrategy.sol";
 import { IEverlongEvents } from "../interfaces/IEverlongEvents.sol";
 import { ONE } from "./Constants.sol";
 
@@ -207,7 +207,7 @@ library HyperdriveExecutionLibrary {
     function closeLong(
         IHyperdrive self,
         bool _asBase,
-        IEverlong.Position memory _position,
+        IEverlongStrategy.Position memory _position,
         uint256 _minOutput,
         bytes memory _data
     ) internal returns (uint256 proceeds) {
@@ -233,7 +233,7 @@ library HyperdriveExecutionLibrary {
     function previewCloseLong(
         IHyperdrive self,
         bool _asBase,
-        IEverlong.Position memory _position,
+        IEverlongStrategy.Position memory _position,
         bytes memory // unused extradata
     ) internal view returns (uint256) {
         uint256 shareProceeds = _calculateCloseLong(self, _position);
@@ -253,7 +253,7 @@ library HyperdriveExecutionLibrary {
     /// @return The amount of output assets received from closing the long.
     function _calculateCloseLong(
         IHyperdrive self,
-        IEverlong.Position memory _position
+        IEverlongStrategy.Position memory _position
     ) internal view returns (uint256) {
         // We must load the entire PoolConfig since it contains values from
         // immutables without public accessors.
@@ -444,7 +444,7 @@ library HyperdriveExecutionLibrary {
     /// @return True if the position is mature false otherwise.
     function isMature(
         IHyperdrive self,
-        IEverlong.Position memory _position
+        IEverlongStrategy.Position memory _position
     ) internal view returns (bool) {
         return isMature(self, _position.maturityTime);
     }

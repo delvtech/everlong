@@ -9,7 +9,7 @@ contract TestEverlong is EverlongTest {
     /// @dev Ensure that the `hyperdrive()` view function is implemented.
     function test_hyperdrive() external view {
         assertEq(
-            everlong.hyperdrive(),
+            strategy.hyperdrive(),
             address(hyperdrive),
             "hyperdrive() should return hyperdrive address"
         );
@@ -17,13 +17,13 @@ contract TestEverlong is EverlongTest {
 
     /// @dev Ensure that the `kind()` view function is implemented.
     function test_kind() external view {
-        assertEq(everlong.kind(), EVERLONG_KIND, "kind does not match");
+        assertEq(strategy.kind(), EVERLONG_KIND, "kind does not match");
     }
 
     /// @dev Ensure that the `version()` view function is implemented.
     function test_version() external view {
         assertEq(
-            everlong.version(),
+            strategy.version(),
             EVERLONG_VERSION,
             "version does not match"
         );

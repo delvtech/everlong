@@ -19,7 +19,7 @@ interface IRoleManager {
         uint256 _category,
         string calldata _name,
         string calldata _symbol
-    ) external virtual returns (address);
+    ) external  returns (address);
 
     /**
      * @notice Creates a new endorsed vault with default profit max unlock time.
@@ -36,7 +36,7 @@ interface IRoleManager {
         string calldata _name,
         string calldata _symbol,
         uint256 _depositLimit
-    ) external virtual returns (address);
+    ) external  returns (address);
 
     /**
      * @notice Adds a new vault to the RoleManager with the specified category.
@@ -45,7 +45,7 @@ interface IRoleManager {
      * @param _vault Address of the vault to be added.
      * @param _category Category associated with the vault.
      */
-    function addNewVault(address _vault, uint256 _category) external virtual;
+    function addNewVault(address _vault, uint256 _category) external ;
 
     /**
      * @notice Adds a new vault to the RoleManager with the specified category and debt allocator.
@@ -58,7 +58,7 @@ interface IRoleManager {
         address _vault,
         uint256 _category,
         address _debtAllocator
-    ) external virtual;
+    ) external ;
 
     /**
      * @notice Update a `_vault`s debt allocator.
@@ -67,7 +67,7 @@ interface IRoleManager {
      */
     function updateDebtAllocator(
         address _vault
-    ) external virtual returns (address _newDebtAllocator);
+    ) external  returns (address _newDebtAllocator);
 
     /**
      * @notice Update a `_vault`s debt allocator to a specified `_debtAllocator`.
@@ -77,14 +77,14 @@ interface IRoleManager {
     function updateDebtAllocator(
         address _vault,
         address _debtAllocator
-    ) external virtual;
+    ) external ;
 
     /**
      * @notice Update a `_vault`s keeper to a specified `_keeper`.
      * @param _vault Address of the vault to update the keeper for.
      * @param _keeper Address of the new keeper.
      */
-    function updateKeeper(address _vault, address _keeper) external virtual;
+    function updateKeeper(address _vault, address _keeper) external ;
 
     function updateVaultName(address _vault, string calldata _name) external;
 
@@ -98,7 +98,7 @@ interface IRoleManager {
      * @dev This will NOT un-endorse the vault from the registry.
      * @param _vault Address of the vault to be removed.
      */
-    function removeVault(address _vault) external virtual;
+    function removeVault(address _vault) external ;
 
     /**
      * @notice Removes a specific role(s) for a `_holder` from the `_vaults`.
@@ -111,7 +111,7 @@ interface IRoleManager {
         address[] calldata _vaults,
         address _holder,
         uint256 _role
-    ) external virtual;
+    ) external ;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ SETTERS                                                 │
@@ -125,7 +125,7 @@ interface IRoleManager {
     function setPositionRoles(
         bytes32 _position,
         uint256 _newRoles
-    ) external virtual;
+    ) external ;
 
     /**
      * @notice Setter function for updating a positions holder.
@@ -137,7 +137,7 @@ interface IRoleManager {
     function setPositionHolder(
         bytes32 _position,
         address _newHolder
-    ) external virtual;
+    ) external ;
 
     /**
      * @notice Sets the default time until profits are fully unlocked for new vaults.
@@ -145,13 +145,13 @@ interface IRoleManager {
      */
     function setDefaultProfitMaxUnlockTime(
         uint256 _newDefaultProfitMaxUnlockTime
-    ) external virtual;
+    ) external ;
 
     /**
      * @notice Accept the Governance role.
      * @dev Caller must be the Pending Governance.
      */
-    function acceptGovernance() external virtual;
+    function acceptGovernance() external ;
 
     // ╭─────────────────────────────────────────────────────────╮
     // │ VIEW METHODS                                            │
@@ -160,13 +160,13 @@ interface IRoleManager {
     /**
      * @notice Get the name of this contract.
      */
-    function name() external view virtual returns (string memory);
+    function name() external view  returns (string memory);
 
     /**
      * @notice Get all vaults that this role manager controls..
      * @return The full array of vault addresses.
      */
-    function getAllVaults() external view virtual returns (address[] memory);
+    function getAllVaults() external view  returns (address[] memory);
 
     /**
      * @notice Get the vault for a specific asset, api and category.
@@ -181,7 +181,7 @@ interface IRoleManager {
         address _asset,
         string memory _apiVersion,
         uint256 _category
-    ) external view virtual returns (address);
+    ) external view  returns (address);
 
     /**
      * @notice Get the latest vault for a specific asset.
@@ -191,7 +191,7 @@ interface IRoleManager {
      */
     function latestVault(
         address _asset
-    ) external view virtual returns (address);
+    ) external view  returns (address);
 
     /**
      * @notice Get the latest vault for a specific asset.
@@ -202,7 +202,7 @@ interface IRoleManager {
     function latestVault(
         address _asset,
         uint256 _category
-    ) external view virtual returns (address _vault);
+    ) external view  returns (address _vault);
 
     /**
      * @notice Check if a vault is managed by this contract.
@@ -217,7 +217,7 @@ interface IRoleManager {
      */
     function isVaultsRoleManager(
         address _vault
-    ) external view virtual returns (bool);
+    ) external view  returns (bool);
 
     /**
      * @notice Get the debt allocator for a specific vault.
@@ -227,7 +227,7 @@ interface IRoleManager {
      */
     function getDebtAllocator(
         address _vault
-    ) external view virtual returns (address);
+    ) external view  returns (address);
 
     /**
      * @notice Get the category for a specific vault.
@@ -237,71 +237,71 @@ interface IRoleManager {
      */
     function getCategory(
         address _vault
-    ) external view virtual returns (uint256);
+    ) external view  returns (uint256);
 
     /**
      * @notice Get the address assigned to the Governance position.
      * @return The address assigned to the Governance position.
      */
-    function getGovernance() external view virtual returns (address);
+    function getGovernance() external view  returns (address);
 
     /**
      * @notice Get the address assigned to the Pending Governance position.
      * @return The address assigned to the Pending Governance position.
      */
-    function getPendingGovernance() external view virtual returns (address);
+    function getPendingGovernance() external view  returns (address);
 
     /**
      * @notice Get the address assigned to the Management position.
      * @return The address assigned to the Management position.
      */
-    function getManagement() external view virtual returns (address);
+    function getManagement() external view  returns (address);
 
     /**
      * @notice Get the address assigned to the Keeper position.
      * @return The address assigned to the Keeper position.
      */
-    function getKeeper() external view virtual returns (address);
+    function getKeeper() external view  returns (address);
 
     /**
      * @notice Get the address assigned to the Registry.
      * @return The address assigned to the Registry.
      */
-    function getRegistry() external view virtual returns (address);
+    function getRegistry() external view  returns (address);
 
     /**
      * @notice Get the address assigned to the accountant.
      * @return The address assigned to the accountant.
      */
-    function getAccountant() external view virtual returns (address);
+    function getAccountant() external view  returns (address);
 
     /**
      * @notice Get the address assigned to be the debt allocator if any.
      * @return The address assigned to be the debt allocator if any.
      */
-    function getDebtAllocator() external view virtual returns (address);
+    function getDebtAllocator() external view  returns (address);
 
     /**
      * @notice Get the roles given to the Governance position.
      * @return The roles given to the Governance position.
      */
-    function getGovernanceRoles() external view virtual returns (uint256);
+    function getGovernanceRoles() external view  returns (uint256);
 
     /**
      * @notice Get the roles given to the Management position.
      * @return The roles given to the Management position.
      */
-    function getManagementRoles() external view virtual returns (uint256);
+    function getManagementRoles() external view  returns (uint256);
 
     /**
      * @notice Get the roles given to the Keeper position.
      * @return The roles given to the Keeper position.
      */
-    function getKeeperRoles() external view virtual returns (uint256);
+    function getKeeperRoles() external view  returns (uint256);
 
     /**
      * @notice Get the roles given to the debt allocators.
      * @return The roles given to the debt allocators.
      */
-    function getDebtAllocatorRoles() external view virtual returns (uint256);
+    function getDebtAllocatorRoles() external view  returns (uint256);
 }

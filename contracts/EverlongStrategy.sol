@@ -8,15 +8,69 @@ import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { BaseStrategy, ERC20 } from "tokenized-strategy/BaseStrategy.sol";
-import { IEverlong } from "./interfaces/IEverlong.sol";
-import { Everlong } from "./Everlong.sol";
+import { IEverlongStrategy } from "./interfaces/IEverlongStrategy.sol";
 import { EVERLONG_KIND, EVERLONG_VERSION, ONE } from "./libraries/Constants.sol";
 import { HyperdriveExecutionLibrary } from "./libraries/HyperdriveExecution.sol";
 import { Portfolio } from "./libraries/Portfolio.sol";
 
-// NOTE: To implement permissioned functions you can use the onlyManagement, onlyEmergencyAuthorized and onlyKeepers modifiers
-
-contract Strategy is BaseStrategy {
+//           ,---..-.   .-.,---.  ,---.   ,-.    .---.  .-. .-.  ,--,
+//           | .-' \ \ / / | .-'  | .-.\  | |   / .-. ) |  \| |.' .'
+//           | `-.  \ V /  | `-.  | `-'/  | |   | | |(_)|   | ||  |  __
+//           | .-'   ) /   | .-'  |   (   | |   | | | | | |\  |\  \ ( _)
+//           |  `--.(_)    |  `--.| |\ \  | `--.\ `-' / | | |)| \  `-) )
+//           /( __.'       /( __.'|_| \)\ |( __.')---'  /(  (_) )\____/
+//          (__)          (__)        (__)(_)   (_)    (__)    (__)
+//
+//          ##########      #++###################################      ### ######
+//              ##########  #####################################   ###########
+//                  #########################################################
+//                  ##+###################################################
+//                   ###############################################
+//                   ##+#########++++++++++++++++++################
+//                    ##+#####+++++++++++++++++++++++++++#########+
+//                   +#######++++++++++++++++++++++++++++++######
+//      ####################++++++++++++++++++++++++++++++++++#####
+//   #####+# #+############++++++++++++++++++++++++++++++++++++##############
+// ##+    ++##############+++++++++++++++++++++++++++++++++-++++###################
+// ######################++++++++++++++++++++++++++++++++++-++++##########  ####+ #
+// +#++++###############++++++++++#######++++++++++++++++++++++++#######      #####
+//     +########+######++++++++++++++++++++++++++++++++++++++++++####           ###
+//    ####  ###########++++++--+++++##++++++++++++++##+++++++++++####             #
+//  +#################+++++--+++++++###+#++++++++++++####++++++++#######
+// +##################++++++++++++++++++##+++++++++++###+++++++++#########
+// ##################++++++++++++++++++++++++++++++++++###+++++++###############
+// ##################++-+++++++++++++++++++++++++++++++##+++++++###################
+//   ###    #####++++++-++++++++++++++++++++++++++++++++++++++++##########  #######
+//  ###      ###+++++++++---+++++++++++++++-+++-++++++++++++++++######### #########
+//          ###++++++++------++++++++++++###++-++++++++--+++++++#############
+//        #####+++++++----------+++++++++++++++##++++-------+++##########
+//    #########++++++----------+++++++++++++++++++++++------+++#########
+// #############+++++----------+++++++++++++++++++++++++---+++###########
+// #############++-++----------+++++++++++++++++++++++-+---++###    ## ###
+// ### ###       ++++----------+++++++-++-++++++-+++++-----++###        ###
+//                 ++----------+++#+++---------+++--++-+---++#####       ####
+//                #+----------+++++++++++++--+--+++-------+-++#####       ####
+//              ####+---------++++++++++++++++++#+++-----++-++#######      ####
+//            ######+----------------++++++++++++++-----++--+    #####       ###
+//          ##### #+++------+++-------+++++++--+++-----++-###       ###      #####
+//         ###    ++--+-----+++++++++++++---------+---++-##++###    +##
+//        ##+   ###+--------+++++++++++++++++--+++---++++      ++#######
+//     ####+    ###+-----------+++++++++++++++++++++++++            #  #
+//           ++##++++---------------+++++++++++++++++
+//          ++## +++++------------+++++++++++++++++++
+//              +++++++-----------+++++++++++++++++++
+//          ++###++++++---------------++++++++++++++
+//       +++#####+++++++++--------------++++++++++++
+// #+ +++#######+++++++++++---------------+++++++++#+
+// ###########++++++++++++++-------------++++++++++###
+//
+/// @author DELV
+/// @title EverlongStrategy
+/// @notice A money market powered by Hyperdrive.
+/// @custom:disclaimer The language used in this code is for coding convenience
+///                    only, and is not intended to, and does not, have any
+///                    particular legal or regulatory significance.
+contract EverlongStrategy is BaseStrategy {
     using FixedPointMath for uint256;
     using HyperdriveExecutionLibrary for IHyperdrive;
     using Portfolio for Portfolio.State;
@@ -24,11 +78,25 @@ contract Strategy is BaseStrategy {
     using SafeERC20 for ERC20;
     using HyperdriveUtils for *;
 
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                               CONSTANTS                               │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
     /// @notice Amount of additional bonds to close during a partial position
     ///         closure to avoid rounding errors. Represented as a percentage
-    ///         of the positions total  amount of bonds where 0.1e18 represents
+    ///         of the positions total  amount of bonds where 1e18 represents
     ///         a 10% buffer.
     uint256 public constant partialPositionClosureBuffer = 0.001e18;
+
+    /// @notice The Everlong instance's kind.
+    string public constant kind = EVERLONG_KIND;
+
+    /// @notice The Everlong instance's version.
+    string public constant version = EVERLONG_VERSION;
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                              IMMUTABLES                               │
+    // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @notice Address of the Hyperdrive instance wrapped by Everlong.
     address public immutable hyperdrive;
@@ -40,6 +108,10 @@ contract Strategy is BaseStrategy {
     /// @dev Structure to store and account for everlong-controlled positions.
     Portfolio.State internal _portfolio;
 
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                              CONSTRUCTOR                              │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
     constructor(
         address _asset,
         string memory __name,
@@ -50,31 +122,24 @@ contract Strategy is BaseStrategy {
         asBase = _asBase;
     }
 
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ STRATEGY OVERRIDES                                      │
-    // ╰─────────────────────────────────────────────────────────╯
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                          STRATEGY OVERRIDES                           │
+    // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @inheritdoc BaseStrategy
-    function _deployFunds(uint256 _amount) internal override {
-        // If amount to spend is above hyperdrive's minimum, open a new
-        // position.
-        if (
-            _amount >=
-            IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount
-        ) {
-            // Leave an extra wei for the approval to keep the slot warm.
-            ERC20(asset).forceApprove(address(hyperdrive), _amount + 1);
-            (uint256 maturityTime, uint256 bondAmount) = IHyperdrive(hyperdrive)
-                .openLong(asBase, _amount, 0, 0, "");
-
-            // Account for the new position in the portfolio.
-            _portfolio.handleOpenPosition(maturityTime, bondAmount);
-        }
+    function _deployFunds(uint256) internal override {
+        // Do nothing.
+        // Opening longs on Hyperdrive is sandwichable so funds should only be
+        // deployed when the `keeper` calls `tend()`.
+        return;
     }
 
     /// @inheritdoc BaseStrategy
     function _freeFunds(uint256 _amount) internal override {
+        // Close all matured positions (if any).
         uint256 output = _closeMaturedPositions(0);
+
+        // Close immature positions if additional funds need to be freed.
         if (_amount > output) {
             _closePositions(_amount - output);
         }
@@ -86,7 +151,10 @@ contract Strategy is BaseStrategy {
         override
         returns (uint256 _totalAssets)
     {
+        // Close all matured positions (if any).
         _closeMaturedPositions(0);
+
+        // Recalculate the value of assets the strategy controls.
         _totalAssets = _calculateTotalAssets();
     }
 
@@ -94,8 +162,8 @@ contract Strategy is BaseStrategy {
     function availableDepositLimit(
         address
     ) public view override returns (uint256) {
-        // return IHyperdrive(hyperdrive).calculateMaxLong();
-        return type(uint256).max - 1;
+        // Limit deposits to the maximum long that can be opened in hyperdrive.
+        return IHyperdrive(hyperdrive).calculateMaxLong();
     }
 
     /// @inheritdoc BaseStrategy
@@ -128,33 +196,9 @@ contract Strategy is BaseStrategy {
         }
     }
 
-    // TODO: Use cached poolconfig.
-    //
-    /// @notice Returns true if the portfolio can be rebalanced.
-    /// @notice The portfolio can be rebalanced if:
-    ///         - Any positions are matured.
-    ///         - The current idle liquidity is above the target.
-    /// @return True if the portfolio can be rebalanced, false otherwise.
-    function canRebalance() public view returns (bool) {
-        return hasMaturedPositions() || canOpenPosition();
-    }
-
-    /// @notice Returns whether Everlong has sufficient idle liquidity to open
-    ///         a new position.
-    /// @return True if a new position can be opened, false otherwise.
-    function canOpenPosition() public view returns (bool) {
-        return
-            asset.balanceOf(address(this)) >
-            IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount;
-    }
-
-    /// @notice Returns whether the portfolio has matured positions.
-    /// @return True if the portfolio has matured positions, false otherwise.
-    function hasMaturedPositions() public view returns (bool) {
-        return
-            !_portfolio.isEmpty() &&
-            IHyperdrive(hyperdrive).isMature(_portfolio.head());
-    }
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                           POSITION CLOSURE                            │
+    // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @dev Close only matured positions in the portfolio.
     /// @param _limit The maximum number of positions to close.
@@ -173,7 +217,7 @@ contract Strategy is BaseStrategy {
         // - There are no more positions.
         // - The current position is not mature.
         // - The limit on closed positions has been reached.
-        IEverlong.Position memory position;
+        IEverlongStrategy.Position memory position;
         for (uint256 count; !_portfolio.isEmpty() && count < _limit; ++count) {
             // Retrieve the most mature position.
             position = _portfolio.head();
@@ -214,7 +258,7 @@ contract Strategy is BaseStrategy {
         //
         // For each position, use the expected output of closing the entire
         // position to estimate the amount of bonds to sell for a partial closure.
-        IEverlong.Position memory position;
+        IEverlongStrategy.Position memory position;
         uint256 totalPositionValue;
         while (!_portfolio.isEmpty() && output < _targetOutput) {
             // Retrieve the most mature position.
@@ -239,13 +283,13 @@ contract Strategy is BaseStrategy {
                     IHyperdrive(hyperdrive)
                         .getPoolConfig()
                         .minimumTransactionAmount).mulUp(
-                        1e18 + partialPositionClosureBuffer
+                        ONE + partialPositionClosureBuffer
                     )
             ) {
                 // Calculate the amount of bonds to close from the position.
                 uint256 bondsNeeded = uint256(position.bondAmount).mulDivUp(
                     (_targetOutput - output).mulUp(
-                        1e18 + partialPositionClosureBuffer
+                        ONE + partialPositionClosureBuffer
                     ),
                     totalPositionValue
                 );
@@ -254,7 +298,7 @@ contract Strategy is BaseStrategy {
                 // Add the amount of assets received to the total output.
                 output += IHyperdrive(hyperdrive).closeLong(
                     asBase,
-                    IEverlong.Position({
+                    IEverlongStrategy.Position({
                         maturityTime: position.maturityTime,
                         bondAmount: bondsNeeded.toUint128()
                     }),
@@ -287,6 +331,10 @@ contract Strategy is BaseStrategy {
         return output;
     }
 
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                            VIEW FUNCTIONS                             │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
     /// @dev Calculates the present portfolio value using the total amount of
     ///      bonds and the weighted average maturity of all positions.
     /// @return value The present portfolio value.
@@ -297,7 +345,7 @@ contract Strategy is BaseStrategy {
             //       underestimate the portfolio value.
             value += IHyperdrive(hyperdrive).previewCloseLong(
                 asBase,
-                IEverlong.Position({
+                IEverlongStrategy.Position({
                     maturityTime: IHyperdrive(hyperdrive)
                         .getCheckpointIdUp(_portfolio.avgMaturityTime)
                         .toUint128(),
@@ -308,12 +356,40 @@ contract Strategy is BaseStrategy {
         }
     }
 
+    // TODO: Use cached poolconfig.
+    //
+    /// @notice Returns true if the portfolio can be rebalanced.
+    /// @notice The portfolio can be rebalanced if:
+    ///         - Any positions are matured.
+    ///         - The current idle liquidity is above the target.
+    /// @return True if the portfolio can be rebalanced, false otherwise.
+    function canRebalance() public view returns (bool) {
+        return hasMaturedPositions() || canOpenPosition();
+    }
+
+    /// @notice Returns whether Everlong has sufficient idle liquidity to open
+    ///         a new position.
+    /// @return True if a new position can be opened, false otherwise.
+    function canOpenPosition() public view returns (bool) {
+        return
+            asset.balanceOf(address(this)) >
+            IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount;
+    }
+
+    /// @notice Returns whether the portfolio has matured positions.
+    /// @return True if the portfolio has matured positions, false otherwise.
+    function hasMaturedPositions() public view returns (bool) {
+        return
+            !_portfolio.isEmpty() &&
+            IHyperdrive(hyperdrive).isMature(_portfolio.head());
+    }
+
     /// @notice Retrieve the position at the specified location in the queue.
     /// @param _index Index in the queue to retrieve the position.
     /// @return The position at the specified location.
     function positionAt(
         uint256 _index
-    ) external view returns (IEverlong.Position memory) {
+    ) external view returns (IEverlongStrategy.Position memory) {
         return _portfolio.at(_index);
     }
 
@@ -321,5 +397,11 @@ contract Strategy is BaseStrategy {
     /// @return The queue's position count.
     function positionCount() external view returns (uint256) {
         return _portfolio.positionCount();
+    }
+
+    /// @notice Total quantity of bonds held in the portfolio.
+    /// @return Total quantity of bonds held in the portfolio.
+    function totalBonds() external view returns (uint256) {
+        return _portfolio.totalBonds;
     }
 }

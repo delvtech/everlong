@@ -8,7 +8,7 @@ import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
-import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
+import { IEverlongStrategy } from "../../contracts/interfaces/IEverlongStrategy.sol";
 import { Portfolio } from "../../contracts/libraries/Portfolio.sol";
 import { HyperdriveExecutionLibrary } from "../../contracts/libraries/HyperdriveExecution.sol";
 import { EverlongTest } from "../harnesses/EverlongTest.sol";
@@ -21,14 +21,14 @@ contract TestHyperdriveExecution is EverlongTest {
     Portfolio.State public portfolio;
 
     function test_previewOpenLong() external {
-        // Deploy the everlong instance.
+        // Deploy the vault.instance.
         deployEverlong();
 
         // With no longs, ensure the estimated and actual bond amounts are
         // the same.
         uint256 longAmount = 10e18;
         uint256 previewBonds = hyperdrive.previewOpenLong(
-            everlong.asBase(),
+            strategy.asBase(),
             longAmount,
             ""
         );
@@ -39,7 +39,7 @@ contract TestHyperdriveExecution is EverlongTest {
         // is an existing position in hyperdrive.
         longAmount = 500e18;
         previewBonds = hyperdrive.previewOpenLong(
-            everlong.asBase(),
+            strategy.asBase(),
             longAmount,
             ""
         );
@@ -48,7 +48,7 @@ contract TestHyperdriveExecution is EverlongTest {
     }
 
     function test_previewCloseLong_immediate_close() external {
-        // Deploy the everlong instance.
+        // Deploy the vault.instance.
         deployEverlong();
 
         // Open a long.
@@ -58,8 +58,8 @@ contract TestHyperdriveExecution is EverlongTest {
         // Ensure the preview amount underestimates the actual and is
         // within the tolerance.
         uint256 previewAssets = hyperdrive.previewCloseLong(
-            everlong.asBase(),
-            IEverlong.Position({
+            strategy.asBase(),
+            IEverlongStrategy.Position({
                 maturityTime: maturityTime.toUint128(),
                 bondAmount: bondAmount.toUint128()
             }),
@@ -72,7 +72,7 @@ contract TestHyperdriveExecution is EverlongTest {
     function test_previewCloseLong_immediate_close_negative_interest()
         external
     {
-        // Deploy the everlong instance with a negative interest rate.
+        // Deploy the vault.instance with a negative interest rate.
         VARIABLE_RATE = -0.05e18;
         deployEverlong();
 
@@ -83,8 +83,8 @@ contract TestHyperdriveExecution is EverlongTest {
         // Ensure the preview amount underestimates the actual and is
         // within the tolerance.
         uint256 previewAssets = hyperdrive.previewCloseLong(
-            everlong.asBase(),
-            IEverlong.Position({
+            strategy.asBase(),
+            IEverlongStrategy.Position({
                 maturityTime: maturityTime.toUint128(),
                 bondAmount: bondAmount.toUint128()
             }),
@@ -95,7 +95,7 @@ contract TestHyperdriveExecution is EverlongTest {
     }
 
     function test_previewCloseLong_partial_maturity() external {
-        // Deploy the everlong instance.
+        // Deploy the vault.instance.
         deployEverlong();
 
         // Open a long.
@@ -108,8 +108,8 @@ contract TestHyperdriveExecution is EverlongTest {
         // Ensure the preview amount underestimates the actual and is
         // within the tolerance.
         uint256 previewAssets = hyperdrive.previewCloseLong(
-            everlong.asBase(),
-            IEverlong.Position({
+            strategy.asBase(),
+            IEverlongStrategy.Position({
                 maturityTime: maturityTime.toUint128(),
                 bondAmount: bondAmount.toUint128()
             }),
@@ -122,7 +122,7 @@ contract TestHyperdriveExecution is EverlongTest {
     function test_previewCloseLong_partial_maturity_negative_interest()
         external
     {
-        // Deploy the everlong instance with a negative interest rate.
+        // Deploy the vault.instance with a negative interest rate.
         VARIABLE_RATE = -0.05e18;
         deployEverlong();
 
@@ -136,8 +136,8 @@ contract TestHyperdriveExecution is EverlongTest {
         // Ensure the preview amount underestimates the actual and is
         // within the tolerance.
         uint256 previewAssets = hyperdrive.previewCloseLong(
-            everlong.asBase(),
-            IEverlong.Position({
+            strategy.asBase(),
+            IEverlongStrategy.Position({
                 maturityTime: maturityTime.toUint128(),
                 bondAmount: bondAmount.toUint128()
             }),
@@ -148,7 +148,7 @@ contract TestHyperdriveExecution is EverlongTest {
     }
 
     function test_previewCloseLong_full_maturity() external {
-        // Deploy the everlong instance.
+        // Deploy the vault.instance.
         deployEverlong();
 
         // Open a long.
@@ -161,8 +161,8 @@ contract TestHyperdriveExecution is EverlongTest {
         // Ensure the preview amount underestimates the actual and is
         // within the tolerance.
         uint256 previewAssets = hyperdrive.previewCloseLong(
-            everlong.asBase(),
-            IEverlong.Position({
+            strategy.asBase(),
+            IEverlongStrategy.Position({
                 maturityTime: maturityTime.toUint128(),
                 bondAmount: bondAmount.toUint128()
             }),
@@ -173,7 +173,7 @@ contract TestHyperdriveExecution is EverlongTest {
     }
 
     function test_previewCloseLong_full_maturity_negative_interest() external {
-        // Deploy the everlong instance.
+        // Deploy the vault.instance.
         VARIABLE_RATE = -0.05e18;
         deployEverlong();
 
@@ -187,8 +187,8 @@ contract TestHyperdriveExecution is EverlongTest {
         // Ensure the preview amount underestimates the actual and is
         // within the tolerance.
         uint256 previewAssets = hyperdrive.previewCloseLong(
-            everlong.asBase(),
-            IEverlong.Position({
+            strategy.asBase(),
+            IEverlongStrategy.Position({
                 maturityTime: maturityTime.toUint128(),
                 bondAmount: bondAmount.toUint128()
             }),
