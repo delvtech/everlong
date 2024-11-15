@@ -21,9 +21,6 @@ contract TestHyperdriveExecution is EverlongTest {
     Portfolio.State public portfolio;
 
     function test_previewOpenLong() external {
-        // Deploy the vault.instance.
-        deployEverlong();
-
         // With no longs, ensure the estimated and actual bond amounts are
         // the same.
         uint256 longAmount = 10e18;
@@ -48,9 +45,6 @@ contract TestHyperdriveExecution is EverlongTest {
     }
 
     function test_previewCloseLong_immediate_close() external {
-        // Deploy the vault.instance.
-        deployEverlong();
-
         // Open a long.
         uint256 amount = 100e18;
         (uint256 maturityTime, uint256 bondAmount) = openLong(alice, amount);
@@ -74,7 +68,7 @@ contract TestHyperdriveExecution is EverlongTest {
     {
         // Deploy the vault.instance with a negative interest rate.
         VARIABLE_RATE = -0.05e18;
-        deployEverlong();
+        super.setUp();
 
         // Open a long.
         uint256 amount = 100e18;
@@ -95,9 +89,6 @@ contract TestHyperdriveExecution is EverlongTest {
     }
 
     function test_previewCloseLong_partial_maturity() external {
-        // Deploy the vault.instance.
-        deployEverlong();
-
         // Open a long.
         uint256 amount = 100e18;
         (uint256 maturityTime, uint256 bondAmount) = openLong(alice, amount);
@@ -124,7 +115,7 @@ contract TestHyperdriveExecution is EverlongTest {
     {
         // Deploy the vault.instance with a negative interest rate.
         VARIABLE_RATE = -0.05e18;
-        deployEverlong();
+        super.setUp();
 
         // Open a long.
         uint256 amount = 100e18;
@@ -148,9 +139,6 @@ contract TestHyperdriveExecution is EverlongTest {
     }
 
     function test_previewCloseLong_full_maturity() external {
-        // Deploy the vault.instance.
-        deployEverlong();
-
         // Open a long.
         uint256 amount = 100e18;
         (uint256 maturityTime, uint256 bondAmount) = openLong(alice, amount);
@@ -175,7 +163,7 @@ contract TestHyperdriveExecution is EverlongTest {
     function test_previewCloseLong_full_maturity_negative_interest() external {
         // Deploy the vault.instance.
         VARIABLE_RATE = -0.05e18;
-        deployEverlong();
+        super.setUp();
 
         // Open a long.
         uint256 amount = 100e18;

@@ -28,9 +28,6 @@ contract TestEverlongERC4626 is EverlongTest {
     /// @dev Tests that previewRedeem does not overestimate proceeds for a
     ///      single shareholder immediately redeeming all their shares.
     function test_previewRedeem_single_instant_full() external {
-        // Deploy the everlong instance.
-        deployEverlong();
-
         // Deposit into everlong.
         uint256 amount = 250e18;
         uint256 shares = depositStrategy(amount, alice, true);
@@ -43,9 +40,6 @@ contract TestEverlongERC4626 is EverlongTest {
     /// @dev Tests that previewRedeem does not overestimate proceeds for a
     ///      single shareholder immediately redeeming part of their shares.
     function test_previewRedeem_single_instant_partial() external {
-        // Deploy the everlong instance.
-        deployEverlong();
-
         // Deposit into everlong.
         uint256 amount = 250e18;
         uint256 shares = depositStrategy(amount, alice, true);
@@ -59,9 +53,6 @@ contract TestEverlongERC4626 is EverlongTest {
     ///      single shareholder waiting half the position duration and
     ///      redeeming all their shares.
     function test_previewRedeem_single_unmatured_full() external {
-        // Deploy the everlong instance.
-        deployEverlong();
-
         // Deposit into everlong.
         uint256 amount = 250e18;
         uint256 shares = depositStrategy(amount, alice, true);
@@ -78,9 +69,6 @@ contract TestEverlongERC4626 is EverlongTest {
     ///      single shareholder waiting half the position duration and
     ///      redeeming some of their shares.
     function test_previewRedeem_single_unmatured_partial() external {
-        // Deploy the everlong instance.
-        deployEverlong();
-
         // Deposit into everlong.
         uint256 amount = 250e18;
         uint256 shares = depositStrategy(amount, alice, true);
@@ -95,9 +83,6 @@ contract TestEverlongERC4626 is EverlongTest {
 
     // FIXME: Convert into fuzz test
     function test_previewWithdraw_previewRedeem_parity() external {
-        // Deploy Everlong.
-        deployEverlong();
-
         uint256 aliceDeposit = 10_0000e18;
         uint256 aliceShares = depositStrategy(aliceDeposit, alice);
 

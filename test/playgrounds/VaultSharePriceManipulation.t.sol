@@ -370,9 +370,6 @@ contract TestVaultSharePriceManipulation is EverlongTest {
     ///      7. Alice (bystander) redeems from Everlong.
     ///      8. Celine redeems from Everlong.
     function sandwich() internal returns (string memory) {
-        // Deploy Everlong.
-        deployEverlong();
-
         // Clear all balances
         clearBalances();
 

@@ -19,8 +19,6 @@ contract TestVaultSharePrice is EverlongTest {
         // Skip this test unless disabled manually.
         // vm.skip(true);
 
-        deployEverlong();
-
         // Alice makes a deposit.
         uint256 aliceDeposit = 10_000e18;
         uint256 aliceShares = depositStrategy(aliceDeposit, alice);

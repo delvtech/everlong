@@ -134,7 +134,6 @@ contract TestCloseImmatureLongs is EverlongTest {
     ) internal {
         INITIAL_VAULT_SHARE_PRICE = initialVaultSharePrice;
         VARIABLE_RATE = preTradeVariableInterest;
-        deployEverlong();
         VARIABLE_RATE = variableInterest;
 
         vm.startPrank(bob);

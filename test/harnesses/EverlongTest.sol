@@ -122,8 +122,6 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     // │                             SetUp Helpers                             │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
-    function deployEverlong() internal {}
-
     function setUp() public virtual override {
         vm.createSelectFork(vm.rpcUrl("mainnet"));
         super.setUp();
@@ -226,7 +224,10 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         // updating at 1 BP.
         vm.startPrank(management);
         debtAllocator.setMinimumWait(0);
-        debtAllocator.setMinimumChange(address(vault), 1);
+        debtAllocator.setMinimumChange(
+            address(vault),
+            hyperdrive.getPoolConfig().minimumTransactionAmount
+        );
         debtAllocator.setStrategyDebtRatio(
             address(vault),
             address(strategy),
@@ -774,7 +775,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @dev Outputs a table of all positions.
-    function logPositions() public view {
+    function logPositions() internal view {
         /* solhint-disable no-console */
         console.log("-- POSITIONS -------------------------------");
         for (uint128 i = 0; i < strategy.positionCount(); ++i) {
@@ -789,4 +790,10 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         console.log("--------------------------------------------");
         /* solhint-enable no-console */
     }
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                           Strategy Helpers                            │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
+    function apr() internal view returns (uint256) {}
 }

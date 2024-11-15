@@ -18,7 +18,6 @@ contract TestSandwich is EverlongTest {
     ) external {
         TARGET_IDLE_LIQUIDITY_BASIS_POINTS = 0;
         MIN_IDLE_LIQUIDITY_BASIS_POINTS = 0;
-        deployEverlong();
         sandwich_short_instant(
             _shortAmount,
             _attackerDepositAmount,
@@ -34,7 +33,6 @@ contract TestSandwich is EverlongTest {
     ) external {
         TARGET_IDLE_LIQUIDITY_BASIS_POINTS = 1_000;
         MIN_IDLE_LIQUIDITY_BASIS_POINTS = 2_000;
-        deployEverlong();
         sandwich_short_instant(
             _shortAmount,
             _attackerDepositAmount,
@@ -50,7 +48,6 @@ contract TestSandwich is EverlongTest {
     ) external {
         TARGET_IDLE_LIQUIDITY_BASIS_POINTS = 0;
         MIN_IDLE_LIQUIDITY_BASIS_POINTS = 0;
-        deployEverlong();
         sandwich_lp_instant(
             _lpDeposit,
             _attackerDepositAmount,
@@ -66,7 +63,6 @@ contract TestSandwich is EverlongTest {
     ) external {
         TARGET_IDLE_LIQUIDITY_BASIS_POINTS = 1_000;
         MIN_IDLE_LIQUIDITY_BASIS_POINTS = 2_000;
-        deployEverlong();
         sandwich_lp_instant(
             _lpDeposit,
             _attackerDepositAmount,
