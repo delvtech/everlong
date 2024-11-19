@@ -55,4 +55,6 @@ interface IEverlongStrategy is IStrategy, IEverlongEvents, IEverlongPortfolio {
     /// @notice Gets whether Everlong uses hyperdrive's base token.
     /// @return True if using hyperdrive's base token, false otherwise.
     function asBase() external view returns (bool);
+
+    function calculateTotalAssets() external view returns (uint256);
 }

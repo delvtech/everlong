@@ -8,6 +8,7 @@ import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { BaseStrategy, ERC20 } from "tokenized-strategy/BaseStrategy.sol";
+import { BaseHealthCheck } from "tokenized-strategy-periphery/Bases/HealthCheck/BaseHealthCheck.sol";
 import { IEverlongStrategy } from "./interfaces/IEverlongStrategy.sol";
 import { EVERLONG_KIND, EVERLONG_VERSION, ONE } from "./libraries/Constants.sol";
 import { HyperdriveExecutionLibrary } from "./libraries/HyperdriveExecution.sol";
@@ -70,7 +71,7 @@ import { Portfolio } from "./libraries/Portfolio.sol";
 /// @custom:disclaimer The language used in this code is for coding convenience
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
-contract EverlongStrategy is BaseStrategy {
+contract EverlongStrategy is BaseHealthCheck {
     using FixedPointMath for uint256;
     using HyperdriveExecutionLibrary for IHyperdrive;
     using Portfolio for Portfolio.State;
@@ -151,11 +152,11 @@ contract EverlongStrategy is BaseStrategy {
         override
         returns (uint256 _totalAssets)
     {
-        // Close all matured positions (if any).
-        _closeMaturedPositions(0);
+        // Close matured positions and redeploy any idle liquidity.
+        // _tend(asset.balanceOf(address(this)));
 
         // Recalculate the value of assets the strategy controls.
-        _totalAssets = _calculateTotalAssets();
+        _totalAssets = calculateTotalAssets();
     }
 
     /// @inheritdoc BaseStrategy
@@ -335,10 +336,10 @@ contract EverlongStrategy is BaseStrategy {
     // │                            VIEW FUNCTIONS                             │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
-    /// @dev Calculates the present portfolio value using the total amount of
+    /// @notice Calculates the present portfolio value using the total amount of
     ///      bonds and the weighted average maturity of all positions.
     /// @return value The present portfolio value.
-    function _calculateTotalAssets() internal view returns (uint256 value) {
+    function calculateTotalAssets() public view returns (uint256 value) {
         value = ERC20(asset).balanceOf(address(this));
         if (_portfolio.totalBonds != 0) {
             // NOTE: The maturity time is rounded to the next checkpoint to

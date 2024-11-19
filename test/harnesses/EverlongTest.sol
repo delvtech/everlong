@@ -7,21 +7,23 @@ import { HyperdriveTest } from "hyperdrive/test/utils/HyperdriveTest.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
-import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol";
-import { IEverlongStrategy } from "../../contracts/interfaces/IEverlongStrategy.sol";
-import { IEverlongStrategyFactory } from "../../contracts/interfaces/IEverlongStrategyFactory.sol";
-import { EverlongStrategyFactory } from "../../contracts/EverlongStrategyFactory.sol";
-import { EverlongStrategy } from "../../contracts/EverlongStrategy.sol";
 import { IStrategy } from "tokenized-strategy/interfaces/IStrategy.sol";
-import { IRoleManagerFactory } from "../../contracts/interfaces/IRoleManagerFactory.sol";
-import { IRoleManager } from "../../contracts/interfaces/IRoleManager.sol";
-import { IVault } from "yearn-vaults-v3/interfaces/IVault.sol";
 import { Roles } from "yearn-vaults-v3/interfaces/Roles.sol";
 import { IVaultFactory } from "yearn-vaults-v3/interfaces/IVaultFactory.sol";
 import { DebtAllocator } from "vault-periphery/debtAllocators/DebtAllocator.sol";
 import { Positions } from "vault-periphery/managers/Positions.sol";
 import { Registry } from "vault-periphery/registry/Registry.sol";
 import { ReleaseRegistry } from "vault-periphery/registry/ReleaseRegistry.sol";
+import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol";
+import { IAprOracle } from "../../contracts/interfaces/IAprOracle.sol";
+import { IEverlongStrategy } from "../../contracts/interfaces/IEverlongStrategy.sol";
+import { IEverlongStrategyFactory } from "../../contracts/interfaces/IEverlongStrategyFactory.sol";
+import { EverlongStrategyFactory } from "../../contracts/EverlongStrategyFactory.sol";
+import { EverlongStrategy } from "../../contracts/EverlongStrategy.sol";
+import { IRoleManagerFactory } from "../../contracts/interfaces/IRoleManagerFactory.sol";
+import { IRoleManager } from "../../contracts/interfaces/IRoleManager.sol";
+import { IVault } from "yearn-vaults-v3/interfaces/IVault.sol";
+import { IAccountant } from "../../contracts/interfaces/IAccountant.sol";
 
 // TODO: Refactor this to include an instance of `Everlong` with exposed internal functions.
 /// @dev Everlong testing harness contract.
@@ -62,7 +64,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     address internal HYPERDRIVE_INITIALIZER = address(0);
 
     uint256 internal FIXED_RATE = 0.05e18;
-    int256 internal VARIABLE_RATE = 0.10e18;
+    int256 internal VARIABLE_RATE = 0.05e18;
 
     uint256 internal INITIAL_VAULT_SHARE_PRICE = 1e18;
     uint256 internal INITIAL_CONTRIBUTION = 2_000_000e18;
@@ -117,6 +119,9 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     IRoleManager internal roleManager;
     DebtAllocator internal debtAllocator;
     Registry internal yearnRegistry;
+    IAccountant internal accountant;
+    IAprOracle internal aprOracle =
+        IAprOracle(0x1981AD9F44F2EA9aDd2dC4AD7D075c102C70aF92);
 
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                             SetUp Helpers                             │
@@ -185,6 +190,12 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         );
 
         vm.stopPrank();
+
+        // Set the `profitMaxUnlockTime` to 0.
+        vm.startPrank(management);
+        strategy.acceptManagement();
+        strategy.setProfitMaxUnlockTime(0);
+        vm.stopPrank();
     }
 
     /// @dev Deploy the Everlong Yearn v3 Vault.
@@ -197,7 +208,10 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         );
         debtAllocator = DebtAllocator(roleManager.getDebtAllocator());
         yearnRegistry = Registry(roleManager.getRegistry());
+        accountant = IAccountant(roleManager.getAccountant());
         vm.stopPrank();
+
+        console.log("Fee Manager: %s", accountant.feeManager());
 
         // As the `governance` address:
         //   1. Deploy the Vault using the RoleManager.
@@ -219,14 +233,18 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         );
         vm.stopPrank();
 
+        // vm.prank(address(roleManagerFactory));
+        // accountant.turnOffHealthCheck(address(vault), address(strategy));
+
         // As the `management` address, configure the DebtAllocator to not
         // wait to update a strategy's debt and set the minimum change before
         // updating at 1 BP.
         vm.startPrank(management);
-        debtAllocator.setMinimumWait(0);
+        vault.setProfitMaxUnlockTime(1 days);
+        debtAllocator.setMinimumWait(6 hours);
         debtAllocator.setMinimumChange(
             address(vault),
-            hyperdrive.getPoolConfig().minimumTransactionAmount
+            MINIMUM_TRANSACTION_AMOUNT
         );
         debtAllocator.setStrategyDebtRatio(
             address(vault),
@@ -330,10 +348,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
 
         // Rebalance if specified.
         if (_shouldRebalance) {
-            vm.startPrank(keeper);
-            strategy.tend();
-            strategy.report();
-            vm.stopPrank();
+            rebalance();
         }
 
         // Return the amount of shares issued to _depositor for the deposit.
@@ -429,14 +444,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
 
         // Rebalance if specified.
         if (_shouldRebalance) {
-            vm.prank(management);
-            debtAllocator.update_debt(
-                address(vault),
-                address(strategy),
-                type(uint256).max
-            );
-            vm.prank(keeper);
-            strategy.tend();
+            rebalance();
         }
 
         // Return the amount of shares issued to _depositor for the deposit.
@@ -524,8 +532,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
 
         // Rebalance if specified.
         if (_shouldRebalance) {
-            vm.prank(keeper);
-            strategy.tend();
+            rebalance();
         }
     }
 
@@ -606,14 +613,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
 
         // Rebalance if specified.
         if (_shouldRebalance) {
-            vm.prank(management);
-            debtAllocator.update_debt(
-                address(vault),
-                address(strategy),
-                type(uint256).max
-            );
-            vm.prank(keeper);
-            strategy.tend();
+            rebalance();
         }
     }
 
@@ -635,7 +635,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @dev Call `everlong.rebalance(...)` as the admin with default options.
-    function rebalance() internal virtual {
+    function rebalance() internal {
         vm.prank(management);
         debtAllocator.update_debt(
             address(vault),
@@ -644,6 +644,20 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         );
         vm.prank(keeper);
         strategy.tend();
+    }
+
+    function report() internal {
+        if (strategy.calculateTotalAssets() < strategy.totalAssets()) {
+            console.log(
+                "Loss: %e",
+                strategy.totalAssets() - strategy.calculateTotalAssets()
+            );
+        }
+        vm.prank(keeper);
+        strategy.report();
+        vm.prank(management);
+        vault.process_report(address(strategy));
+        console.log("Report: %e", strategy.totalAssets());
     }
 
     function rebalance(
@@ -790,10 +804,4 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         console.log("--------------------------------------------");
         /* solhint-enable no-console */
     }
-
-    // ╭───────────────────────────────────────────────────────────────────────╮
-    // │                           Strategy Helpers                            │
-    // ╰───────────────────────────────────────────────────────────────────────╯
-
-    function apr() internal view returns (uint256) {}
 }
