@@ -36,7 +36,7 @@ contract TestStrategy is EverlongTest {
                 true
             );
             advanceTimeWithCheckpoints(CHECKPOINT_DURATION);
-            if (i != 0 && i % 7 == 0) {
+            if (i != 0 && i % 14 == 0) {
                 report();
             }
         }

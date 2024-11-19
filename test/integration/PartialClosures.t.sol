@@ -90,10 +90,10 @@ contract TestPartialClosures is EverlongTest {
         IEverlongStrategy.Position memory oldPosition = strategy.positionAt(0);
         IEverlongStrategy.Position memory newPosition = strategy.positionAt(1);
         uint256 oldBondPrice = hyperdrive
-            .previewCloseLong(true, oldPosition, "")
+            .previewCloseLong(true, hyperdrive.getPoolConfig(), oldPosition, "")
             .divDown(oldPosition.bondAmount);
         uint256 newBondPrice = hyperdrive
-            .previewCloseLong(true, newPosition, "")
+            .previewCloseLong(true, hyperdrive.getPoolConfig(), newPosition, "")
             .divDown(newPosition.bondAmount);
         assertGt(
             (oldBondPrice - newBondPrice).divDown(oldBondPrice),

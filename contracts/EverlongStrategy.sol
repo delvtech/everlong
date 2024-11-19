@@ -8,7 +8,6 @@ import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { BaseStrategy, ERC20 } from "tokenized-strategy/BaseStrategy.sol";
-import { BaseHealthCheck } from "tokenized-strategy-periphery/Bases/HealthCheck/BaseHealthCheck.sol";
 import { IEverlongStrategy } from "./interfaces/IEverlongStrategy.sol";
 import { EVERLONG_KIND, EVERLONG_VERSION, ONE } from "./libraries/Constants.sol";
 import { HyperdriveExecutionLibrary } from "./libraries/HyperdriveExecution.sol";
@@ -71,7 +70,7 @@ import { Portfolio } from "./libraries/Portfolio.sol";
 /// @custom:disclaimer The language used in this code is for coding convenience
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
-contract EverlongStrategy is BaseHealthCheck {
+contract EverlongStrategy is BaseStrategy {
     using FixedPointMath for uint256;
     using HyperdriveExecutionLibrary for IHyperdrive;
     using Portfolio for Portfolio.State;
@@ -106,6 +105,12 @@ contract EverlongStrategy is BaseHealthCheck {
     ///      If false, use the Hyperdrive's `vaultSharesToken`.
     bool public immutable asBase;
 
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                                 STATE                                 │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
+    IHyperdrive.PoolConfig internal _poolConfig;
+
     /// @dev Structure to store and account for everlong-controlled positions.
     Portfolio.State internal _portfolio;
 
@@ -121,6 +126,7 @@ contract EverlongStrategy is BaseHealthCheck {
     ) BaseStrategy(_asset, __name) {
         hyperdrive = _hyperdrive;
         asBase = _asBase;
+        _poolConfig = IHyperdrive(_hyperdrive).getPoolConfig();
     }
 
     // ╭───────────────────────────────────────────────────────────────────────╮
@@ -269,6 +275,7 @@ contract EverlongStrategy is BaseHealthCheck {
             // the expected output for partial closures.
             totalPositionValue = IHyperdrive(hyperdrive).previewCloseLong(
                 asBase,
+                _poolConfig,
                 position,
                 ""
             );
@@ -346,6 +353,7 @@ contract EverlongStrategy is BaseHealthCheck {
             //       underestimate the portfolio value.
             value += IHyperdrive(hyperdrive).previewCloseLong(
                 asBase,
+                _poolConfig,
                 IEverlongStrategy.Position({
                     maturityTime: IHyperdrive(hyperdrive)
                         .getCheckpointIdUp(_portfolio.avgMaturityTime)

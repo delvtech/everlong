@@ -64,7 +64,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     address internal HYPERDRIVE_INITIALIZER = address(0);
 
     uint256 internal FIXED_RATE = 0.05e18;
-    int256 internal VARIABLE_RATE = 0.05e18;
+    int256 internal VARIABLE_RATE = 0.025e18;
 
     uint256 internal INITIAL_VAULT_SHARE_PRICE = 1e18;
     uint256 internal INITIAL_CONTRIBUTION = 2_000_000e18;
@@ -647,17 +647,10 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     }
 
     function report() internal {
-        if (strategy.calculateTotalAssets() < strategy.totalAssets()) {
-            console.log(
-                "Loss: %e",
-                strategy.totalAssets() - strategy.calculateTotalAssets()
-            );
-        }
         vm.prank(keeper);
         strategy.report();
         vm.prank(management);
         vault.process_report(address(strategy));
-        console.log("Report: %e", strategy.totalAssets());
     }
 
     function rebalance(
