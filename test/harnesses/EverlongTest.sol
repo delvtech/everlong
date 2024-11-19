@@ -23,8 +23,8 @@ import { EverlongStrategy } from "../../contracts/EverlongStrategy.sol";
 import { IRoleManagerFactory } from "../../contracts/interfaces/IRoleManagerFactory.sol";
 import { IRoleManager } from "../../contracts/interfaces/IRoleManager.sol";
 import { IVault } from "yearn-vaults-v3/interfaces/IVault.sol";
+import { IAccountant } from "../../contracts/interfaces/IAccountant.sol";
 
-// TODO: Refactor this to include an instance of `Everlong` with exposed internal functions.
 /// @dev Everlong testing harness contract.
 /// @dev Tests should extend this contract and call its `setUp` function.
 contract EverlongTest is HyperdriveTest, IEverlongEvents {
@@ -63,7 +63,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     address internal HYPERDRIVE_INITIALIZER = address(0);
 
     uint256 internal FIXED_RATE = 0.05e18;
-    int256 internal VARIABLE_RATE = 0.025e18;
+    int256 internal VARIABLE_RATE = 0.10e18;
 
     uint256 internal INITIAL_VAULT_SHARE_PRICE = 1e18;
     uint256 internal INITIAL_CONTRIBUTION = 2_000_000e18;
@@ -109,6 +109,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     IRoleManager internal roleManager;
     DebtAllocator internal debtAllocator;
     Registry internal yearnRegistry;
+    IAccountant internal accountant;
     IAprOracle internal aprOracle =
         IAprOracle(0x1981AD9F44F2EA9aDd2dC4AD7D075c102C70aF92);
 
@@ -180,7 +181,12 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
 
         vm.stopPrank();
 
-        // Set the `profitMaxUnlockTime` to 0.
+        // As the `management` address:
+        //   1. Accept the `management` role for the strategy.
+        //   2. Set the `profitMaxUnlockTime` to zero.
+        //      TODO: Ensure this is what we want. Pendle has their strategy
+        //            `profitMaxUnlockTime` set to 0 and their vault's set to
+        //            3 days.
         vm.startPrank(management);
         strategy.acceptManagement();
         strategy.setProfitMaxUnlockTime(0);
@@ -197,13 +203,33 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         );
         debtAllocator = DebtAllocator(roleManager.getDebtAllocator());
         yearnRegistry = Registry(roleManager.getRegistry());
+        accountant = IAccountant(roleManager.getAccountant());
         vm.stopPrank();
 
         // As the `governance` address:
-        //   1. Deploy the Vault using the RoleManager.
-        //   2. Add the EverlongStrategy to the vault.
-        //   3. Update the max debt for the strategy to be the maximum uint256.
+        //   1. Accept the "Fee Manager" role for the Accountant.
+        //   2. Set the default `config.maxLoss` for the accountant to be 10%.
+        //      This will enable losses of up to 10% across reports before
+        //      reverting.
+        //   3. Deploy the Vault using the RoleManager.
+        //   4. Add the EverlongStrategy to the vault.
+        //   5. Update the max debt for the strategy to be the maximum uint256.
+        //   6. Configure the vault to `auto_allocate` which will automatically
+        //      update the strategy's debt on deposit.
         vm.startPrank(governance);
+        accountant.acceptFeeManager();
+        IAccountant.Fee memory defaultConfig = accountant.defaultConfig();
+        // TODO: Confirm with the yearn team that this is the best way to be
+        //       handling the scenario where totalAssets drops after liquidity
+        //       is deployed to Hyperdrive.
+        accountant.updateDefaultConfig(
+            defaultConfig.managementFee,
+            defaultConfig.performanceFee,
+            defaultConfig.refundRatio,
+            defaultConfig.maxFee,
+            defaultConfig.maxGain,
+            1_000
+        );
         vault = IVault(
             roleManager.newVault(
                 address(hyperdrive.baseToken()),
@@ -217,17 +243,23 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             address(strategy),
             type(uint256).max
         );
+        vault.set_auto_allocate(true);
         vm.stopPrank();
 
         // As the `management` address, configure the DebtAllocator to not
         // wait to update a strategy's debt and set the minimum change before
-        // updating at 1 BP.
+        // updating to just above hyperdrive's minimum transaction amount.
         vm.startPrank(management);
-        vault.setProfitMaxUnlockTime(1 days);
-        debtAllocator.setMinimumWait(6 hours);
+        //      TODO: Ensure this is what we want. Pendle has their strategy
+        //            `profitMaxUnlockTime` set to 0 and their vault's set to
+        //            3 days.
+        vault.setProfitMaxUnlockTime(3 days);
+        // TODO: Determine what `minimumWait` affects and whether we should be
+        // messing with it.
+        debtAllocator.setMinimumWait(0);
         debtAllocator.setMinimumChange(
             address(vault),
-            MINIMUM_TRANSACTION_AMOUNT
+            MINIMUM_TRANSACTION_AMOUNT + 1
         );
         debtAllocator.setStrategyDebtRatio(
             address(vault),
@@ -241,6 +273,9 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                            Deposit Helpers                            │
     // ╰───────────────────────────────────────────────────────────────────────╯
+
+    // TODO: Determine the benefits/drawbacks of depositing directly into the
+    //       strategy vs depositing into a vault.
 
     /// @dev Deposit into Everlong strategy.
     /// @param _amount Amount of assets to deposit.
@@ -415,18 +450,16 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
 
     /// @dev Call `everlong.rebalance(...)` as the admin with default options.
     function rebalance() internal {
-        vm.startPrank(management);
-        debtAllocator.update_debt(
-            address(vault),
-            address(strategy),
-            type(uint256).max
-        );
-        vm.stopPrank();
         vm.startPrank(keeper);
         strategy.tend();
         vm.stopPrank();
     }
 
+    // TODO: Discuss with yearn team the appropriate frequency and order of
+    //       operations for `tend()`, `report()`, and `process_report()`.
+    //
+    /// @dev Call `report` on the strategy then call `process_report` on the
+    ///      vault.
     function report() internal {
         vm.startPrank(keeper);
         strategy.report();
@@ -461,6 +494,27 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         while (block.timestamp - startTimeElapsed < _time) {
             advanceTime(_rebalanceInterval, VARIABLE_RATE);
             rebalance();
+        }
+    }
+
+    /// @dev Advance time, create checkpoints, and report at checkpoints.
+    /// @dev If time % _rebalanceInterval != 0 then it ends up advancing time
+    ///      to the next _rebalanceInterval.
+    /// @param _time Amount of time to advance.
+    function advanceTimeWithCheckpointsAndReporting(
+        uint256 _time
+    ) internal virtual {
+        uint256 startTimeElapsed = block.timestamp;
+        // Note: if time % CHECKPOINT_DURATION != 0 then it ends up
+        // advancing time to the next checkpoint.
+        while (block.timestamp - startTimeElapsed < _time) {
+            advanceTime(CHECKPOINT_DURATION, VARIABLE_RATE);
+            hyperdrive.checkpoint(
+                HyperdriveUtils.latestCheckpoint(hyperdrive),
+                0
+            );
+            report();
+            console.log("APR: %e", aprOracle.getCurrentApr(address(vault)));
         }
     }
 

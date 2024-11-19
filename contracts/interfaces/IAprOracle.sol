@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
+// WARN: Installing tokenized-strategy-periphery results in solidity compiler
+//       errors, so needed methods are copied here.
 interface IAprOracle {
     /**
      * @notice Get the current APR a strategy is earning.

@@ -104,6 +104,7 @@ contract EverlongStrategy is BaseStrategy {
     // │                                 STATE                                 │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
+    /// FIXME: Comment
     IEverlongStrategy.TendConfig internal _tendConfig;
 
     /// @dev Structure to store and account for everlong-controlled positions.
@@ -155,11 +156,15 @@ contract EverlongStrategy is BaseStrategy {
         override
         returns (uint256 _totalAssets)
     {
-        // Close matured positions and redeploy any idle liquidity.
-        _closeMaturedPositions(_tendConfig.positionClosureLimit);
-
         // Recalculate the value of assets the strategy controls.
+        // Since `totalAssets` decreases slightly after opening longs, we want
+        // to update it before calling tend to avoid reporting a temporary loss.
         _totalAssets = calculateTotalAssets();
+
+        // Call `_tend()` to close mature positions and spend idle if needed.
+        if (_tendTrigger()) {
+            _tend(ERC20(asset).balanceOf(address(this)));
+        }
     }
 
     /// @inheritdoc BaseStrategy
@@ -181,7 +186,7 @@ contract EverlongStrategy is BaseStrategy {
         _totalIdle += _closeMaturedPositions(_tendConfig.positionClosureLimit);
 
         // If Everlong has sufficient idle, open a new position.
-        if (_totalIdle >= _poolConfig.minimumTransactionAmount) {
+        if (_totalIdle > _poolConfig.minimumTransactionAmount) {
             // Approve leaving an extra wei so the slot stays warm.
             ERC20(asset).forceApprove(address(hyperdrive), _totalIdle + 1);
             (uint256 maturityTime, uint256 bondAmount) = IHyperdrive(hyperdrive)

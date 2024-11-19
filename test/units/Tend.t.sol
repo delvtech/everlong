@@ -30,13 +30,9 @@ contract TestTend is EverlongTest {
         uint256 shares;
         uint256 spent;
         for (uint256 i; i < maxPositionCount; i++) {
-            spent += MINIMUM_TRANSACTION_AMOUNT * 200;
-            shares += depositVault(
-                MINIMUM_TRANSACTION_AMOUNT * 200,
-                alice,
-                true
-            );
-            advanceTimeWithCheckpoints(CHECKPOINT_DURATION);
+            spent += MINIMUM_TRANSACTION_AMOUNT * 2;
+            shares += depositVault(MINIMUM_TRANSACTION_AMOUNT * 2, alice, true);
+            advanceTimeWithCheckpointsAndReporting(CHECKPOINT_DURATION);
         }
 
         // Ensure Everlong has the maximum amount of positions possible.
@@ -44,9 +40,6 @@ contract TestTend is EverlongTest {
 
         // Advance time so that all positions are mature.
         advanceTimeWithCheckpoints(POSITION_DURATION);
-
-        rebalance();
-        report();
 
         // Track the gas cost for the redemption.
         uint256 gasUsed = gasleft();
@@ -111,7 +104,7 @@ contract TestTend is EverlongTest {
         // Mint some tokens to Everlong for opening longs and rebalance.
         mintApproveEverlongBaseAsset(
             address(strategy),
-            MINIMUM_TRANSACTION_AMOUNT
+            MINIMUM_TRANSACTION_AMOUNT + 1
         );
         rebalance();
 
