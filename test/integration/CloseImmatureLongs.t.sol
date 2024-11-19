@@ -140,24 +140,27 @@ contract TestCloseImmatureLongs is EverlongTest {
 
         // Deposit.
         uint256 basePaid = 10_000e18;
-        ERC20Mintable(vault.asset()).mint(basePaid);
-        ERC20Mintable(vault.asset()).approve(address(vault), basePaid);
+        ERC20Mintable(strategy.asset()).mint(basePaid);
+        ERC20Mintable(strategy.asset()).approve(address(vault), basePaid);
         uint256 shares = depositStrategy(basePaid, bob, true);
 
         // half term passes
         advanceTimeWithCheckpointsAndRebalancing(POSITION_DURATION / 2);
 
+        // Create a report to update the strategy's `totalAssets`.
+        report();
+
         // Estimate the proceeds.
-        uint256 estimatedProceeds = vault.previewRedeem(shares);
+        uint256 estimatedProceeds = strategy.previewRedeem(shares);
         console.log("previewRedeem: %e", estimatedProceeds);
-        console.log("totalAssets:   %e", vault.totalAssets());
+        console.log("totalAssets:   %e", strategy.totalAssets());
 
         // Close the long.
         uint256 baseProceeds = redeemStrategy(shares, bob, true);
         console.log("actual:    %s", baseProceeds);
         console.log(
             "assets:    %s",
-            ERC20Mintable(vault.asset()).balanceOf(address(vault))
+            ERC20Mintable(strategy.asset()).balanceOf(address(vault))
         );
         // console.log("avg maturity time: %s", strategy.avgMaturityTime());
         console.log("total bonds      : %s", strategy.totalBonds());
@@ -176,32 +179,4 @@ contract TestCloseImmatureLongs is EverlongTest {
         );
         vm.stopPrank();
     }
-
-    /// @dev Tests the situation where the closing of an immature position
-    ///      results in losses that exceed the amount of assets owed to the
-    ///      redeemer who forced the position closure.
-    // function testFuzz_immature_losses_exceed_assets_owed(
-    //     uint256 _depositAmount,
-    //     uint256 _shareAmount
-    // ) external {
-    //     // Deploy Everlong.
-    //     deployEverlong();
-    //
-    //     // Make a large deposit.
-    //     _depositAmount = bound(
-    //         _depositAmount,
-    //         hyperdrive.calculateMaxLong() / 100,
-    //         hyperdrive.calculateMaxLong() / 3
-    //     );
-    //
-    //     // Ensure previewRedeem returns zero for a small amount of shares.
-    //     depositStrategy(_depositAmount, bob, true);
-    //     _shareAmount = bound(_shareAmount, 0, 1000);
-    //     uint256 assetsOwed = everlong.previewRedeem(_shareAmount);
-    //     assertEq(assetsOwed, 0);
-    //
-    //     // Ensure revert when attempting to redeem a small amount of shares.
-    //     vm.expectRevert(RedemptionZeroOutput.selector);
-    //     redeemStrategy(_shareAmount, bob, true);
-    // }
 }

@@ -78,10 +78,6 @@ contract EverlongStrategy is BaseStrategy {
     using SafeERC20 for ERC20;
     using HyperdriveUtils for *;
 
-    // ╭───────────────────────────────────────────────────────────────────────╮
-    // │                               CONSTANTS                               │
-    // ╰───────────────────────────────────────────────────────────────────────╯
-
     /// @notice Amount of additional bonds to close during a partial position
     ///         closure to avoid rounding errors. Represented as a percentage
     ///         of the positions total  amount of bonds where 1e18 represents
@@ -94,10 +90,6 @@ contract EverlongStrategy is BaseStrategy {
     /// @notice The Everlong instance's version.
     string public constant version = EVERLONG_VERSION;
 
-    // ╭───────────────────────────────────────────────────────────────────────╮
-    // │                              IMMUTABLES                               │
-    // ╰───────────────────────────────────────────────────────────────────────╯
-
     /// @notice Address of the Hyperdrive instance wrapped by Everlong.
     address public immutable hyperdrive;
 
@@ -105,11 +97,14 @@ contract EverlongStrategy is BaseStrategy {
     ///      If false, use the Hyperdrive's `vaultSharesToken`.
     bool public immutable asBase;
 
+    /// @dev The Hyperdrive's PoolConfig.
+    IHyperdrive.PoolConfig internal _poolConfig;
+
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                                 STATE                                 │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
-    IHyperdrive.PoolConfig internal _poolConfig;
+    IEverlongStrategy.TendConfig internal _tendConfig;
 
     /// @dev Structure to store and account for everlong-controlled positions.
     Portfolio.State internal _portfolio;
@@ -144,6 +139,8 @@ contract EverlongStrategy is BaseStrategy {
     /// @inheritdoc BaseStrategy
     function _freeFunds(uint256 _amount) internal override {
         // Close all matured positions (if any).
+        // TODO: Determine whether `_tendConfig.positionClosureLimit` should
+        //       affect this.
         uint256 output = _closeMaturedPositions(0);
 
         // Close immature positions if additional funds need to be freed.
@@ -159,7 +156,7 @@ contract EverlongStrategy is BaseStrategy {
         returns (uint256 _totalAssets)
     {
         // Close matured positions and redeploy any idle liquidity.
-        // _tend(asset.balanceOf(address(this)));
+        _closeMaturedPositions(_tendConfig.positionClosureLimit);
 
         // Recalculate the value of assets the strategy controls.
         _totalAssets = calculateTotalAssets();
@@ -175,28 +172,26 @@ contract EverlongStrategy is BaseStrategy {
 
     /// @inheritdoc BaseStrategy
     function _tendTrigger() internal view override returns (bool) {
-        return canRebalance();
+        return hasMaturedPositions() || canOpenPosition();
     }
 
     /// @inheritdoc BaseStrategy
     function _tend(uint256 _totalIdle) internal override {
-        // Early return if no rebalancing is needed.
-        if (!canRebalance()) {
-            return;
-        }
-
         // Close matured positions.
-        _totalIdle += _closeMaturedPositions(0);
+        _totalIdle += _closeMaturedPositions(_tendConfig.positionClosureLimit);
 
         // If Everlong has sufficient idle, open a new position.
-        if (
-            _totalIdle >=
-            IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount
-        ) {
+        if (_totalIdle >= _poolConfig.minimumTransactionAmount) {
             // Approve leaving an extra wei so the slot stays warm.
             ERC20(asset).forceApprove(address(hyperdrive), _totalIdle + 1);
             (uint256 maturityTime, uint256 bondAmount) = IHyperdrive(hyperdrive)
-                .openLong(asBase, _totalIdle, 0, 0, "");
+                .openLong(
+                    asBase,
+                    _totalIdle,
+                    _tendConfig.minOutput,
+                    _tendConfig.minVaultSharePrice,
+                    _tendConfig.extraData
+                );
 
             // Account for the new position in the portfolio.
             _portfolio.handleOpenPosition(maturityTime, bondAmount);
@@ -256,15 +251,14 @@ contract EverlongStrategy is BaseStrategy {
         uint256 _targetOutput
     ) internal returns (uint256 output) {
         // Round `_targetOutput` up to Hyperdrive's minimum transaction amount.
-        _targetOutput = _targetOutput.max(
-            IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount
-        );
+        _targetOutput = _targetOutput.max(_poolConfig.minimumTransactionAmount);
 
         // Since multiple position's worth of bonds may need to be closed,
         // iterate through each position starting with the most mature.
         //
         // For each position, use the expected output of closing the entire
-        // position to estimate the amount of bonds to sell for a partial closure.
+        // position to estimate the amount of bonds to sell for a partial
+        // closure.
         IEverlongStrategy.Position memory position;
         uint256 totalPositionValue;
         while (!_portfolio.isEmpty() && output < _targetOutput) {
@@ -286,13 +280,8 @@ contract EverlongStrategy is BaseStrategy {
             // Hyperdrive's minimum transaction amount.
             if (
                 totalPositionValue >
-                (_targetOutput -
-                    output +
-                    IHyperdrive(hyperdrive)
-                        .getPoolConfig()
-                        .minimumTransactionAmount).mulUp(
-                        ONE + partialPositionClosureBuffer
-                    )
+                (_targetOutput - output + _poolConfig.minimumTransactionAmount)
+                    .mulUp(ONE + partialPositionClosureBuffer)
             ) {
                 // Calculate the amount of bonds to close from the position.
                 uint256 bondsNeeded = uint256(position.bondAmount).mulDivUp(
@@ -340,8 +329,51 @@ contract EverlongStrategy is BaseStrategy {
     }
 
     // ╭───────────────────────────────────────────────────────────────────────╮
-    // │                            VIEW FUNCTIONS                             │
+    // │                                SETTERS                                │
     // ╰───────────────────────────────────────────────────────────────────────╯
+
+    /// @notice Sets the minimum number of bonds to receive when opening a long.
+    /// @param _minOutput Minimum number of bonds to receive when opening a
+    ///        long.
+    function setMinOutput(uint256 _minOutput) external onlyKeepers {
+        _tendConfig.minOutput = _minOutput;
+    }
+
+    /// @notice Sets the minimum vault share price when opening a long.
+    /// @param _minVaultSharePrice Minimum vault share price when opening a
+    ///        long.
+    function setMinVaultSharePrice(
+        uint256 _minVaultSharePrice
+    ) external onlyKeepers {
+        _tendConfig.minVaultSharePrice = _minVaultSharePrice;
+    }
+
+    /// @notice Sets the max amount of mature positions to close at a time.
+    /// @param _positionClosureLimit Max amount of mature positions to close at
+    ///        a time.
+    function setPositionClosureLimit(
+        uint256 _positionClosureLimit
+    ) external onlyKeepers {
+        _tendConfig.positionClosureLimit = _positionClosureLimit;
+    }
+
+    /// @notice Sets the extra data to pass to hyperdrive when opening/closing
+    ///         longs.
+    /// @param _extraData Extra data to pass to hyperdrive when opening/closing
+    ///         longs.
+    function setExtraData(bytes memory _extraData) external onlyKeepers {
+        _tendConfig.extraData = _extraData;
+    }
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                                 VIEWS                                 │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
+    /// @notice Weighted average maturity timestamp of the portfolio.
+    /// @return Weighted average maturity timestamp of the portfolio.
+    function avgMaturityTime() external view returns (uint128) {
+        return _portfolio.avgMaturityTime;
+    }
 
     /// @notice Calculates the present portfolio value using the total amount of
     ///      bonds and the weighted average maturity of all positions.
@@ -365,24 +397,38 @@ contract EverlongStrategy is BaseStrategy {
         }
     }
 
-    // TODO: Use cached poolconfig.
-    //
-    /// @notice Returns true if the portfolio can be rebalanced.
-    /// @notice The portfolio can be rebalanced if:
-    ///         - Any positions are matured.
-    ///         - The current idle liquidity is above the target.
-    /// @return True if the portfolio can be rebalanced, false otherwise.
-    function canRebalance() public view returns (bool) {
-        return hasMaturedPositions() || canOpenPosition();
-    }
-
     /// @notice Returns whether Everlong has sufficient idle liquidity to open
     ///         a new position.
     /// @return True if a new position can be opened, false otherwise.
     function canOpenPosition() public view returns (bool) {
         return
             asset.balanceOf(address(this)) >
-            IHyperdrive(hyperdrive).getPoolConfig().minimumTransactionAmount;
+            _poolConfig.minimumTransactionAmount;
+    }
+
+    /// @notice Gets the minimum number of bonds to receive when opening a long.
+    /// @return Minimum number of bonds to receive when opening a long.
+    function getMinOutput() external view returns (uint256) {
+        return _tendConfig.minOutput;
+    }
+
+    /// @notice Gets the minimum vault share price when opening a long.
+    /// @return Minimum vault share price when opening a long.
+    function getMinVaultSharePrice() external view returns (uint256) {
+        return _tendConfig.minVaultSharePrice;
+    }
+
+    /// @notice Gets the max amount of mature positions to close at a time.
+    /// @return Max amount of mature positions to close at a time.
+    function getPositionClosureLimit() external view returns (uint256) {
+        return _tendConfig.positionClosureLimit;
+    }
+
+    /// @notice Gets the extra data to pass to hyperdrive when opening/closing
+    ///         longs.
+    /// @return Extra data to pass to hyperdrive when opening/closing longs.
+    function getExtraData() external view returns (bytes memory) {
+        return _tendConfig.extraData;
     }
 
     /// @notice Returns whether the portfolio has matured positions.

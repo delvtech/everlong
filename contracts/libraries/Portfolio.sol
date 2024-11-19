@@ -17,18 +17,12 @@ library Portfolio {
     using SafeCast for *;
     using PositionLibrary for IEverlongStrategy.Position;
 
-    // TODO: Rename me.
-    //
     /// @notice Thrown on attempting to access either end of an empty queue.
     error IndexOutOfBounds();
 
-    // TODO: Rename me.
-    //
     /// @notice Thrown on attempting to remove a position from an empty queue.
     error QueueEmpty();
 
-    // TODO: Rename me.
-    //
     /// @notice Thrown on attempting to add a position to a full queue.
     error QueueFull();
 
@@ -238,8 +232,6 @@ library Portfolio {
             // Ensure there are items in the queue.
             if (frontIndex == self._end) revert QueueEmpty();
 
-            // TODO: Ensure that we're safe to not fully clear storage here.
-            //
             // Update indices to shrink the queue.
             value = self._q[frontIndex];
             delete self._q[frontIndex];

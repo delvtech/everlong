@@ -103,7 +103,6 @@ library HyperdriveExecutionLibrary {
         uint256 _minOutput,
         bytes memory _data
     ) internal returns (uint256 proceeds) {
-        // TODO: Slippage
         proceeds = self.closeLong(
             _position.maturityTime,
             _position.bondAmount,
