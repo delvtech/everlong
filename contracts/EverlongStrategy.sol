@@ -156,15 +156,13 @@ contract EverlongStrategy is BaseStrategy {
         override
         returns (uint256 _totalAssets)
     {
-        // Recalculate the value of assets the strategy controls.
-        // Since `totalAssets` decreases slightly after opening longs, we want
-        // to update it before calling tend to avoid reporting a temporary loss.
-        _totalAssets = calculateTotalAssets();
-
         // Call `_tend()` to close mature positions and spend idle if needed.
         if (_tendTrigger()) {
             _tend(ERC20(asset).balanceOf(address(this)));
         }
+
+        // Recalculate the value of assets the strategy controls.
+        _totalAssets = calculateTotalAssets();
     }
 
     /// @inheritdoc BaseStrategy

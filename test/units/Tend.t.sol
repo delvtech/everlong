@@ -17,6 +17,30 @@ contract TestTend is EverlongTest {
     using HyperdriveUtils for *;
     using HyperdriveExecutionLibrary for *;
 
+    // NOTE: Playground to see vault APR. Modify various vault parameters to see
+    //       how they affect the calculated APR.
+    //
+    /// @dev Tests that the gas cost for closing the maximum amount of matured
+    ///      positions does not exceed the block gas limit.
+    function test_apr() external {
+        // Comment the line below to run the playground.
+        // vm.skip(true);
+
+        uint256 spent = 100e18;
+        uint256 shares = depositVault(spent, alice, true);
+        advanceTimeWithCheckpointsAndReporting(POSITION_DURATION + 1);
+        redeemVault(shares, alice);
+        uint256 balance = IERC20(vault.asset()).balanceOf(alice);
+        console.log("Fixed: %e", FIXED_RATE);
+        console.log("Variable: %e", VARIABLE_RATE);
+        console.log("Balance: %e", balance);
+        console.log("Spent: %e", spent);
+        console.log(
+            "Profit: %e",
+            (IERC20(vault.asset()).balanceOf(alice) - spent).divDown(spent)
+        );
+    }
+
     /// @dev Tests that the gas cost for closing the maximum amount of matured
     ///      positions does not exceed the block gas limit.
     function test_tend_max_matured_positions() external {

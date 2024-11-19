@@ -63,7 +63,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     address internal HYPERDRIVE_INITIALIZER = address(0);
 
     uint256 internal FIXED_RATE = 0.05e18;
-    int256 internal VARIABLE_RATE = 0.10e18;
+    int256 internal VARIABLE_RATE = 0.05e18;
 
     uint256 internal INITIAL_VAULT_SHARE_PRICE = 1e18;
     uint256 internal INITIAL_CONTRIBUTION = 2_000_000e18;
@@ -83,6 +83,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     /// @dev Everlong token symbol.
     string internal EVERLONG_SYMBOL = "EVRLNG";
 
+    // TODO: Implement and test.
     uint256 internal TARGET_IDLE_LIQUIDITY_BASIS_POINTS = 0;
     uint256 internal MIN_IDLE_LIQUIDITY_BASIS_POINTS = 0;
 
