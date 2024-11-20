@@ -103,7 +103,7 @@ contract EverlongStrategy is BaseStrategy {
     // │                                 STATE                                 │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
-    /// FIXME: Comment
+    /// @dev Configuration for how `_tend(..)` is performed.
     IEverlongStrategy.TendConfig internal _tendConfig;
 
     /// @dev Structure to store and account for everlong-controlled positions.
