@@ -156,8 +156,9 @@ contract EverlongStrategy is BaseStrategy {
         override
         returns (uint256 _totalAssets)
     {
-        // Call `_tend()` to close mature positions and spend idle if needed.
-        if (_tendTrigger()) {
+        // If the strategy isn't shut down, call `_tend()` to close mature
+        // positions and spend idle if needed.
+        if (!TokenizedStrategy.isShutdown() && _tendTrigger()) {
             _tend(ERC20(asset).balanceOf(address(this)));
         }
 
@@ -183,14 +184,17 @@ contract EverlongStrategy is BaseStrategy {
         // Close matured positions.
         _totalIdle += _closeMaturedPositions(_tendConfig.positionClosureLimit);
 
+        // Limit the amount that can be spent by the deposit limit.
+        uint256 toSpend = _totalIdle.min(availableDepositLimit(address(this)));
+
         // If Everlong has sufficient idle, open a new position.
-        if (_totalIdle > _poolConfig.minimumTransactionAmount) {
+        if (toSpend > _poolConfig.minimumTransactionAmount) {
             // Approve leaving an extra wei so the slot stays warm.
-            ERC20(asset).forceApprove(address(hyperdrive), _totalIdle + 1);
+            ERC20(asset).forceApprove(address(hyperdrive), toSpend + 1);
             (uint256 maturityTime, uint256 bondAmount) = IHyperdrive(hyperdrive)
                 .openLong(
                     asBase,
-                    _totalIdle,
+                    toSpend,
                     _tendConfig.minOutput,
                     _tendConfig.minVaultSharePrice,
                     _tendConfig.extraData
@@ -386,17 +390,26 @@ contract EverlongStrategy is BaseStrategy {
         if (_portfolio.totalBonds != 0) {
             // NOTE: The maturity time is rounded to the next checkpoint to
             //       underestimate the portfolio value.
-            value += IHyperdrive(hyperdrive).previewCloseLong(
-                asBase,
-                _poolConfig,
-                IEverlongStrategy.Position({
-                    maturityTime: IHyperdrive(hyperdrive)
-                        .getCheckpointIdUp(_portfolio.avgMaturityTime)
-                        .toUint128(),
-                    bondAmount: _portfolio.totalBonds
-                }),
-                ""
-            );
+            // value += IHyperdrive(hyperdrive).previewCloseLong(
+            //     asBase,
+            //     _poolConfig,
+            //     IEverlongStrategy.Position({
+            //         maturityTime: IHyperdrive(hyperdrive)
+            //             .getCheckpointIdUp(_portfolio.avgMaturityTime)
+            //             .toUint128(),
+            //         bondAmount: _portfolio.totalBonds
+            //     }),
+            //     ""
+            // );
+            for (uint256 i = 0; i < _portfolio.positionCount(); i++) {
+                IEverlongStrategy.Position memory p = _portfolio.at(i);
+                value += IHyperdrive(hyperdrive).previewCloseLong(
+                    asBase,
+                    _poolConfig,
+                    p,
+                    ""
+                );
+            }
         }
     }
 

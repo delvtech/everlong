@@ -6,6 +6,7 @@ import { console2 as console } from "forge-std/console2.sol";
 import { HyperdriveTest } from "hyperdrive/test/utils/HyperdriveTest.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
+import { IHyperdrive, IERC20 } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { IStrategy } from "tokenized-strategy/interfaces/IStrategy.sol";
 import { Roles } from "yearn-vaults-v3/interfaces/Roles.sol";
@@ -66,7 +67,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     int256 internal VARIABLE_RATE = 0.05e18;
 
     uint256 internal INITIAL_VAULT_SHARE_PRICE = 1e18;
-    uint256 internal INITIAL_CONTRIBUTION = 2_000_000e18;
+    uint256 internal INITIAL_CONTRIBUTION = 1_000_000e18;
 
     uint256 internal CURVE_FEE = 0.01e18;
     uint256 internal FLAT_FEE = 0.0005e18;
@@ -76,6 +77,18 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                           Everlong Storage                            │
     // ╰───────────────────────────────────────────────────────────────────────╯
+
+    uint256 lastStrategyReportTime;
+    uint256 lastVaultReportTime;
+
+    /// @dev Time period for the strategy to release profits over.
+    uint256 internal STRATEGY_PROFIT_MAX_UNLOCK_TIME = 0;
+
+    /// @dev Time period for the strategy to release profits over.
+    uint256 internal VAULT_PROFIT_MAX_UNLOCK_TIME = 3 days;
+
+    /// @dev Everlong asset.
+    IERC20 internal asset;
 
     /// @dev Everlong token name.
     string internal EVERLONG_NAME = "Everlong Testing";
@@ -140,6 +153,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             GOVERNANCE_LP_FEE,
             GOVERNANCE_ZOMBIE_FEE
         );
+        asset = IERC20(hyperdrive.baseToken());
 
         // Seed liquidity for the hyperdrive instance.
         if (HYPERDRIVE_INITIALIZER == address(0)) {
@@ -172,7 +186,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         strategy = IEverlongStrategy(
             address(
                 strategyFactory.newStrategy(
-                    address(hyperdrive.baseToken()),
+                    address(asset),
                     EVERLONG_NAME,
                     address(hyperdrive),
                     true
@@ -185,12 +199,12 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         // As the `management` address:
         //   1. Accept the `management` role for the strategy.
         //   2. Set the `profitMaxUnlockTime` to zero.
-        //      TODO: Ensure this is what we want. Pendle has their strategy
+        //  TODO: Ensure this is what we want. Pendle has their strategy
         //            `profitMaxUnlockTime` set to 0 and their vault's set to
         //            3 days.
         vm.startPrank(management);
         strategy.acceptManagement();
-        strategy.setProfitMaxUnlockTime(0);
+        strategy.setProfitMaxUnlockTime(STRATEGY_PROFIT_MAX_UNLOCK_TIME);
         vm.stopPrank();
     }
 
@@ -229,11 +243,11 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             defaultConfig.refundRatio,
             defaultConfig.maxFee,
             defaultConfig.maxGain,
-            1_000
+            100
         );
         vault = IVault(
             roleManager.newVault(
-                address(hyperdrive.baseToken()),
+                address(asset),
                 0,
                 EVERLONG_NAME,
                 EVERLONG_SYMBOL
@@ -254,9 +268,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         //      TODO: Ensure this is what we want. Pendle has their strategy
         //            `profitMaxUnlockTime` set to 0 and their vault's set to
         //            3 days.
-        vault.setProfitMaxUnlockTime(3 days);
-        // TODO: Determine what `minimumWait` affects and whether we should be
-        // messing with it.
+        vault.setProfitMaxUnlockTime(VAULT_PROFIT_MAX_UNLOCK_TIME);
         debtAllocator.setMinimumWait(0);
         debtAllocator.setMinimumChange(
             address(vault),
@@ -268,6 +280,8 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             10_000 - TARGET_IDLE_LIQUIDITY_BASIS_POINTS,
             10_000 - MIN_IDLE_LIQUIDITY_BASIS_POINTS
         );
+        console.log("Default Queue: %s", vault.get_default_queue()[0]);
+        // debtAllocator.setMaxDebtUpdateLoss(500);
         vm.stopPrank();
     }
 
@@ -439,9 +453,9 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         address _recipient,
         uint256 _amount
     ) internal {
-        ERC20Mintable(hyperdrive.baseToken()).mint(_recipient, _amount);
+        ERC20Mintable(address(asset)).mint(_recipient, _amount);
         vm.startPrank(_recipient);
-        ERC20Mintable(hyperdrive.baseToken()).approve(address(vault), _amount);
+        ERC20Mintable(address(asset)).approve(address(vault), _amount);
         vm.stopPrank();
     }
 
@@ -465,8 +479,21 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         vm.startPrank(keeper);
         strategy.report();
         vm.stopPrank();
+        lastStrategyReportTime = block.timestamp;
         vm.startPrank(management);
-        vault.process_report(address(strategy));
+        if (
+            lastVaultReportTime == 0 ||
+            block.timestamp - lastVaultReportTime > VAULT_PROFIT_MAX_UNLOCK_TIME
+        ) {
+            (uint256 gain, uint256 loss) = vault.process_report(
+                address(strategy)
+            );
+            lastVaultReportTime = block.timestamp;
+            console.log(
+                "Vault APR: %e",
+                aprOracle.getCurrentApr(address(vault))
+            );
+        }
         vm.stopPrank();
     }
 
@@ -514,8 +541,15 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
                 HyperdriveUtils.latestCheckpoint(hyperdrive),
                 0
             );
-            report();
-            console.log("APR: %e", aprOracle.getCurrentApr(address(vault)));
+            if (
+                lastStrategyReportTime == 0 ||
+                block.timestamp - lastStrategyReportTime >
+                STRATEGY_PROFIT_MAX_UNLOCK_TIME
+            ) {
+                report();
+            } else {
+                rebalance();
+            }
         }
     }
 

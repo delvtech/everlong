@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.22;
 
+import { MockLido } from "hyperdrive/contracts/test/MockLido.sol";
+import { IHyperdrive, IERC20 } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { console2 as console } from "forge-std/console2.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
-import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { EverlongTest } from "../harnesses/EverlongTest.sol";
 import { IEverlongStrategy } from "../../contracts/interfaces/IEverlongStrategy.sol";
 import { HyperdriveExecutionLibrary } from "../../contracts/libraries/HyperdriveExecution.sol";
@@ -24,20 +25,28 @@ contract TestTend is EverlongTest {
     ///      positions does not exceed the block gas limit.
     function test_apr() external {
         // Comment the line below to run the playground.
-        // vm.skip(true);
+        vm.skip(true);
 
         uint256 spent = 100e18;
-        uint256 shares = depositVault(spent, alice, true);
-        advanceTimeWithCheckpointsAndReporting(POSITION_DURATION + 1);
-        redeemVault(shares, alice);
+        uint256 bobShares = depositVault(spent, bob, true);
+        advanceTimeWithCheckpoints(CHECKPOINT_DURATION);
+        uint256 aliceShares = depositVault(spent, alice, false);
+        advanceTimeWithCheckpointsAndReporting(POSITION_DURATION * 2);
+        redeemVault(aliceShares, alice, true);
+        advanceTimeWithCheckpoints(3 days);
+        redeemVault(bobShares, bob, true);
         uint256 balance = IERC20(vault.asset()).balanceOf(alice);
         console.log("Fixed: %e", FIXED_RATE);
         console.log("Variable: %e", VARIABLE_RATE);
         console.log("Balance: %e", balance);
         console.log("Spent: %e", spent);
         console.log(
-            "Profit: %e",
+            "Alice Profit: %e",
             (IERC20(vault.asset()).balanceOf(alice) - spent).divDown(spent)
+        );
+        console.log(
+            "Bob Profit: %e",
+            (IERC20(vault.asset()).balanceOf(bob) - spent).divDown(spent)
         );
     }
 
