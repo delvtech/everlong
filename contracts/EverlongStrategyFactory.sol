@@ -47,6 +47,13 @@ contract EverlongStrategyFactory is IEverlongStrategyFactory {
     // │                              Constructor                              │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
+    /// @notice Creates a new EverlongStrategyFactory.
+    /// @param _name Name for the strategy.
+    /// @param _management Management address to use for new strategies.
+    /// @param _performanceFeeRecipient Performance fee recipient address to use
+    ///        for new strategies.
+    /// @param _keeper Keeper address to use for new strategies.
+    /// @param _emergencyAdmin Emergency admin address to use for new strategies.
     constructor(
         string memory _name,
         address _management,

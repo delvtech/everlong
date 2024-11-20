@@ -113,6 +113,11 @@ contract EverlongStrategy is BaseStrategy {
     // │                              CONSTRUCTOR                              │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
+    /// @notice Creates a new EverlongStrategy.
+    /// @param _asset Asset to use for the strategy.
+    /// @param __name Name for the strategy.
+    /// @param _hyperdrive Address of the Hyperdrive instance.
+    /// @param _asBase Whether `_asset` is Hyperdrive's base asset.
     constructor(
         address _asset,
         string memory __name,
