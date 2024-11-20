@@ -85,7 +85,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     uint256 internal STRATEGY_PROFIT_MAX_UNLOCK_TIME = 0;
 
     /// @dev Time period for the strategy to release profits over.
-    uint256 internal VAULT_PROFIT_MAX_UNLOCK_TIME = 0;
+    uint256 internal VAULT_PROFIT_MAX_UNLOCK_TIME = 1 days;
 
     /// @dev Everlong asset.
     IERC20 internal asset;
