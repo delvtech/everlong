@@ -3,11 +3,11 @@ pragma solidity ^0.8.20;
 
 import { console2 as console } from "forge-std/console2.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
+import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
-import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
-import { EverlongTest } from "../harnesses/EverlongTest.sol";
 import { Packing } from "openzeppelin/utils/Packing.sol";
+import { EverlongTest } from "../harnesses/EverlongTest.sol";
 
 uint256 constant HYPERDRIVE_SHARE_RESERVES_BOND_RESERVES_SLOT = 2;
 uint256 constant HYPERDRIVE_LONG_EXPOSURE_LONGS_OUTSTANDING_SLOT = 3;
@@ -152,23 +152,9 @@ contract TestCloseImmatureLongs is EverlongTest {
 
         // Estimate the proceeds.
         uint256 estimatedProceeds = strategy.previewRedeem(shares);
-        console.log("previewRedeem: %e", estimatedProceeds);
-        console.log("totalAssets:   %e", strategy.totalAssets());
 
         // Close the long.
         uint256 baseProceeds = redeemStrategy(shares, bob, true);
-        console.log("actual:    %s", baseProceeds);
-        console.log(
-            "assets:    %s",
-            ERC20Mintable(strategy.asset()).balanceOf(address(vault))
-        );
-        // console.log("avg maturity time: %s", strategy.avgMaturityTime());
-        console.log("total bonds      : %s", strategy.totalBonds());
-        if (estimatedProceeds > baseProceeds) {
-            console.log("DIFFERENCE: %s", estimatedProceeds - baseProceeds);
-        }
-
-        // logPortfolioMetrics();
 
         assertGe(baseProceeds, estimatedProceeds);
         assertApproxEqAbs(
