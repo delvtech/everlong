@@ -3,28 +3,21 @@ pragma solidity ^0.8.20;
 
 // solhint-disable-next-line no-console, no-unused-import
 import { console2 as console } from "forge-std/console2.sol";
-import { HyperdriveTest } from "hyperdrive/test/utils/HyperdriveTest.sol";
-import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
+import { IERC20 } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
-import { IHyperdrive, IERC20 } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
+import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
+import { HyperdriveTest } from "hyperdrive/test/utils/HyperdriveTest.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
-import { IStrategy } from "tokenized-strategy/interfaces/IStrategy.sol";
-import { Roles } from "yearn-vaults-v3/interfaces/Roles.sol";
-import { IVaultFactory } from "yearn-vaults-v3/interfaces/IVaultFactory.sol";
 import { DebtAllocator } from "vault-periphery/debtAllocators/DebtAllocator.sol";
-import { Positions } from "vault-periphery/managers/Positions.sol";
-import { Registry } from "vault-periphery/registry/Registry.sol";
-import { ReleaseRegistry } from "vault-periphery/registry/ReleaseRegistry.sol";
-import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol";
-import { IAprOracle } from "../../contracts/interfaces/IAprOracle.sol";
-import { IEverlongStrategy } from "../../contracts/interfaces/IEverlongStrategy.sol";
-import { IEverlongStrategyFactory } from "../../contracts/interfaces/IEverlongStrategyFactory.sol";
-import { EverlongStrategyFactory } from "../../contracts/EverlongStrategyFactory.sol";
-import { EverlongStrategy } from "../../contracts/EverlongStrategy.sol";
-import { IRoleManagerFactory } from "../../contracts/interfaces/IRoleManagerFactory.sol";
-import { IRoleManager } from "../../contracts/interfaces/IRoleManager.sol";
 import { IVault } from "yearn-vaults-v3/interfaces/IVault.sol";
 import { IAccountant } from "../../contracts/interfaces/IAccountant.sol";
+import { IAprOracle } from "../../contracts/interfaces/IAprOracle.sol";
+import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol";
+import { IEverlongStrategy } from "../../contracts/interfaces/IEverlongStrategy.sol";
+import { IEverlongStrategyFactory } from "../../contracts/interfaces/IEverlongStrategyFactory.sol";
+import { IRoleManager } from "../../contracts/interfaces/IRoleManager.sol";
+import { IRoleManagerFactory } from "../../contracts/interfaces/IRoleManagerFactory.sol";
+import { EverlongStrategyFactory } from "../../contracts/EverlongStrategyFactory.sol";
 
 /// @dev Everlong testing harness contract.
 /// @dev Tests should extend this contract and call its `setUp` function.
@@ -138,15 +131,21 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     IVault internal vault;
 
     /// @dev Everlong vault role manager.
+    /// @dev Handles setup and permissioning for
+    ///      vault periphery contracts such as DebtAllocator and Accountant.
     IRoleManager internal roleManager;
 
     /// @dev Everlong vault debt allocator.
+    /// @dev Handles vault debt allocation to strategies.
     DebtAllocator internal debtAllocator;
 
     /// @dev Everlong vault accountant.
+    /// @dev Handles fee and reporting configuration.
     IAccountant internal accountant;
 
     /// @dev Yearn apr oracle.
+    /// @dev Capable of getting the current and expected apr for any vault or
+    ///      strategy.
     IAprOracle internal aprOracle =
         IAprOracle(0x1981AD9F44F2EA9aDd2dC4AD7D075c102C70aF92);
 
