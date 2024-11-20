@@ -65,7 +65,7 @@ import { Portfolio } from "./libraries/Portfolio.sol";
 //
 /// @author DELV
 /// @title EverlongStrategy
-/// @notice A money market powered by Hyperdrive.
+/// @notice A money market powered by Hyperdrive and Yearn.
 /// @custom:disclaimer The language used in this code is for coding convenience
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
