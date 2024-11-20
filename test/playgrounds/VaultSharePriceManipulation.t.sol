@@ -9,7 +9,6 @@ import { HyperdriveMath } from "hyperdrive/contracts/src/libraries/HyperdriveMat
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
-import { EVERLONG_KIND, EVERLONG_VERSION } from "../../contracts/libraries/Constants.sol";
 import { EverlongTest } from "../harnesses/EverlongTest.sol";
 import { Packing } from "openzeppelin/utils/Packing.sol";
 

@@ -5,4 +5,6 @@ uint256 constant ONE = 1e18;
 
 string constant EVERLONG_VERSION = "v0.0.1";
 
-string constant EVERLONG_KIND = "Everlong";
+string constant EVERLONG_STRATEGY_KIND = "EverlongStrategy";
+
+string constant EVERLONG_STRATEGY_FACTORY_KIND = "EverlongStrategyFactory";

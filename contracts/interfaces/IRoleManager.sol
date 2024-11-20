@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.20;
 
 // WARN: Directly importing `RoleManager.sol` from vault-periphery results in
 //       solidity compiler errors, so needed methods are copied here.

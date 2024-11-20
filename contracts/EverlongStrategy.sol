@@ -9,7 +9,7 @@ import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { BaseStrategy, ERC20 } from "tokenized-strategy/BaseStrategy.sol";
 import { IEverlongStrategy } from "./interfaces/IEverlongStrategy.sol";
-import { EVERLONG_KIND, EVERLONG_VERSION, ONE } from "./libraries/Constants.sol";
+import { EVERLONG_STRATEGY_KIND, EVERLONG_VERSION, ONE } from "./libraries/Constants.sol";
 import { HyperdriveExecutionLibrary } from "./libraries/HyperdriveExecution.sol";
 import { Portfolio } from "./libraries/Portfolio.sol";
 
@@ -85,7 +85,7 @@ contract EverlongStrategy is BaseStrategy {
     uint256 public constant partialPositionClosureBuffer = 0.001e18;
 
     /// @notice The Everlong instance's kind.
-    string public constant kind = EVERLONG_KIND;
+    string public constant kind = EVERLONG_STRATEGY_KIND;
 
     /// @notice The Everlong instance's version.
     string public constant version = EVERLONG_VERSION;
