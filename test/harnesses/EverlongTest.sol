@@ -265,9 +265,9 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         // wait to update a strategy's debt and set the minimum change before
         // updating to just above hyperdrive's minimum transaction amount.
         vm.startPrank(management);
-        //      TODO: Ensure this is what we want. Pendle has their strategy
-        //            `profitMaxUnlockTime` set to 0 and their vault's set to
-        //            3 days.
+        // TODO: Ensure this is what we want. Pendle has their strategy
+        //       `profitMaxUnlockTime` set to 0 and their vault's set to
+        //       3 days.
         vault.setProfitMaxUnlockTime(VAULT_PROFIT_MAX_UNLOCK_TIME);
         debtAllocator.setMinimumWait(0);
         debtAllocator.setMinimumChange(
