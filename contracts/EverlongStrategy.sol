@@ -394,26 +394,17 @@ contract EverlongStrategy is BaseStrategy {
         if (_portfolio.totalBonds != 0) {
             // NOTE: The maturity time is rounded to the next checkpoint to
             //       underestimate the portfolio value.
-            // value += IHyperdrive(hyperdrive).previewCloseLong(
-            //     asBase,
-            //     _poolConfig,
-            //     IEverlongStrategy.Position({
-            //         maturityTime: IHyperdrive(hyperdrive)
-            //             .getCheckpointIdUp(_portfolio.avgMaturityTime)
-            //             .toUint128(),
-            //         bondAmount: _portfolio.totalBonds
-            //     }),
-            //     ""
-            // );
-            for (uint256 i = 0; i < _portfolio.positionCount(); i++) {
-                IEverlongStrategy.Position memory p = _portfolio.at(i);
-                value += IHyperdrive(hyperdrive).previewCloseLong(
-                    asBase,
-                    _poolConfig,
-                    p,
-                    ""
-                );
-            }
+            value += IHyperdrive(hyperdrive).previewCloseLong(
+                asBase,
+                _poolConfig,
+                IEverlongStrategy.Position({
+                    maturityTime: IHyperdrive(hyperdrive)
+                        .getCheckpointIdUp(_portfolio.avgMaturityTime)
+                        .toUint128(),
+                    bondAmount: _portfolio.totalBonds
+                }),
+                ""
+            );
         }
     }
 

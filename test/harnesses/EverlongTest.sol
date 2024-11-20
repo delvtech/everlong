@@ -153,6 +153,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     // │                             SetUp Helpers                             │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
+    /// @dev Set up the testing environment on a fork of mainnet.
     function setUp() public virtual override {
         vm.createSelectFork(vm.rpcUrl("mainnet"));
         super.setUp();
