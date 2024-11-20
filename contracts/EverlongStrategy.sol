@@ -93,7 +93,7 @@ contract EverlongStrategy is BaseStrategy {
     address public immutable hyperdrive;
 
     /// @notice Whether to use Hyperdrive's base token to purchase bonds.
-    ///      If false, use the Hyperdrive's `vaultSharesToken`.
+    ///         If false, use the Hyperdrive's `vaultSharesToken`.
     bool public immutable asBase;
 
     /// @dev The Hyperdrive's PoolConfig.
