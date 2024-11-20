@@ -80,7 +80,7 @@ contract EverlongStrategy is BaseStrategy {
     /// @notice Amount of additional bonds to close during a partial position
     ///         closure to avoid rounding errors. Represented as a percentage
     ///         of the positions total  amount of bonds where 1e18 represents
-    ///         a 10% buffer.
+    ///         a 100% buffer.
     uint256 public constant partialPositionClosureBuffer = 0.001e18;
 
     /// @notice The Everlong instance's kind.

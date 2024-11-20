@@ -122,8 +122,8 @@ interface IEverlongStrategy is IStrategy, IEverlongEvents {
 
     /// @notice Amount of additional bonds to close during a partial position
     ///         closure to avoid rounding errors. Represented as a percentage
-    ///         of the positions total  amount of bonds where 0.1e18 represents
-    ///         a 10% buffer.
+    ///         of the positions total  amount of bonds where 1e18 represents
+    ///         a 100% buffer.
     /// @return The buffer for partial position closures.
     function partialPositionClosureBuffer() external view returns (uint256);
 
