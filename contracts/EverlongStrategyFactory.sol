@@ -6,7 +6,7 @@ import { IEverlongStrategy } from "./interfaces/IEverlongStrategy.sol";
 import { EVERLONG_STRATEGY_FACTORY_KIND, EVERLONG_VERSION } from "./libraries/Constants.sol";
 import { EverlongStrategy } from "./EverlongStrategy.sol";
 
-// TODO: Add testing.
+// FIXME: Add testing.
 //
 /// @author DELV
 /// @title EverlongStrategyFactory

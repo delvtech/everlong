@@ -15,10 +15,8 @@ interface IAccountant {
         bool custom; // Flag to set for custom configs.
     }
 
-    /**
-     * @notice Sets the `maxLoss` parameter to be used on redeems.
-     * @param _maxLoss The amount in basis points to set as the maximum loss.
-     */
+    /// @notice Sets the `maxLoss` parameter to be used on redeems.
+    /// @param _maxLoss The amount in basis points to set as the maximum loss.
     function setMaxLoss(uint256 _maxLoss) external;
 
     /// @notice The amount of max loss to use when redeeming from vaults.
@@ -27,16 +25,14 @@ interface IAccountant {
     /// @notice The default fee configuration.
     function defaultConfig() external view returns (Fee memory);
 
-    /**
-     * @notice Function to update the default fee configuration used for
-     *     all strategies that don't have a custom config set.
-     * @param defaultManagement Default annual management fee to charge.
-     * @param defaultPerformance Default performance fee to charge.
-     * @param defaultRefund Default refund ratio to give back on losses.
-     * @param defaultMaxFee Default max fee to allow as a percent of gain.
-     * @param defaultMaxGain Default max percent gain a strategy can report.
-     * @param defaultMaxLoss Default max percent loss a strategy can report.
-     */
+    /// @notice Function to update the default fee configuration used for
+    ///    all strategies that don't have a custom config set.
+    /// @param defaultManagement Default annual management fee to charge.
+    /// @param defaultPerformance Default performance fee to charge.
+    /// @param defaultRefund Default refund ratio to give back on losses.
+    /// @param defaultMaxFee Default max fee to allow as a percent of gain.
+    /// @param defaultMaxGain Default max percent gain a strategy can report.
+    /// @param defaultMaxLoss Default max percent loss a strategy can report.
     function updateDefaultConfig(
         uint16 defaultManagement,
         uint16 defaultPerformance,
@@ -46,17 +42,13 @@ interface IAccountant {
         uint16 defaultMaxLoss
     ) external;
 
-    /**
-     * @notice Function to accept the role change and become the new fee manager.
-     * @dev This function allows the future fee manager to accept the role change and become the new fee manager.
-     */
+    /// @notice Function to accept the role change and become the new fee manager.
+    /// @dev This function allows the future fee manager to accept the role change and become the new fee manager.
     function acceptFeeManager() external;
 
-    /**
-     * @notice Function to add a new vault for this accountant to charge fees for.
-     * @dev This is not used to set any of the fees for the specific vault or strategy. Each fee will be set separately.
-     * @param vault The address of a vault to allow to use this accountant.
-     */
+    /// @notice Function to add a new vault for this accountant to charge fees for.
+    /// @dev This is not used to set any of the fees for the specific vault or strategy. Each fee will be set separately.
+    /// @param vault The address of a vault to allow to use this accountant.
     function addVault(address vault) external;
 
     /// @notice The address of the fee manager.
