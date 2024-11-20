@@ -5,12 +5,11 @@ import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { HyperdriveMath } from "hyperdrive/contracts/src/libraries/HyperdriveMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
-import { YieldSpaceMath } from "hyperdrive/contracts/src/libraries/YieldSpaceMath.sol";
 import { ERC20 } from "openzeppelin/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { Packing } from "openzeppelin/utils/Packing.sol";
-import { IEverlongStrategy } from "../interfaces/IEverlongStrategy.sol";
 import { IEverlongEvents } from "../interfaces/IEverlongEvents.sol";
+import { IEverlongStrategy } from "../interfaces/IEverlongStrategy.sol";
 import { ONE } from "./Constants.sol";
 
 // TODO: Extract into its own library.

@@ -27,26 +27,29 @@ contract TestTend is EverlongTest {
         // Comment the line below to run the playground.
         vm.skip(true);
 
-        uint256 spent = 100e18;
-        uint256 bobShares = depositVault(spent, bob, true);
-        advanceTimeWithCheckpoints(CHECKPOINT_DURATION);
-        uint256 aliceShares = depositVault(spent, alice, false);
-        advanceTimeWithCheckpointsAndReporting(POSITION_DURATION * 2);
-        redeemVault(aliceShares, alice, true);
-        advanceTimeWithCheckpoints(3 days);
-        redeemVault(bobShares, bob, true);
-        uint256 balance = IERC20(vault.asset()).balanceOf(alice);
-        console.log("Fixed: %e", FIXED_RATE);
-        console.log("Variable: %e", VARIABLE_RATE);
-        console.log("Balance: %e", balance);
-        console.log("Spent: %e", spent);
+        uint256 depositAmount = 1_000e18;
+
+        // Deposit and redeem from the strategy.
+        uint256 bobShares = depositStrategy(depositAmount, bob, true);
+        advanceTimeWithCheckpointsAndReporting(POSITION_DURATION);
+        redeemStrategy(bobShares, bob);
+
+        // Deposit and redeem from the vault.
+        uint256 aliceShares = depositVault(depositAmount, alice, true);
+        advanceTimeWithCheckpointsAndReporting(POSITION_DURATION);
+        redeemVault(aliceShares, alice);
+
         console.log(
-            "Alice Profit: %e",
-            (IERC20(vault.asset()).balanceOf(alice) - spent).divDown(spent)
+            "Vault Profit: %e",
+            (IERC20(vault.asset()).balanceOf(alice) - depositAmount).divDown(
+                depositAmount
+            )
         );
         console.log(
-            "Bob Profit: %e",
-            (IERC20(vault.asset()).balanceOf(bob) - spent).divDown(spent)
+            "Strategy Profit: %e",
+            (IERC20(vault.asset()).balanceOf(bob) - depositAmount).divDown(
+                depositAmount
+            )
         );
     }
 

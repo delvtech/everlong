@@ -61,28 +61,39 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     // │                       Hyperdrive Configuration                        │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
+    /// @dev Address calling `initialize(..)` on the hyperdrive instance.
     address internal HYPERDRIVE_INITIALIZER = address(0);
 
+    /// @dev Fixed rate for the hyperdrive instance.
     uint256 internal FIXED_RATE = 0.05e18;
+
+    /// @dev Variable rate for the hyperdrive instance.
     int256 internal VARIABLE_RATE = 0.05e18;
 
+    /// @dev Initial vault share price for the hyperdrive instance.
     uint256 internal INITIAL_VAULT_SHARE_PRICE = 1e18;
+
+    /// @dev Initial contribution for the hyperdrive instance.
     uint256 internal INITIAL_CONTRIBUTION = 1_000_000e18;
 
+    /// @dev Curve fee for the hyperdrive instance.
     uint256 internal CURVE_FEE = 0.01e18;
+
+    /// @dev Flat fee for the hyperdrive instance.
     uint256 internal FLAT_FEE = 0.0005e18;
+
+    /// @dev Governance LP fee for the hyperdrive instance.
     uint256 internal GOVERNANCE_LP_FEE = 0.15e18;
+
+    /// @dev Governance Zombie fee for the hyperdrive instance.
     uint256 internal GOVERNANCE_ZOMBIE_FEE = 0.03e18;
 
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                           Everlong Storage                            │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
-    uint256 lastStrategyReportTime;
-    uint256 lastVaultReportTime;
-
     /// @dev Time period for the strategy to release profits over.
-    uint256 internal STRATEGY_PROFIT_MAX_UNLOCK_TIME = 0;
+    uint256 internal STRATEGY_PROFIT_MAX_UNLOCK_TIME = 1 days;
 
     /// @dev Time period for the strategy to release profits over.
     uint256 internal VAULT_PROFIT_MAX_UNLOCK_TIME = 1 days;
@@ -97,7 +108,13 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     string internal EVERLONG_SYMBOL = "EVRLNG";
 
     // TODO: Implement and test.
+    //
+    /// @dev Target idle liquidity (in basis points) for the Everlong vault.
     uint256 internal TARGET_IDLE_LIQUIDITY_BASIS_POINTS = 0;
+
+    // TODO: Implement and test.
+    //
+    /// @dev Target idle liquidity (in basis points) for the Everlong vault.
     uint256 internal MIN_IDLE_LIQUIDITY_BASIS_POINTS = 0;
 
     /// @dev Everlong vault management address.
@@ -120,10 +137,16 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     /// @dev Everlong vault.
     IVault internal vault;
 
+    /// @dev Everlong vault role manager.
     IRoleManager internal roleManager;
+
+    /// @dev Everlong vault debt allocator.
     DebtAllocator internal debtAllocator;
-    Registry internal yearnRegistry;
+
+    /// @dev Everlong vault accountant.
     IAccountant internal accountant;
+
+    /// @dev Yearn apr oracle.
     IAprOracle internal aprOracle =
         IAprOracle(0x1981AD9F44F2EA9aDd2dC4AD7D075c102C70aF92);
 
@@ -206,6 +229,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         vm.startPrank(management);
         strategy.acceptManagement();
         strategy.setProfitMaxUnlockTime(STRATEGY_PROFIT_MAX_UNLOCK_TIME);
+        strategy.setPerformanceFee(0);
         vm.stopPrank();
     }
 
@@ -218,7 +242,6 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             roleManagerFactory.newProject("Everlong", governance, management)
         );
         debtAllocator = DebtAllocator(roleManager.getDebtAllocator());
-        yearnRegistry = Registry(roleManager.getRegistry());
         accountant = IAccountant(roleManager.getAccountant());
         vm.stopPrank();
 
@@ -238,14 +261,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         // TODO: Confirm with the yearn team that this is the best way to be
         //       handling the scenario where totalAssets drops after liquidity
         //       is deployed to Hyperdrive.
-        accountant.updateDefaultConfig(
-            defaultConfig.managementFee,
-            defaultConfig.performanceFee,
-            defaultConfig.refundRatio,
-            defaultConfig.maxFee,
-            defaultConfig.maxGain,
-            100
-        );
+        accountant.updateDefaultConfig(0, 0, 0, 0, defaultConfig.maxGain, 100);
         vault = IVault(
             roleManager.newVault(
                 address(asset),
@@ -281,8 +297,6 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             10_000 - TARGET_IDLE_LIQUIDITY_BASIS_POINTS,
             10_000 - MIN_IDLE_LIQUIDITY_BASIS_POINTS
         );
-        console.log("Default Queue: %s", vault.get_default_queue()[0]);
-        // debtAllocator.setMaxDebtUpdateLoss(500);
         vm.stopPrank();
     }
 
@@ -477,24 +491,14 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     /// @dev Call `report` on the strategy then call `process_report` on the
     ///      vault.
     function report() internal {
+        // Call report for the strategy.
         vm.startPrank(keeper);
         strategy.report();
         vm.stopPrank();
-        lastStrategyReportTime = block.timestamp;
+
+        // Call process_report for the vault.
         vm.startPrank(management);
-        if (
-            lastVaultReportTime == 0 ||
-            block.timestamp - lastVaultReportTime > VAULT_PROFIT_MAX_UNLOCK_TIME
-        ) {
-            (uint256 gain, uint256 loss) = vault.process_report(
-                address(strategy)
-            );
-            lastVaultReportTime = block.timestamp;
-            console.log(
-                "Vault APR: %e",
-                aprOracle.getCurrentApr(address(vault))
-            );
-        }
+        vault.process_report(address(strategy));
         vm.stopPrank();
     }
 
@@ -538,19 +542,14 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         // advancing time to the next checkpoint.
         while (block.timestamp - startTimeElapsed < _time) {
             advanceTime(CHECKPOINT_DURATION, VARIABLE_RATE);
+            // Create the checkpoint.
             hyperdrive.checkpoint(
                 HyperdriveUtils.latestCheckpoint(hyperdrive),
                 0
             );
-            if (
-                lastStrategyReportTime == 0 ||
-                block.timestamp - lastStrategyReportTime >
-                STRATEGY_PROFIT_MAX_UNLOCK_TIME
-            ) {
-                report();
-            } else {
-                rebalance();
-            }
+
+            // Generate reports for the strategy and vault.
+            report();
         }
     }
 
