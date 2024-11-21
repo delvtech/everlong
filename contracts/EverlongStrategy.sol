@@ -133,7 +133,9 @@ contract EverlongStrategy is BaseStrategy {
     // │                          STRATEGY OVERRIDES                           │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
-    /// @inheritdoc BaseStrategy
+    /// @dev Deploy up to '_amount' of 'asset' in the yield source.
+    /// @param _amount The amount of 'asset' that the strategy can attempt
+    ///        to deposit in the yield source.
     function _deployFunds(uint256) internal override {
         // Do nothing.
         // Opening longs on Hyperdrive is sandwichable so funds should only be
@@ -141,7 +143,10 @@ contract EverlongStrategy is BaseStrategy {
         return;
     }
 
-    /// @inheritdoc BaseStrategy
+    /// @dev Attempt to free the '_amount' of 'asset'.
+    /// @dev Any difference between `_amount` and what is actually freed will be
+    ///      counted as a loss and passed on to the withdrawer.
+    /// @param _amount The amount of 'asset' to be freed.
     function _freeFunds(uint256 _amount) internal override {
         // Close all matured positions (if any).
         // TODO: Determine whether `_tendConfig.positionClosureLimit` should
@@ -154,7 +159,12 @@ contract EverlongStrategy is BaseStrategy {
         }
     }
 
-    /// @inheritdoc BaseStrategy
+    /// @dev Internal function to harvest all rewards, redeploy any idle
+    ///      funds and return an accurate accounting of all funds currently
+    ///      held by the Strategy.
+    /// @return _totalAssets A trusted and accurate account for the total
+    ///         amount of 'asset' the strategy currently holds including idle
+    ///         funds.
     function _harvestAndReport()
         internal
         override
@@ -170,7 +180,10 @@ contract EverlongStrategy is BaseStrategy {
         _totalAssets = calculateTotalAssets();
     }
 
-    /// @inheritdoc BaseStrategy
+    /// @notice Gets the max amount of `asset` that an address can deposit.
+    /// @param . The address that is depositing into the strategy.
+    /// @return The available amount the `_owner` can deposit in terms of
+    ///         `asset`.
     function availableDepositLimit(
         address
     ) public view override returns (uint256) {
@@ -178,12 +191,17 @@ contract EverlongStrategy is BaseStrategy {
         return IHyperdrive(hyperdrive).calculateMaxLong();
     }
 
-    /// @inheritdoc BaseStrategy
+    /// @dev Trigger to override if tend() will be used by the strategy.
+    ///      This must be implemented if the strategy hopes to invoke _tend().
+    ///
+    /// @return Return true if tend() should be called by keeper, false if not.
     function _tendTrigger() internal view override returns (bool) {
         return hasMaturedPositions() || canOpenPosition();
     }
 
-    /// @inheritdoc BaseStrategy
+    /// @dev Can be called inbetween reports to rebalance the portfolio.
+    /// @param _totalIdle The current amount of idle funds that are available to
+    ///         deploy.
     function _tend(uint256 _totalIdle) internal override {
         // Close matured positions.
         _totalIdle += _closeMaturedPositions(_tendConfig.positionClosureLimit);
