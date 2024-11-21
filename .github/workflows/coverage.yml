@@ -1,12 +1,12 @@
-name: Code Coverage
+name: coverage
 
 on:
   pull_request:
   merge_group:
 
 jobs:
-  coverage:
-    name: coverage
+  lcov:
+    name: lcov
     runs-on: ubuntu-latest
     env:
       MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
@@ -44,7 +44,7 @@ jobs:
           parallel: true
 
   finish:
-    needs: coverage
+    needs: lcov
     runs-on: ubuntu-latest
     steps:
       - name: Coveralls Finished

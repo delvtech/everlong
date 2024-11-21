@@ -8,7 +8,8 @@ env:
   FOUNDRY_PROFILE: ci
 
 jobs:
-  check:
+  foundry:
+    name: foundry
     strategy:
       fail-fast: true
     env:
@@ -16,7 +17,6 @@ jobs:
       SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
       GNOSIS_CHAIN_RPC_URL: ${{ secrets.GNOSIS_CHAIN_RPC_URL }}
       LINEA_RPC_URL: ${{ secrets.LINEA_RPC_URL }}
-    name: Foundry project
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
