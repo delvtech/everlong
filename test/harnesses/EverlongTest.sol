@@ -3,19 +3,32 @@ pragma solidity ^0.8.20;
 
 // solhint-disable-next-line no-console, no-unused-import
 import { console2 as console } from "forge-std/console2.sol";
-import { HyperdriveTest } from "hyperdrive/test/utils/HyperdriveTest.sol";
+import { IERC20 } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
+import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
+import { HyperdriveTest } from "hyperdrive/test/utils/HyperdriveTest.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
+import { DebtAllocator } from "vault-periphery/debtAllocators/DebtAllocator.sol";
+import { IVault } from "yearn-vaults-v3/interfaces/IVault.sol";
+import { IAccountant } from "../../contracts/interfaces/IAccountant.sol";
+import { IAprOracle } from "../../contracts/interfaces/IAprOracle.sol";
 import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol";
-import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
-import { EverlongExposed } from "../exposed/EverlongExposed.sol";
+import { IEverlongStrategy } from "../../contracts/interfaces/IEverlongStrategy.sol";
+import { IEverlongStrategyFactory } from "../../contracts/interfaces/IEverlongStrategyFactory.sol";
+import { IRoleManager } from "../../contracts/interfaces/IRoleManager.sol";
+import { IRoleManagerFactory } from "../../contracts/interfaces/IRoleManagerFactory.sol";
+import { EverlongStrategyFactory } from "../../contracts/EverlongStrategyFactory.sol";
 
-// TODO: Refactor this to include an instance of `Everlong` with exposed internal functions.
 /// @dev Everlong testing harness contract.
 /// @dev Tests should extend this contract and call its `setUp` function.
 contract EverlongTest is HyperdriveTest, IEverlongEvents {
     using HyperdriveUtils for *;
-    // ── Hyperdrive Storage ──────────────────────────────────────────────
+    using FixedPointMath for *;
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                        HyperdriveTest Storage                         │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
     // address alice
     // address bob
     // address celine
@@ -37,51 +50,122 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     // IHyperdriveCheckpointRewarder checkpointRewarder
     // IHyperdrive                   hyperdrive
 
-    /// @dev Everlong instance to test.
-    EverlongExposed internal everlong;
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                       Hyperdrive Configuration                        │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
+    /// @dev Address calling `initialize(..)` on the hyperdrive instance.
+    address internal HYPERDRIVE_INITIALIZER = address(0);
+
+    /// @dev Fixed rate for the hyperdrive instance.
+    uint256 internal FIXED_RATE = 0.05e18;
+
+    /// @dev Variable rate for the hyperdrive instance.
+    int256 internal VARIABLE_RATE = 0.05e18;
+
+    /// @dev Initial vault share price for the hyperdrive instance.
+    uint256 internal INITIAL_VAULT_SHARE_PRICE = 1e18;
+
+    /// @dev Initial contribution for the hyperdrive instance.
+    uint256 internal INITIAL_CONTRIBUTION = 1_000_000e18;
+
+    /// @dev Curve fee for the hyperdrive instance.
+    uint256 internal CURVE_FEE = 0.01e18;
+
+    /// @dev Flat fee for the hyperdrive instance.
+    uint256 internal FLAT_FEE = 0.0005e18;
+
+    /// @dev Governance LP fee for the hyperdrive instance.
+    uint256 internal GOVERNANCE_LP_FEE = 0.15e18;
+
+    /// @dev Governance Zombie fee for the hyperdrive instance.
+    uint256 internal GOVERNANCE_ZOMBIE_FEE = 0.03e18;
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                           Everlong Storage                            │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
+    /// @dev Time period for the strategy to release profits over.
+    uint256 internal STRATEGY_PROFIT_MAX_UNLOCK_TIME = 1 days;
+
+    /// @dev Time period for the strategy to release profits over.
+    uint256 internal VAULT_PROFIT_MAX_UNLOCK_TIME = 1 days;
+
+    /// @dev Everlong asset.
+    IERC20 internal asset;
 
     /// @dev Everlong token name.
     string internal EVERLONG_NAME = "Everlong Testing";
 
     /// @dev Everlong token symbol.
-    string internal EVERLONG_SYMBOL = "evTest";
+    string internal EVERLONG_SYMBOL = "EVRLNG";
 
-    uint256 internal TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0.1e18;
-    uint256 internal MAX_IDLE_LIQUIDITY_PERCENTAGE = 0.2e18;
+    // TODO: Implement and test.
+    //
+    /// @dev Target idle liquidity (in basis points) for the Everlong vault.
+    uint256 internal TARGET_IDLE_LIQUIDITY_BASIS_POINTS = 0;
 
-    IEverlong.RebalanceOptions internal DEFAULT_REBALANCE_OPTIONS =
-        IEverlong.RebalanceOptions({
-            spendingLimit: 0,
-            minOutput: 0,
-            minVaultSharePrice: 0,
-            positionClosureLimit: 0,
-            extraData: ""
-        });
+    // TODO: Implement and test.
+    //
+    /// @dev Target idle liquidity (in basis points) for the Everlong vault.
+    uint256 internal MIN_IDLE_LIQUIDITY_BASIS_POINTS = 0;
 
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ Hyperdrive Configuration                                │
-    // ╰─────────────────────────────────────────────────────────╯
+    /// @dev Everlong vault management address.
+    /// @dev Used when interacting with the `DebtAllocator`.
+    address internal management;
 
-    address internal HYPERDRIVE_INITIALIZER = address(0);
+    /// @dev Everlong keeper address.
+    address internal keeper;
 
-    uint256 internal FIXED_RATE = 0.05e18;
-    int256 internal VARIABLE_RATE = 0.10e18;
+    /// @dev Mainnet `RoleManager` factory.
+    IRoleManagerFactory internal roleManagerFactory =
+        IRoleManagerFactory(0xca12459a931643BF28388c67639b3F352fe9e5Ce);
 
-    uint256 internal INITIAL_VAULT_SHARE_PRICE = 1e18;
-    uint256 internal INITIAL_CONTRIBUTION = 2_000_000e18;
+    /// @dev Everlong strategy factory.
+    IEverlongStrategyFactory internal strategyFactory;
 
-    uint256 internal CURVE_FEE = 0.01e18;
-    uint256 internal FLAT_FEE = 0.0005e18;
-    uint256 internal GOVERNANCE_LP_FEE = 0.15e18;
-    uint256 internal GOVERNANCE_ZOMBIE_FEE = 0.03e18;
+    /// @dev Everlong strategy.
+    IEverlongStrategy internal strategy;
 
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ Deploy Helpers                                          │
-    // ╰─────────────────────────────────────────────────────────╯
+    /// @dev Everlong vault.
+    IVault internal vault;
 
-    /// @dev Deploy the Everlong instance with default underlying, name,
-    ///      and symbol.
-    function deployEverlong() internal {
+    /// @dev Everlong vault role manager.
+    /// @dev Handles setup and permissioning for
+    ///      vault periphery contracts such as DebtAllocator and Accountant.
+    IRoleManager internal roleManager;
+
+    /// @dev Everlong vault debt allocator.
+    /// @dev Handles vault debt allocation to strategies.
+    DebtAllocator internal debtAllocator;
+
+    /// @dev Everlong vault accountant.
+    /// @dev Handles fee and reporting configuration.
+    IAccountant internal accountant;
+
+    /// @dev Yearn apr oracle.
+    /// @dev Capable of getting the current and expected apr for any vault or
+    ///      strategy.
+    IAprOracle internal aprOracle =
+        IAprOracle(0x1981AD9F44F2EA9aDd2dC4AD7D075c102C70aF92);
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                             SetUp Helpers                             │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
+    /// @dev Set up the testing environment on a fork of mainnet.
+    function setUp() public virtual override {
+        vm.createSelectFork(vm.rpcUrl("mainnet"));
+        super.setUp();
+        setUpHyperdrive();
+        setUpEverlongStrategy();
+        setUpEverlongVault();
+    }
+
+    /// @dev Deploy and initialize the hyperdrive instance with seed liquidity.
+    function setUpHyperdrive() internal {
+        vm.startPrank(deployer);
+
         // Deploy the hyperdrive instance.
         deploy(
             deployer,
@@ -92,6 +176,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             GOVERNANCE_LP_FEE,
             GOVERNANCE_ZOMBIE_FEE
         );
+        asset = IERC20(hyperdrive.baseToken());
 
         // Seed liquidity for the hyperdrive instance.
         if (HYPERDRIVE_INITIALIZER == address(0)) {
@@ -99,97 +184,149 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         }
         initialize(HYPERDRIVE_INITIALIZER, FIXED_RATE, INITIAL_CONTRIBUTION);
 
-        vm.startPrank(deployer);
-        everlong = new EverlongExposed(
-            EVERLONG_NAME,
-            EVERLONG_SYMBOL,
-            hyperdrive.decimals(),
-            address(hyperdrive),
-            true,
-            TARGET_IDLE_LIQUIDITY_PERCENTAGE,
-            MAX_IDLE_LIQUIDITY_PERCENTAGE
-        );
         vm.stopPrank();
-
-        // Fast forward and accrue some interest.
-        advanceTimeWithCheckpoints(POSITION_DURATION * 2);
     }
 
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ Deposit Helpers                                         │
-    // ╰─────────────────────────────────────────────────────────╯
+    /// @dev Deploy the Everlong Yearn Tokenized Strategy.
+    function setUpEverlongStrategy() internal {
+        vm.startPrank(deployer);
 
-    /// @dev Deposit into Everlong.
+        // Set up the `management` address.
+        management = createUser("management");
+
+        // Set Up the `keeper` address.
+        keeper = createUser("keeper");
+
+        // Deploy the EverlongStrategyFactory.
+        strategyFactory = new EverlongStrategyFactory(
+            "TestEverlongStrategyFactory", // Name
+            management, // Management
+            governance, // Performance Fee Recipient
+            keeper, // Keeper
+            deployer // Emergency Admin
+        );
+
+        // Deploy the Strategy.
+        strategy = IEverlongStrategy(
+            address(
+                strategyFactory.newStrategy(
+                    address(asset),
+                    EVERLONG_NAME,
+                    address(hyperdrive),
+                    true
+                )
+            )
+        );
+
+        vm.stopPrank();
+
+        // As the `management` address:
+        //   1. Accept the `management` role for the strategy.
+        //   2. Set the `profitMaxUnlockTime` to zero.
+        //  TODO: Ensure this is what we want. Pendle has their strategy
+        //            `profitMaxUnlockTime` set to 0 and their vault's set to
+        //            3 days.
+        vm.startPrank(management);
+        strategy.acceptManagement();
+        strategy.setProfitMaxUnlockTime(STRATEGY_PROFIT_MAX_UNLOCK_TIME);
+        strategy.setPerformanceFee(0);
+        vm.stopPrank();
+    }
+
+    /// @dev Deploy the Everlong Yearn v3 Vault.
+    function setUpEverlongVault() internal {
+        // Deploy the RoleManager from the factory and store the relevant
+        // RoleManager component addresses.
+        vm.startPrank(deployer);
+        roleManager = IRoleManager(
+            roleManagerFactory.newProject("Everlong", governance, management)
+        );
+        debtAllocator = DebtAllocator(roleManager.getDebtAllocator());
+        accountant = IAccountant(roleManager.getAccountant());
+        vm.stopPrank();
+
+        // As the `governance` address:
+        //   1. Accept the "Fee Manager" role for the Accountant.
+        //   2. Set the default `config.maxLoss` for the accountant to be 10%.
+        //      This will enable losses of up to 10% across reports before
+        //      reverting.
+        //   3. Deploy the Vault using the RoleManager.
+        //   4. Add the EverlongStrategy to the vault.
+        //   5. Update the max debt for the strategy to be the maximum uint256.
+        //   6. Configure the vault to `auto_allocate` which will automatically
+        //      update the strategy's debt on deposit.
+        vm.startPrank(governance);
+        accountant.acceptFeeManager();
+        IAccountant.Fee memory defaultConfig = accountant.defaultConfig();
+        // TODO: Confirm with the yearn team that this is the best way to be
+        //       handling the scenario where totalAssets drops after liquidity
+        //       is deployed to Hyperdrive.
+        accountant.updateDefaultConfig(0, 0, 0, 0, defaultConfig.maxGain, 100);
+        vault = IVault(
+            roleManager.newVault(
+                address(asset),
+                0,
+                EVERLONG_NAME,
+                EVERLONG_SYMBOL
+            )
+        );
+        vault.add_strategy(address(strategy));
+        vault.update_max_debt_for_strategy(
+            address(strategy),
+            type(uint256).max
+        );
+        vault.set_auto_allocate(true);
+        vm.stopPrank();
+
+        // As the `management` address, configure the DebtAllocator to not
+        // wait to update a strategy's debt and set the minimum change before
+        // updating to just above hyperdrive's minimum transaction amount.
+        vm.startPrank(management);
+        // TODO: Ensure this is what we want. Pendle has their strategy
+        //       `profitMaxUnlockTime` set to 0 and their vault's set to
+        //       3 days.
+        vault.setProfitMaxUnlockTime(VAULT_PROFIT_MAX_UNLOCK_TIME);
+        debtAllocator.setMinimumWait(0);
+        debtAllocator.setMinimumChange(
+            address(vault),
+            MINIMUM_TRANSACTION_AMOUNT + 1
+        );
+        debtAllocator.setStrategyDebtRatio(
+            address(vault),
+            address(strategy),
+            10_000 - TARGET_IDLE_LIQUIDITY_BASIS_POINTS,
+            10_000 - MIN_IDLE_LIQUIDITY_BASIS_POINTS
+        );
+        vm.stopPrank();
+    }
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                            Deposit Helpers                            │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
+    // TODO: Determine the benefits/drawbacks of depositing directly into the
+    //       strategy vs depositing into a vault.
+
+    /// @dev Deposit into Everlong strategy.
     /// @param _amount Amount of assets to deposit.
     /// @param _depositor Address to deposit as.
     /// @return shares Amount of shares received from the deposit.
-    function depositEverlong(
+    function depositStrategy(
         uint256 _amount,
         address _depositor
     ) internal returns (uint256 shares) {
-        return
-            depositEverlong(
-                _amount,
-                _depositor,
-                false,
-                IEverlong.RebalanceOptions({
-                    spendingLimit: 0,
-                    minOutput: 0,
-                    minVaultSharePrice: 0,
-                    positionClosureLimit: 0,
-                    extraData: ""
-                })
-            );
+        return depositStrategy(_amount, _depositor, false);
     }
 
-    /// @dev Deposit into Everlong.
-    /// @param _amount Amount of assets to deposit.
-    /// @param _depositor Address to deposit as.
-    /// @param _shouldRebalance Whether to rebalance after the deposit is made.
-    /// @return shares Amount of shares received from the deposit.
-    function depositEverlong(
+    // NOTE: Core functionality for all `depositStrategy(..)` overloads.
+    //       This is the most verbose, probably don't want to call it directly.
+    function depositStrategy(
         uint256 _amount,
         address _depositor,
         bool _shouldRebalance
     ) internal returns (uint256 shares) {
-        return
-            depositEverlong(
-                _amount,
-                _depositor,
-                _shouldRebalance,
-                IEverlong.RebalanceOptions({
-                    spendingLimit: 0,
-                    minOutput: 0,
-                    minVaultSharePrice: 0,
-                    positionClosureLimit: 0,
-                    extraData: ""
-                })
-            );
-    }
-
-    /// @dev Deposit into Everlong and rebalance after the deposit.
-    /// @param _amount Amount of assets to deposit.
-    /// @param _depositor Address to deposit as.
-    /// @param _rebalanceOptions Options to pass to the rebalance call.
-    /// @return shares Amount of shares received from the deposit.
-    function depositEverlong(
-        uint256 _amount,
-        address _depositor,
-        IEverlong.RebalanceOptions memory _rebalanceOptions
-    ) internal returns (uint256 shares) {
-        return depositEverlong(_amount, _depositor, true, _rebalanceOptions);
-    }
-
-    // NOTE: Core functionality for all `depositEverlong(..)` overloads.
-    //       This is the most verbose, probably don't want to call it directly.
-    function depositEverlong(
-        uint256 _amount,
-        address _depositor,
-        bool _shouldRebalance,
-        IEverlong.RebalanceOptions memory _rebalanceOptions
-    ) private returns (uint256 shares) {
         // Resolve the appropriate token.
-        ERC20Mintable token = ERC20Mintable(everlong.asset());
+        ERC20Mintable token = ERC20Mintable(vault.asset());
 
         // Mint sufficient tokens to _depositor.
         vm.startPrank(_depositor);
@@ -198,105 +335,129 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
 
         // Approve everlong as _depositor.
         vm.startPrank(_depositor);
-        token.approve(address(everlong), _amount);
+        token.approve(address(strategy), _amount);
         vm.stopPrank();
 
         // Make the deposit.
         vm.startPrank(_depositor);
-        shares = everlong.deposit(_amount, _depositor);
+        shares = strategy.deposit(_amount, _depositor);
         vm.stopPrank();
 
         // Rebalance if specified.
         if (_shouldRebalance) {
-            rebalance(_rebalanceOptions);
+            rebalance();
         }
 
         // Return the amount of shares issued to _depositor for the deposit.
         return shares;
     }
 
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ Redeem Helpers                                          │
-    // ╰─────────────────────────────────────────────────────────╯
-
-    /// @dev Redeem shares from Everlong.
-    /// @param _shares Amount of shares to redeem.
-    /// @param _redeemer Address to redeem as.
-    /// @return assets Amount of assets received from the redemption.
-    function redeemEverlong(
-        uint256 _shares,
-        address _redeemer
-    ) internal returns (uint256 assets) {
-        assets = redeemEverlong(
-            _shares,
-            _redeemer,
-            true,
-            IEverlong.RebalanceOptions({
-                spendingLimit: 0,
-                minOutput: 0,
-                minVaultSharePrice: 0,
-                positionClosureLimit: 0,
-                extraData: ""
-            })
-        );
-        return assets;
-    }
-
-    /// @dev Redeem shares from Everlong.
-    /// @param _shares Amount of shares to redeem.
-    /// @param _redeemer Address to redeem as.
-    /// @param _shouldRebalance Whether to rebalance after the redeem is made.
-    /// @return assets Amount of assets received from the redemption.
-    function redeemEverlong(
-        uint256 _shares,
-        address _redeemer,
-        bool _shouldRebalance
-    ) internal returns (uint256 assets) {
-        assets = redeemEverlong(
-            _shares,
-            _redeemer,
-            _shouldRebalance,
-            IEverlong.RebalanceOptions({
-                spendingLimit: 0,
-                minOutput: 0,
-                minVaultSharePrice: 0,
-                positionClosureLimit: 0,
-                extraData: ""
-            })
-        );
-        return assets;
-    }
-
-    /// @dev Redeem shares from Everlong.
-    /// @param _shares Amount of shares to redeem.
-    /// @param _redeemer Address to redeem as.
-    /// @param _rebalanceOptions Options to pass to the rebalance call.
-    /// @return assets Amount of assets received from the redemption.
-    function redeemEverlong(
-        uint256 _shares,
-        address _redeemer,
-        IEverlong.RebalanceOptions memory _rebalanceOptions
-    ) internal returns (uint256 assets) {
-        assets = redeemEverlong(_shares, _redeemer, true, _rebalanceOptions);
-        return assets;
-    }
-
-    // NOTE: Core functionality for all `redeemEverlong(..)` overloads.
-    //       This is the most verbose, probably don't want to call it directly.
-    function redeemEverlong(
+    /// @dev Deposit into Everlong vault.
+    /// @param _amount Amount of assets to deposit.
+    /// @param _depositor Address to deposit as.
+    /// @return shares Amount of shares received from the deposit.
+    function depositVault(
         uint256 _amount,
-        address _redeemer,
-        bool _shouldRebalance,
-        IEverlong.RebalanceOptions memory _rebalanceOptions
-    ) internal returns (uint256 proceeds) {
-        // Make the redemption.
-        vm.startPrank(_redeemer);
-        proceeds = everlong.redeem(_amount, _redeemer, _redeemer);
+        address _depositor
+    ) internal returns (uint256 shares) {
+        return depositVault(_amount, _depositor, false);
+    }
+
+    // NOTE: Core functionality for all `depositVault(..)` overloads.
+    //       This is the most verbose, probably don't want to call it directly.
+    function depositVault(
+        uint256 _amount,
+        address _depositor,
+        bool _shouldRebalance
+    ) internal returns (uint256 shares) {
+        // Resolve the appropriate token.
+        ERC20Mintable token = ERC20Mintable(vault.asset());
+
+        // Mint sufficient tokens to _depositor.
+        vm.startPrank(_depositor);
+        token.mint(_amount);
+        vm.stopPrank();
+
+        // Approve everlong as _depositor.
+        vm.startPrank(_depositor);
+        token.approve(address(vault), _amount);
+        vm.stopPrank();
+
+        // Make the deposit.
+        vm.startPrank(_depositor);
+        shares = vault.deposit(_amount, _depositor);
         vm.stopPrank();
 
         // Rebalance if specified.
         if (_shouldRebalance) {
-            rebalance(_rebalanceOptions);
+            rebalance();
+        }
+
+        // Return the amount of shares issued to _depositor for the deposit.
+        return shares;
+    }
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                            Redeem Helpers                             │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
+    /// @dev Redeem shares from Everlong strategy.
+    /// @param _shares Amount of shares to redeem.
+    /// @param _redeemer Address to redeem as.
+    /// @return assets Amount of assets received from the redemption.
+    function redeemStrategy(
+        uint256 _shares,
+        address _redeemer
+    ) internal returns (uint256 assets) {
+        assets = redeemStrategy(_shares, _redeemer, false);
+        return assets;
+    }
+
+    // NOTE: Core functionality for all `redeemStrategy(..)` overloads.
+    //       This is the most verbose, probably don't want to call it directly.
+    function redeemStrategy(
+        uint256 _amount,
+        address _redeemer,
+        bool _shouldRebalance
+    ) internal returns (uint256 proceeds) {
+        // Make the redemption.
+        vm.startPrank(_redeemer);
+        proceeds = strategy.redeem(_amount, _redeemer, _redeemer);
+        vm.stopPrank();
+
+        // Rebalance if specified.
+        if (_shouldRebalance) {
+            rebalance();
+        }
+    }
+
+    /// @dev Redeem shares from Everlong vault.
+    /// @param _shares Amount of shares to redeem.
+    /// @param _redeemer Address to redeem as.
+    /// @return assets Amount of assets received from the redemption.
+    function redeemVault(
+        uint256 _shares,
+        address _redeemer
+    ) internal returns (uint256 assets) {
+        assets = redeemVault(_shares, _redeemer, false);
+        return assets;
+    }
+
+    // NOTE: Core functionality for all `redeemVault(..)` overloads.
+    //       This is the most verbose, probably don't want to call it directly.
+    function redeemVault(
+        uint256 _amount,
+        address _redeemer,
+        bool _shouldRebalance
+    ) internal returns (uint256 proceeds) {
+        // Make the redemption.
+        vm.startPrank(_redeemer);
+        proceeds = vault.redeem(_amount, _redeemer, _redeemer);
+        vm.stopPrank();
+
+        // Rebalance if specified.
+        if (_shouldRebalance) {
+            rebalance();
         }
     }
 
@@ -307,39 +468,43 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         address _recipient,
         uint256 _amount
     ) internal {
-        ERC20Mintable(hyperdrive.baseToken()).mint(_recipient, _amount);
+        ERC20Mintable(address(asset)).mint(_recipient, _amount);
         vm.startPrank(_recipient);
-        ERC20Mintable(hyperdrive.baseToken()).approve(
-            address(everlong),
-            _amount
-        );
+        ERC20Mintable(address(asset)).approve(address(vault), _amount);
         vm.stopPrank();
     }
 
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ Rebalancing                                             │
-    // ╰─────────────────────────────────────────────────────────╯
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                          Rebalancing Helpers                          │
+    // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @dev Call `everlong.rebalance(...)` as the admin with default options.
-    function rebalance() internal virtual {
-        vm.startPrank(everlong.admin());
-        everlong.rebalance(DEFAULT_REBALANCE_OPTIONS);
+    function rebalance() internal {
+        vm.startPrank(keeper);
+        strategy.tend();
         vm.stopPrank();
     }
 
-    /// @dev Call `everlong.rebalance(...)` as the admin with provided options.
-    /// @param _options Rebalance options to pass to Everlong.
-    function rebalance(
-        IEverlong.RebalanceOptions memory _options
-    ) internal virtual {
-        vm.startPrank(everlong.admin());
-        everlong.rebalance(_options);
+    // TODO: Discuss with yearn team the appropriate frequency and order of
+    //       operations for `tend()`, `report()`, and `process_report()`.
+    //
+    /// @dev Call `report` on the strategy then call `process_report` on the
+    ///      vault.
+    function report() internal {
+        // Call report for the strategy.
+        vm.startPrank(keeper);
+        strategy.report();
+        vm.stopPrank();
+
+        // Call process_report for the vault.
+        vm.startPrank(management);
+        vault.process_report(address(strategy));
         vm.stopPrank();
     }
 
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ Advance Time Helpers                                    │
-    // ╰─────────────────────────────────────────────────────────╯
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                             Time Helpers                              │
+    // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @dev Advance time by the specified amount at the global variable rate.
     /// @param _time Amount of time to advance.
@@ -365,23 +530,26 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         }
     }
 
-    /// @dev Advance time and rebalance on the specified interval.
+    /// @dev Advance time, create checkpoints, and report at checkpoints.
     /// @dev If time % _rebalanceInterval != 0 then it ends up advancing time
     ///      to the next _rebalanceInterval.
     /// @param _time Amount of time to advance.
-    /// @param _rebalanceInterval Amount of time between rebalances.
-    /// @param _options Rebalance options to pass to Everlong.
-    function advanceTimeWithRebalancing(
-        uint256 _time,
-        uint256 _rebalanceInterval,
-        IEverlong.RebalanceOptions memory _options
+    function advanceTimeWithCheckpointsAndReporting(
+        uint256 _time
     ) internal virtual {
         uint256 startTimeElapsed = block.timestamp;
-        // Note: if time % _rebalanceInterval != 0 then it ends up
-        // advancing time to the next _rebalanceInterval.
+        // Note: if time % CHECKPOINT_DURATION != 0 then it ends up
+        // advancing time to the next checkpoint.
         while (block.timestamp - startTimeElapsed < _time) {
-            advanceTime(_rebalanceInterval, VARIABLE_RATE);
-            rebalance(_options);
+            advanceTime(CHECKPOINT_DURATION, VARIABLE_RATE);
+            // Create the checkpoint.
+            hyperdrive.checkpoint(
+                HyperdriveUtils.latestCheckpoint(hyperdrive),
+                0
+            );
+
+            // Generate reports for the strategy and vault.
+            report();
         }
     }
 
@@ -405,38 +573,44 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         }
     }
 
-    /// @dev Advance time, create checkpoints, and rebalance at checkpoints.
-    /// @dev If time % _rebalanceInterval != 0 then it ends up advancing time
-    ///      to the next _rebalanceInterval.
-    /// @param _time Amount of time to advance.
-    /// @param _options Rebalance options to pass to Everlong.
-    function advanceTimeWithCheckpointsAndRebalancing(
-        uint256 _time,
-        IEverlong.RebalanceOptions memory _options
-    ) internal virtual {
-        uint256 startTimeElapsed = block.timestamp;
-        // Note: if time % CHECKPOINT_DURATION != 0 then it ends up
-        // advancing time to the next checkpoint.
-        while (block.timestamp - startTimeElapsed < _time) {
-            advanceTime(CHECKPOINT_DURATION, VARIABLE_RATE);
-            hyperdrive.checkpoint(
-                HyperdriveUtils.latestCheckpoint(hyperdrive),
-                0
-            );
-            rebalance(_options);
-        }
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                        Idle Liquidity Helpers                         │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
+    /// @dev Calculates the target amount of idle assets for the vault.
+    /// @return Target idle assets for the vault.
+    function targetIdleLiquidity() internal virtual returns (uint256) {
+        return
+            (10_000 -
+                uint256(
+                    debtAllocator
+                        .getStrategyConfig(address(vault), address(strategy))
+                        .targetRatio
+                )).mulDivDown(vault.totalAssets(), 10_000);
     }
 
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ Positions                                               │
-    // ╰─────────────────────────────────────────────────────────╯
+    /// @dev Calculates the minimum amount of idle assets for the vault.
+    /// @return Minimum idle assets for the vault.
+    function minIdleLiquidity() internal virtual returns (uint256) {
+        return
+            (10_000 -
+                uint256(
+                    debtAllocator
+                        .getStrategyConfig(address(vault), address(strategy))
+                        .maxRatio
+                )).mulDivDown(vault.totalAssets(), 10_000);
+    }
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                           Position Helpers                            │
+    // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @dev Outputs a table of all positions.
-    function logPositions() public view {
+    function logPositions() internal view {
         /* solhint-disable no-console */
         console.log("-- POSITIONS -------------------------------");
-        for (uint128 i = 0; i < everlong.positionCount(); ++i) {
-            IEverlong.Position memory p = everlong.positionAt(i);
+        for (uint128 i = 0; i < strategy.positionCount(); ++i) {
+            IEverlongStrategy.Position memory p = strategy.positionAt(i);
             console.log(
                 "index: %e - maturityTime: %e - bondAmount: %e",
                 i,

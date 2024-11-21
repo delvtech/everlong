@@ -6,10 +6,10 @@ import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMat
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { EverlongTest } from "../harnesses/EverlongTest.sol";
-import { IEverlong } from "../../contracts/interfaces/IEverlong.sol";
+import { IEverlongStrategy } from "../../contracts/interfaces/IEverlongStrategy.sol";
 import { HyperdriveExecutionLibrary } from "../../contracts/libraries/HyperdriveExecution.sol";
 
-contract PartialClosures is EverlongTest {
+contract TestPartialClosures is EverlongTest {
     using FixedPointMath for uint256;
     using Lib for *;
     using HyperdriveUtils for *;
@@ -20,51 +20,40 @@ contract PartialClosures is EverlongTest {
     ///      Ensures that the amount of longs closed in the position is not
     ///      excessive.
     function testFuzz_partial_closures(
-        uint256 _targetIdle,
-        uint256 _maxIdle,
         uint256 _deposit,
-        uint256 _redemptionPercentage
+        uint256 _redemptionAmount
     ) external {
-        TARGET_IDLE_LIQUIDITY_PERCENTAGE = bound(_targetIdle, 0.001e18, 0.5e18);
-        MAX_IDLE_LIQUIDITY_PERCENTAGE = bound(
-            _maxIdle,
-            TARGET_IDLE_LIQUIDITY_PERCENTAGE + 0.001e18,
-            0.9e18
-        );
-        deployEverlong();
-
         // Alice deposits into Everlong.
         uint256 aliceDepositAmount = bound(
             _deposit,
-            MINIMUM_TRANSACTION_AMOUNT * 100,
+            MINIMUM_TRANSACTION_AMOUNT * 100, // Increase minimum bound otherwise partial redemption won't occur
             hyperdrive.calculateMaxLong()
         );
-        uint256 aliceShares = depositEverlong(aliceDepositAmount, alice, true);
-        uint256 positionBondsAfterDeposit = everlong.totalBonds();
+        uint256 aliceShares = depositStrategy(aliceDepositAmount, alice, true);
+        uint256 positionBondsAfterDeposit = strategy.totalBonds();
 
         // Alice redeems a significant enough portion of her shares to require
         // partially closing the immature position.
-        _redemptionPercentage = bound(
-            _redemptionPercentage,
-            TARGET_IDLE_LIQUIDITY_PERCENTAGE,
-            0.8e18
+        _redemptionAmount = bound(
+            _redemptionAmount,
+            aliceShares.mulDown(0.05e18),
+            aliceShares.mulDown(0.95e18)
         );
-        uint256 aliceRedeemAmount = aliceShares.mulDown(_redemptionPercentage);
-        redeemEverlong(aliceRedeemAmount, alice);
-        uint256 positionBondsAfterRedeem = everlong.totalBonds();
+        redeemStrategy(_redemptionAmount, alice, false);
+        uint256 positionBondsAfterRedeem = strategy.totalBonds();
 
         // Ensure Everlong still has a position open.
-        assertEq(everlong.positionCount(), 1);
+        assertEq(strategy.positionCount(), 1);
 
         // Ensure the remaining Everlong position has proportionally less bonds
         // than it did prior to redemption.
         assertApproxEqRel(
             positionBondsAfterDeposit.mulDivDown(
-                1e18 - _redemptionPercentage,
-                1e18 - TARGET_IDLE_LIQUIDITY_PERCENTAGE
+                aliceShares - _redemptionAmount,
+                aliceShares
             ),
             positionBondsAfterRedeem,
-            0.01e18
+            0.05e18
         );
     }
 
@@ -83,13 +72,9 @@ contract PartialClosures is EverlongTest {
     function test_partial_closures_large_position_bond_price_difference()
         external
     {
-        TARGET_IDLE_LIQUIDITY_PERCENTAGE = 0.1e18;
-        MAX_IDLE_LIQUIDITY_PERCENTAGE = 0.2e18;
-        deployEverlong();
-
         // Alice deposits into Everlong.
         uint256 aliceDepositAmount = 10_000e18;
-        uint256 aliceShares = depositEverlong(aliceDepositAmount, alice, true);
+        uint256 aliceShares = depositStrategy(aliceDepositAmount, alice, true);
 
         // Time advances towards the end of the term.
         advanceTimeWithCheckpointsAndRebalancing(
@@ -97,22 +82,22 @@ contract PartialClosures is EverlongTest {
         );
 
         // Alice deposits again into Everlong.
-        aliceShares += depositEverlong(aliceDepositAmount, alice, true);
+        aliceShares += depositStrategy(aliceDepositAmount, alice, true);
 
         // Ensure Everlong has two positions and that the bond prices differ
         // by greater than Everlong's max closeLong slippage.
-        assertEq(everlong.positionCount(), 2);
-        IEverlong.Position memory oldPosition = everlong.positionAt(0);
-        IEverlong.Position memory newPosition = everlong.positionAt(1);
+        assertEq(strategy.positionCount(), 2);
+        IEverlongStrategy.Position memory oldPosition = strategy.positionAt(0);
+        IEverlongStrategy.Position memory newPosition = strategy.positionAt(1);
         uint256 oldBondPrice = hyperdrive
-            .previewCloseLong(true, oldPosition, "")
+            .previewCloseLong(true, hyperdrive.getPoolConfig(), oldPosition, "")
             .divDown(oldPosition.bondAmount);
         uint256 newBondPrice = hyperdrive
-            .previewCloseLong(true, newPosition, "")
+            .previewCloseLong(true, hyperdrive.getPoolConfig(), newPosition, "")
             .divDown(newPosition.bondAmount);
         assertGt(
             (oldBondPrice - newBondPrice).divDown(oldBondPrice),
-            everlong.maxCloseLongSlippage()
+            strategy.partialPositionClosureBuffer()
         );
 
         // Alice redeems enough shares to require closing the first and part
@@ -120,9 +105,9 @@ contract PartialClosures is EverlongTest {
         // This should succeed.
         uint256 redeemPercentage = 0.75e18;
         uint256 aliceRedeemAmount = aliceShares.mulDown(redeemPercentage);
-        redeemEverlong(aliceRedeemAmount, alice, true);
+        redeemStrategy(aliceRedeemAmount, alice, true);
 
         // Ensure Everlong has one position left.
-        assertEq(everlong.positionCount(), 1);
+        assertEq(strategy.positionCount(), 1);
     }
 }

@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
-import { IEverlong } from "../interfaces/IEverlong.sol";
+import { IEverlongStrategy } from "../interfaces/IEverlongStrategy.sol";
 
 /// @author DELV
 /// @title PositionLibrary
@@ -18,7 +18,7 @@ library PositionLibrary {
     /// @notice Increase the position's bond count.
     /// @param _bondAmount Amount to increase the position's bond count by.
     function increase(
-        IEverlong.Position storage self,
+        IEverlongStrategy.Position storage self,
         uint256 _bondAmount
     ) internal {
         self.bondAmount += _bondAmount.toUint128();
@@ -27,14 +27,14 @@ library PositionLibrary {
     /// @notice Decrease the position's bond count.
     /// @param _bondAmount Amount to increase the position's bond count by.
     function decrease(
-        IEverlong.Position storage self,
+        IEverlongStrategy.Position storage self,
         uint256 _bondAmount
     ) internal {
         self.bondAmount -= _bondAmount.toUint128();
     }
 
     /// @notice Reset the contents of a position.
-    function clear(IEverlong.Position storage self) internal {
+    function clear(IEverlongStrategy.Position storage self) internal {
         self.maturityTime = 0;
         self.bondAmount = 0;
     }

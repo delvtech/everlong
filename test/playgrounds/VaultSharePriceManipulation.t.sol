@@ -9,7 +9,6 @@ import { HyperdriveMath } from "hyperdrive/contracts/src/libraries/HyperdriveMat
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
-import { EVERLONG_KIND, EVERLONG_VERSION } from "../../contracts/libraries/Constants.sol";
 import { EverlongTest } from "../harnesses/EverlongTest.sol";
 import { Packing } from "openzeppelin/utils/Packing.sol";
 
@@ -18,7 +17,7 @@ uint256 constant HYPERDRIVE_LONG_EXPOSURE_LONGS_OUTSTANDING_SLOT = 3;
 uint256 constant HYPERDRIVE_SHARE_ADJUSTMENT_SHORTS_OUTSTANDING_SLOT = 4;
 
 /// @dev Tests vault share price manipulation with the underlying hyperdrive instance.
-contract VaultSharePriceManipulation is EverlongTest {
+contract TestVaultSharePriceManipulation is EverlongTest {
     using Packing for bytes32;
     using FixedPointMath for uint128;
     using FixedPointMath for uint256;
@@ -294,8 +293,8 @@ contract VaultSharePriceManipulation is EverlongTest {
                     ",",
                     _profits,
                     ",",
-                    ERC20Mintable(everlong.asset())
-                        .balanceOf(address(everlong))
+                    ERC20Mintable(vault.asset())
+                        .balanceOf(address(vault))
                         .toString(18)
                 )
             )
@@ -342,20 +341,20 @@ contract VaultSharePriceManipulation is EverlongTest {
     function clearBalances() internal {
         // Clear initial depositor balance
         vm.startPrank(celine);
-        ERC20Mintable(everlong.asset()).burn(
-            ERC20Mintable(everlong.asset()).balanceOf(celine)
+        ERC20Mintable(vault.asset()).burn(
+            ERC20Mintable(vault.asset()).balanceOf(celine)
         );
         vm.stopPrank();
         // Clear attacker balance
         vm.startPrank(bob);
-        ERC20Mintable(everlong.asset()).burn(
-            ERC20Mintable(everlong.asset()).balanceOf(bob)
+        ERC20Mintable(vault.asset()).burn(
+            ERC20Mintable(vault.asset()).balanceOf(bob)
         );
         vm.stopPrank();
         // Clear bystander balance
         vm.startPrank(alice);
-        ERC20Mintable(everlong.asset()).burn(
-            ERC20Mintable(everlong.asset()).balanceOf(alice)
+        ERC20Mintable(vault.asset()).burn(
+            ERC20Mintable(vault.asset()).balanceOf(alice)
         );
         vm.stopPrank();
     }
@@ -370,9 +369,6 @@ contract VaultSharePriceManipulation is EverlongTest {
     ///      7. Alice (bystander) redeems from Everlong.
     ///      8. Celine redeems from Everlong.
     function sandwich() internal returns (string memory) {
-        // Deploy Everlong.
-        deployEverlong();
-
         // Clear all balances
         clearBalances();
 
@@ -385,10 +381,10 @@ contract VaultSharePriceManipulation is EverlongTest {
         }
 
         // Initial deposit is made into everlong.
-        depositEverlong(params.initialDeposit, celine, true);
+        depositStrategy(params.initialDeposit, celine, true);
 
         // Innocent bystander deposits into everlong.
-        depositEverlong(params.bystanderDeposit, alice, true);
+        depositStrategy(params.bystanderDeposit, alice, true);
 
         // Attacker opens a short on hyperdrive.
         uint256 bobShortMaturityTime;
@@ -402,7 +398,7 @@ contract VaultSharePriceManipulation is EverlongTest {
         }
 
         // Attacker deposits into everlong.
-        uint256 bobEverlongShares = depositEverlong(
+        uint256 bobEverlongShares = depositStrategy(
             params.sandwichDeposit,
             bob,
             true
@@ -410,9 +406,7 @@ contract VaultSharePriceManipulation is EverlongTest {
 
         if (params.timeToCloseShort > 0) {
             advanceTimeWithCheckpointsAndRebalancing(params.timeToCloseShort);
-            if (everlong.canRebalance()) {
-                everlong.rebalance(DEFAULT_REBALANCE_OPTIONS);
-            }
+            rebalance();
         }
 
         // Attacker closes short on hyperdrive.
@@ -430,24 +424,18 @@ contract VaultSharePriceManipulation is EverlongTest {
             advanceTimeWithCheckpointsAndRebalancing(
                 params.timeToCloseEverlong
             );
-            if (everlong.canRebalance()) {
-                everlong.rebalance(DEFAULT_REBALANCE_OPTIONS);
-            }
+            rebalance();
         }
 
         // Attacker redeems from everlong.
-        redeemEverlong(bobEverlongShares, bob, true);
-        if (everlong.canRebalance()) {
-            everlong.rebalance(DEFAULT_REBALANCE_OPTIONS);
-        }
+        redeemStrategy(bobEverlongShares, bob, true);
+        rebalance();
 
         if (params.bystanderCloseDelay > 0) {
             advanceTimeWithCheckpointsAndRebalancing(
                 params.bystanderCloseDelay
             );
-            if (everlong.canRebalance()) {
-                everlong.rebalance(DEFAULT_REBALANCE_OPTIONS);
-            }
+            rebalance();
         }
 
         return
@@ -455,15 +443,11 @@ contract VaultSharePriceManipulation is EverlongTest {
                 abi.encodePacked(
                     bobShortAmount.toString(18),
                     ",",
-                    ERC20Mintable(everlong.asset()).balanceOf(bob).toString(18),
+                    ERC20Mintable(vault.asset()).balanceOf(bob).toString(18),
                     ",",
-                    ERC20Mintable(everlong.asset()).balanceOf(alice).toString(
-                        18
-                    ),
+                    ERC20Mintable(vault.asset()).balanceOf(alice).toString(18),
                     ",",
-                    ERC20Mintable(everlong.asset()).balanceOf(celine).toString(
-                        18
-                    )
+                    ERC20Mintable(vault.asset()).balanceOf(celine).toString(18)
                 )
             );
     }

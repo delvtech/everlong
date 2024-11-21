@@ -5,12 +5,11 @@ import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { HyperdriveMath } from "hyperdrive/contracts/src/libraries/HyperdriveMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
-import { YieldSpaceMath } from "hyperdrive/contracts/src/libraries/YieldSpaceMath.sol";
 import { ERC20 } from "openzeppelin/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { Packing } from "openzeppelin/utils/Packing.sol";
-import { IEverlong } from "../interfaces/IEverlong.sol";
 import { IEverlongEvents } from "../interfaces/IEverlongEvents.sol";
+import { IEverlongStrategy } from "../interfaces/IEverlongStrategy.sol";
 import { ONE } from "./Constants.sol";
 
 // TODO: Extract into its own library.
@@ -86,114 +85,6 @@ library HyperdriveExecutionLibrary {
         );
     }
 
-    /// @dev Calculates the result of opening a long with hyperdrive.
-    /// @param _asBase Whether to use hyperdrive's base asset.
-    /// @param _amount Amount of assets to spend.
-    /// @return Amount of bonds received.
-    function previewOpenLong(
-        IHyperdrive self,
-        bool _asBase,
-        uint256 _amount,
-        bytes memory // unused extra data
-    ) internal view returns (uint256) {
-        return
-            _calculateOpenLong(
-                self,
-                _asBase ? self.convertToShares(_amount) : _amount
-            );
-    }
-
-    /// @dev Calculates the amount of output bonds received from opening a
-    ///      long. The process is as follows:
-    ///        1. Calculates the raw amount using yield space.
-    ///        2. Subtracts fees.
-    /// @param _shareAmount Amount of shares being exchanged for bonds.
-    /// @return Amount of bonds received.
-    function _calculateOpenLong(
-        IHyperdrive self,
-        uint256 _shareAmount
-    ) internal view returns (uint256) {
-        // We must load the entire PoolConfig since it contains values from
-        // immutables without public accessors.
-        IHyperdrive.PoolConfig memory poolConfig = self.getPoolConfig();
-
-        // Prepare the necessary information to perform the yield space
-        // calculation. We save gas by reading storage directly instead of
-        // retrieving entire PoolInfo struct.
-        uint256[] memory slots = new uint256[](2);
-        slots[0] = HYPERDRIVE_SHARE_RESERVES_BOND_RESERVES_SLOT;
-        slots[1] = HYPERDRIVE_SHARE_ADJUSTMENT_SHORTS_OUTSTANDING_SLOT;
-        bytes32[] memory values = self.load(slots);
-        uint256 effectiveShareReserves = HyperdriveMath
-            .calculateEffectiveShareReserves(
-                uint128(values[0].extract_32_16(16)), // shareReserves
-                uint256(uint128(values[1].extract_32_16(16))).toInt256() // shareAdjustment
-            );
-        uint256 bondReserves = uint128(values[0].extract_32_16(0));
-        uint256 _vaultSharePrice = vaultSharePrice(self);
-
-        // Calculate the change in hyperdrive's bond reserves given a purchase
-        // of _shareAmount. This amount is equivalent to the amount of bonds
-        // the purchaser will receive (not accounting for fees).
-        uint256 bondReservesDelta = YieldSpaceMath
-            .calculateBondsOutGivenSharesInDown(
-                effectiveShareReserves,
-                bondReserves,
-                _shareAmount,
-                // NOTE: Since the bonds traded on the curve are newly minted,
-                // we use a time remaining of 1. This means that we can use
-                // `_timeStretch = t * _timeStretch`.
-                ONE - poolConfig.timeStretch,
-                _vaultSharePrice,
-                poolConfig.initialVaultSharePrice
-            );
-
-        // Apply fees to the output bond amount and return it.
-        uint256 spotPrice = HyperdriveMath.calculateSpotPrice(
-            effectiveShareReserves,
-            bondReserves,
-            poolConfig.initialVaultSharePrice,
-            poolConfig.timeStretch
-        );
-        bondReservesDelta = _calculateOpenLongFees(
-            _shareAmount,
-            bondReservesDelta,
-            _vaultSharePrice,
-            spotPrice,
-            poolConfig.fees.curve
-        );
-        return bondReservesDelta;
-    }
-
-    /// @dev Calculate the fees involved with opening the long and apply them.
-    /// @param _shareReservesDelta The change in the share reserves without fees.
-    /// @param _bondReservesDelta The change in the bond reserves without fees.
-    /// @param _vaultSharePrice The current vault share price.
-    /// @param _spotPrice The current spot price.
-    /// @return The change in the bond reserves with fees.
-    function _calculateOpenLongFees(
-        uint256 _shareReservesDelta,
-        uint256 _bondReservesDelta,
-        uint256 _vaultSharePrice,
-        uint256 _spotPrice,
-        uint256 _curveFee
-    ) internal pure returns (uint256) {
-        // Calculate the fees charged to the user (curveFee).
-        uint256 curveFee = _calculateFeesGivenShares(
-            _shareReservesDelta,
-            _spotPrice,
-            _vaultSharePrice,
-            _curveFee
-        );
-
-        // Calculate the impact of the curve fee on the bond reserves. The curve
-        // fee benefits the LPs by causing less bonds to be deducted from the
-        // bond reserves.
-        _bondReservesDelta -= curveFee;
-
-        return (_bondReservesDelta);
-    }
-
     // ╭─────────────────────────────────────────────────────────╮
     // │ Close Long                                              │
     // ╰─────────────────────────────────────────────────────────╯
@@ -207,11 +98,10 @@ library HyperdriveExecutionLibrary {
     function closeLong(
         IHyperdrive self,
         bool _asBase,
-        IEverlong.Position memory _position,
+        IEverlongStrategy.Position memory _position,
         uint256 _minOutput,
         bytes memory _data
     ) internal returns (uint256 proceeds) {
-        // TODO: Slippage
         proceeds = self.closeLong(
             _position.maturityTime,
             _position.bondAmount,
@@ -228,19 +118,63 @@ library HyperdriveExecutionLibrary {
     ///         long.
     /// @dev Always less than or equal to the actual amount of assets received.
     /// @param _asBase Whether to receive hyperdrive's base token as output.
+    /// @param _poolConfig Hyperdrive PoolConfig.
     /// @param _position Position information used to specify the long to close.
     /// @return The amount of output assets received from closing the long.
     function previewCloseLong(
         IHyperdrive self,
         bool _asBase,
-        IEverlong.Position memory _position,
+        IHyperdrive.PoolConfig memory _poolConfig,
+        IEverlongStrategy.Position memory _position,
         bytes memory // unused extradata
     ) internal view returns (uint256) {
-        uint256 shareProceeds = _calculateCloseLong(self, _position);
+        // Read select `PoolInfo` fields directly from Hyperdrive's storage to
+        // save on gas costs.
+        uint256[] memory slots = new uint256[](2);
+        slots[0] = HYPERDRIVE_SHARE_RESERVES_BOND_RESERVES_SLOT;
+        slots[1] = HYPERDRIVE_SHARE_ADJUSTMENT_SHORTS_OUTSTANDING_SLOT;
+        bytes32[] memory values = self.load(slots);
+        uint256 shareProceeds = _calculateCloseLong(
+            self,
+            CalculateCloseLongParams({
+                timeStretch: _poolConfig.timeStretch,
+                initialVaultSharePrice: _poolConfig.initialVaultSharePrice,
+                positionDuration: _poolConfig.positionDuration,
+                curveFee: _poolConfig.fees.curve,
+                flatFee: _poolConfig.fees.flat,
+                shareReserves: uint128(values[0].extract_32_16(16)),
+                bondReserves: uint128(values[0].extract_32_16(0)),
+                shareAdjustment: uint256(uint128(values[1].extract_32_16(16)))
+                    .toInt256()
+            }),
+            _position
+        );
         if (_asBase) {
             return self.convertToBase(shareProceeds);
         }
         return shareProceeds;
+    }
+
+    struct CalculateCloseLongParams {
+        uint256 timeStretch;
+        uint256 initialVaultSharePrice;
+        uint256 positionDuration;
+        uint256 curveFee;
+        uint256 flatFee;
+        uint128 shareReserves;
+        uint128 bondReserves;
+        int256 shareAdjustment;
+    }
+
+    struct CalculateCloseLongData {
+        uint256 effectiveShareReserves;
+        uint256 normalizedTimeRemaining;
+        uint256 openVaultSharePrice;
+        uint256 closeVaultSharePrice;
+        uint256 shareProceeds;
+        uint256 spotPrice;
+        uint256 curveFee;
+        uint256 flatFee;
     }
 
     /// @dev Calculates the amount of output assets received from closing a
@@ -249,29 +183,26 @@ library HyperdriveExecutionLibrary {
     ///        2. Subtracts fees.
     ///        3. Accounts for negative interest.
     ///        4. Converts to shares and back to account for any rounding issues.
+    /// @param _params Hyperdrive data needed for the calculation.
     /// @param _position Position containing information on the long to close.
     /// @return The amount of output assets received from closing the long.
     function _calculateCloseLong(
         IHyperdrive self,
-        IEverlong.Position memory _position
+        CalculateCloseLongParams memory _params,
+        IEverlongStrategy.Position memory _position
     ) internal view returns (uint256) {
-        // We must load the entire PoolConfig since it contains values from
-        // immutables without public accessors.
-        IHyperdrive.PoolConfig memory poolConfig = self.getPoolConfig();
+        // Use a struct to hold intermediate calculation results and avoid
+        // stack-too-deep errors.
+        CalculateCloseLongData memory data;
 
         // Prepare the necessary information to perform the yield space
-        // calculation. We save gas by reading storage directly instead of
-        // retrieving entire PoolInfo struct.
-        uint256[] memory slots = new uint256[](2);
-        slots[0] = HYPERDRIVE_SHARE_RESERVES_BOND_RESERVES_SLOT;
-        slots[1] = HYPERDRIVE_SHARE_ADJUSTMENT_SHORTS_OUTSTANDING_SLOT;
-        bytes32[] memory values = self.load(slots);
-        uint256 effectiveShareReserves = HyperdriveMath
+        // calculation.
+        data.effectiveShareReserves = HyperdriveMath
             .calculateEffectiveShareReserves(
-                uint128(values[0].extract_32_16(16)), // shareReserves
-                uint256(uint128(values[1].extract_32_16(16))).toInt256() // shareAdjustment
+                _params.shareReserves, // shareReserves
+                _params.shareAdjustment // shareAdjustment
             );
-        uint256 _normalizedTimeRemaining = normalizedTimeRemaining(
+        data.normalizedTimeRemaining = normalizedTimeRemaining(
             self,
             _position.maturityTime
         );
@@ -279,64 +210,63 @@ library HyperdriveExecutionLibrary {
         // Hyperdrive uses the vaultSharePrice at the beginning of the
         // checkpoint as the open price, and the current vaultSharePrice as
         // the close price.
-        uint256 closeVaultSharePrice = vaultSharePrice(self);
-        uint256 openVaultSharePrice = getCheckpointDown(
+        data.closeVaultSharePrice = vaultSharePrice(self);
+        data.openVaultSharePrice = getCheckpointDown(
             self,
-            _position.maturityTime - poolConfig.positionDuration
+            _position.maturityTime - _params.positionDuration
         ).vaultSharePrice;
 
         // Calculate the raw proceeds of the close without fees.
-        (, , uint256 shareProceeds) = HyperdriveMath.calculateCloseLong(
-            effectiveShareReserves,
-            uint128(values[0].extract_32_16(0)), // bondReserves
+        (, , data.shareProceeds) = HyperdriveMath.calculateCloseLong(
+            data.effectiveShareReserves,
+            _params.bondReserves, // bondReserves
             _position.bondAmount,
-            _normalizedTimeRemaining,
-            poolConfig.timeStretch,
-            closeVaultSharePrice,
-            poolConfig.initialVaultSharePrice
+            data.normalizedTimeRemaining,
+            _params.timeStretch,
+            data.closeVaultSharePrice,
+            _params.initialVaultSharePrice
         );
 
         // Calculate the fees that should be paid by the trader. The trader
         // pays a fee on the curve and flat parts of the trade. Most of the
         // fees go the LPs, but a portion goes to governance.
-        uint256 spotPrice = HyperdriveMath.calculateSpotPrice(
-            effectiveShareReserves,
-            uint128(values[0].extract_32_16(0)), // bondReserves
-            poolConfig.initialVaultSharePrice,
-            poolConfig.timeStretch
+        data.spotPrice = HyperdriveMath.calculateSpotPrice(
+            data.effectiveShareReserves,
+            _params.bondReserves,
+            _params.initialVaultSharePrice,
+            _params.timeStretch
         );
-        IHyperdrive.Fees memory fees = poolConfig.fees;
         (
-            uint256 curveFee, // shares
-            uint256 flatFee // shares
+            data.curveFee, // shares
+            data.flatFee // shares
         ) = _calculateFeesGivenBonds(
-                _position.bondAmount,
-                _normalizedTimeRemaining,
-                spotPrice,
-                closeVaultSharePrice,
-                fees.curve,
-                fees.flat
-            );
+            _position.bondAmount,
+            data.normalizedTimeRemaining,
+            data.spotPrice,
+            data.closeVaultSharePrice,
+            _params.curveFee,
+            _params.flatFee
+        );
 
         // Subtract fees from the proceeds.
-        shareProceeds -= curveFee + flatFee;
+        data.shareProceeds -= data.curveFee + data.flatFee;
 
         // Adjust the proceeds to account for negative interest.
-        if (closeVaultSharePrice < openVaultSharePrice) {
-            shareProceeds = shareProceeds.mulDivDown(
-                closeVaultSharePrice,
-                openVaultSharePrice
+        if (data.closeVaultSharePrice < data.openVaultSharePrice) {
+            data.shareProceeds = data.shareProceeds.mulDivDown(
+                data.closeVaultSharePrice,
+                data.openVaultSharePrice
             );
         }
 
         // Correct for any error that crept into the calculation of the share
         // amount by converting the shares to base and then back to shares
         // using the vault's share conversion logic.
-        shareProceeds = self.convertToShares(
-            shareProceeds.mulDown(closeVaultSharePrice)
+        data.shareProceeds = self.convertToShares(
+            data.shareProceeds.mulDown(data.closeVaultSharePrice)
         );
 
-        return shareProceeds;
+        return data.shareProceeds;
     }
 
     /// @dev Calculates the fees that go to the LPs and governance.
@@ -392,47 +322,6 @@ library HyperdriveExecutionLibrary {
         flatFee = flat.mulUp(_flatFee);
     }
 
-    /// @dev Calculates the fees that go to the LPs and governance.
-    /// @dev See `lib/hyperdrive/contracts/src/internal/HyperdriveBase.sol`
-    ///      for more information.
-    /// @param _shareAmount The amount of shares exchanged for bonds.
-    /// @param _spotPrice The price without slippage of bonds in terms of base
-    ///         (base/bonds).
-    /// @param _vaultSharePrice The current vault share price (base/shares).
-    /// @return curveFee The curve fee. The fee is in terms of bonds.
-    function _calculateFeesGivenShares(
-        uint256 _shareAmount,
-        uint256 _spotPrice,
-        uint256 _vaultSharePrice,
-        uint256 _curveFee
-    ) internal pure returns (uint256 curveFee) {
-        // NOTE: Round up to overestimate the curve fee.
-        //
-        // Fixed Rate (r) = (value at maturity - purchase price)/(purchase price)
-        //                = (1-p)/p
-        //                = ((1 / p) - 1)
-        //                = the ROI at maturity of a bond purchased at price p
-        //
-        // Another way to think about it:
-        //
-        // p (spot price) tells us how many base a bond is worth -> p = base/bonds
-        // 1/p tells us how many bonds a base is worth -> 1/p = bonds/base
-        // 1/p - 1 tells us how many additional bonds we get for each
-        // base -> (1/p - 1) = additional bonds/base
-        //
-        // The curve fee is taken from the additional bonds the user gets for
-        // each base:
-        //
-        // curve fee = ((1 / p) - 1) * phi_curve * c * dz
-        //           = r * phi_curve * base/shares * shares
-        //           = bonds/base * phi_curve * base
-        //           = bonds * phi_curve
-        curveFee = (uint256(ONE).divUp(_spotPrice) - ONE)
-            .mulUp(_curveFee)
-            .mulUp(_vaultSharePrice)
-            .mulUp(_shareAmount);
-    }
-
     /// @dev Obtains the vaultSharePrice from the hyperdrive instance.
     /// @return The current vaultSharePrice.
     function vaultSharePrice(IHyperdrive self) internal view returns (uint256) {
@@ -444,7 +333,7 @@ library HyperdriveExecutionLibrary {
     /// @return True if the position is mature false otherwise.
     function isMature(
         IHyperdrive self,
-        IEverlong.Position memory _position
+        IEverlongStrategy.Position memory _position
     ) internal view returns (bool) {
         return isMature(self, _position.maturityTime);
     }
