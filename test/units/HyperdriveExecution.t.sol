@@ -20,6 +20,8 @@ contract TestHyperdriveExecution is EverlongTest {
 
     Portfolio.State public portfolio;
 
+    /// @dev Tests that previewCloseLong returns the correct amount when
+    ///      immediately closing a long.
     function test_previewCloseLong_immediate_close() external {
         // Open a long.
         uint256 amount = 100e18;
@@ -40,6 +42,8 @@ contract TestHyperdriveExecution is EverlongTest {
         assertEq(actualAssets, previewAssets);
     }
 
+    /// @dev Tests that previewCloseLong returns the correct amount when
+    ///      immediately closing a long with negative interest.
     function test_previewCloseLong_immediate_close_negative_interest()
         external
     {
@@ -66,6 +70,8 @@ contract TestHyperdriveExecution is EverlongTest {
         assertEq(actualAssets, previewAssets);
     }
 
+    /// @dev Tests that previewCloseLong returns the correct amount when
+    ///      prematurely closing a long.
     function test_previewCloseLong_partial_maturity() external {
         // Open a long.
         uint256 amount = 100e18;
@@ -89,6 +95,8 @@ contract TestHyperdriveExecution is EverlongTest {
         assertEq(actualAssets, previewAssets);
     }
 
+    /// @dev Tests that previewCloseLong returns the correct amount when
+    ///      prematurely closing a long with negative interest.
     function test_previewCloseLong_partial_maturity_negative_interest()
         external
     {
@@ -118,6 +126,8 @@ contract TestHyperdriveExecution is EverlongTest {
         assertEq(actualAssets, previewAssets);
     }
 
+    /// @dev Tests that previewCloseLong returns the correct amount when
+    ///      closing a long at maturity.
     function test_previewCloseLong_full_maturity() external {
         // Open a long.
         uint256 amount = 100e18;
@@ -141,6 +151,8 @@ contract TestHyperdriveExecution is EverlongTest {
         assertEq(actualAssets, previewAssets);
     }
 
+    /// @dev Tests that previewCloseLong returns the correct amount when
+    ///      closing a long at maturity with negative interest.
     function test_previewCloseLong_full_maturity_negative_interest() external {
         // Deploy the vault.instance.
         VARIABLE_RATE = -0.05e18;
