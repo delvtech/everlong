@@ -32,10 +32,12 @@ interface IEverlongStrategyFactory {
     /// @param _management New management address.
     /// @param _performanceFeeRecipient New performance fee recipient address.
     /// @param _keeper New keeper address.
+    /// @param _emergencyAdmin New emergency admin address.
     function setAddresses(
         address _management,
         address _performanceFeeRecipient,
-        address _keeper
+        address _keeper,
+        address _emergencyAdmin
     ) external;
 
     // ╭───────────────────────────────────────────────────────────────────────╮

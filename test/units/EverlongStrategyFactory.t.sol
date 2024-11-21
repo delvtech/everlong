@@ -26,13 +26,15 @@ contract TestEverlongStrategyFactory is EverlongTest {
             "performanceFeeRecipient1"
         );
         address keeper = createUser("keeper1");
+        address emergencyAdmin = createUser("emergencyAdmin1");
 
         // Call setAddresses as the management with new addresses.
         vm.prank(strategyFactory.management());
         strategyFactory.setAddresses(
             management,
             performanceFeeRecipient,
-            keeper
+            keeper,
+            emergencyAdmin
         );
 
         // Ensure the addresses are set in the factory's storage.
@@ -42,6 +44,7 @@ contract TestEverlongStrategyFactory is EverlongTest {
             strategyFactory.performanceFeeRecipient()
         );
         assertEq(keeper, strategyFactory.keeper());
+        assertEq(emergencyAdmin, strategyFactory.emergencyAdmin());
     }
 
     /// @dev Tests that setAddresses fails when not called by management.
@@ -52,6 +55,7 @@ contract TestEverlongStrategyFactory is EverlongTest {
             "performanceFeeRecipient1"
         );
         address keeper = createUser("keeper1");
+        address emergencyAdmin = createUser("emergencyAdmin1");
 
         // Call setAddresses as a non-management.
         // The call should revert with 'OnlyManagement'.
@@ -60,7 +64,8 @@ contract TestEverlongStrategyFactory is EverlongTest {
         strategyFactory.setAddresses(
             management,
             performanceFeeRecipient,
-            keeper
+            keeper,
+            emergencyAdmin
         );
         vm.stopPrank();
     }

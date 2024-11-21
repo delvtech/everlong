@@ -21,7 +21,7 @@ contract TestVaultSharePrice is EverlongTest {
 
         // Alice makes a deposit.
         uint256 aliceDeposit = 10_000e18;
-        uint256 aliceShares = depositStrategy(aliceDeposit, alice);
+        depositStrategy(aliceDeposit, alice);
 
         console.log(
             "Vault Share Price 1: %e",

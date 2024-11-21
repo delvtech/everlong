@@ -24,9 +24,6 @@ contract EverlongStrategyFactory is IEverlongStrategyFactory {
     /// @inheritdoc IEverlongStrategyFactory
     string public constant version = EVERLONG_VERSION;
 
-    /// @inheritdoc IEverlongStrategyFactory
-    address public immutable emergencyAdmin;
-
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                                 State                                 │
     // ╰───────────────────────────────────────────────────────────────────────╯
@@ -39,6 +36,9 @@ contract EverlongStrategyFactory is IEverlongStrategyFactory {
 
     /// @inheritdoc IEverlongStrategyFactory
     address public keeper;
+
+    /// @inheritdoc IEverlongStrategyFactory
+    address public emergencyAdmin;
 
     /// @inheritdoc IEverlongStrategyFactory
     mapping(address => address) public deployments;
@@ -104,7 +104,8 @@ contract EverlongStrategyFactory is IEverlongStrategyFactory {
     function setAddresses(
         address _management,
         address _performanceFeeRecipient,
-        address _keeper
+        address _keeper,
+        address _emergencyAdmin
     ) external {
         // Only the management address can set addresses.
         if (msg.sender != management) {
@@ -115,6 +116,7 @@ contract EverlongStrategyFactory is IEverlongStrategyFactory {
         management = _management;
         performanceFeeRecipient = _performanceFeeRecipient;
         keeper = _keeper;
+        emergencyAdmin = _emergencyAdmin;
     }
 
     // ╭───────────────────────────────────────────────────────────────────────╮

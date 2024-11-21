@@ -136,7 +136,7 @@ contract EverlongStrategy is BaseStrategy {
     /// @dev Deploy up to '_amount' of 'asset' in the yield source.
     /// @param . The amount of 'asset' that the strategy can attempt
     ///        to deposit in the yield source.
-    function _deployFunds(uint256) internal override {
+    function _deployFunds(uint256) internal pure override {
         // Do nothing.
         // Opening longs on Hyperdrive is sandwichable so funds should only be
         // deployed when the `keeper` calls `tend()`.
