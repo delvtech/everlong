@@ -258,9 +258,8 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         vm.startPrank(governance);
         accountant.acceptFeeManager();
         IAccountant.Fee memory defaultConfig = accountant.defaultConfig();
-        // TODO: Confirm with the yearn team that this is the best way to be
-        //       handling the scenario where totalAssets drops after liquidity
-        //       is deployed to Hyperdrive.
+        // Must increase the accountant maxLoss for reporting since `totalAssets`
+        // decreases whenever opening longs.
         accountant.updateDefaultConfig(0, 0, 0, 0, defaultConfig.maxGain, 100);
         vault = IVault(
             roleManager.newVault(
@@ -275,7 +274,6 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             address(strategy),
             type(uint256).max
         );
-        vault.set_auto_allocate(true);
         vm.stopPrank();
 
         // As the `management` address, configure the DebtAllocator to not
@@ -286,7 +284,11 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         //       `profitMaxUnlockTime` set to 0 and their vault's set to
         //       3 days.
         vault.setProfitMaxUnlockTime(VAULT_PROFIT_MAX_UNLOCK_TIME);
+        // Give the `Keeper` role to the keeper address.
+        debtAllocator.setKeeper(keeper, true);
+        // Set minimum wait time for updating strategy debt to zero.
         debtAllocator.setMinimumWait(0);
+        // Set minimum change in debt for triggering an update.
         debtAllocator.setMinimumChange(
             address(vault),
             MINIMUM_TRANSACTION_AMOUNT + 1
@@ -481,6 +483,11 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     /// @dev Call `everlong.rebalance(...)` as the admin with default options.
     function rebalance() internal {
         vm.startPrank(keeper);
+        debtAllocator.update_debt(
+            address(vault),
+            address(strategy),
+            type(uint256).max
+        );
         strategy.tend();
         vm.stopPrank();
     }
