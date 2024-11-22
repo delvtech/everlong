@@ -1,16 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.22;
+pragma solidity ^0.8.20;
 
-import { MockLido } from "hyperdrive/contracts/test/MockLido.sol";
-import { IHyperdrive, IERC20 } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { console2 as console } from "forge-std/console2.sol";
+import { IERC20 } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { EverlongTest } from "../harnesses/EverlongTest.sol";
-import { IEverlongStrategy } from "../../contracts/interfaces/IEverlongStrategy.sol";
 import { HyperdriveExecutionLibrary } from "../../contracts/libraries/HyperdriveExecution.sol";
-import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 
 contract TestTend is EverlongTest {
     using FixedPointMath for uint256;

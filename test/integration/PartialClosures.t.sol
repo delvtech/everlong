@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.22;
+pragma solidity ^0.8.20;
 
 import { console2 as console } from "forge-std/console2.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
-import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { EverlongTest } from "../harnesses/EverlongTest.sol";
 import { IEverlongStrategy } from "../../contracts/interfaces/IEverlongStrategy.sol";
 import { HyperdriveExecutionLibrary } from "../../contracts/libraries/HyperdriveExecution.sol";
@@ -12,7 +11,6 @@ import { HyperdriveExecutionLibrary } from "../../contracts/libraries/Hyperdrive
 contract TestPartialClosures is EverlongTest {
     using FixedPointMath for uint256;
     using Lib for *;
-    using HyperdriveUtils for *;
     using HyperdriveExecutionLibrary for *;
 
     /// @dev Tests that immature positions can be partially closed when
