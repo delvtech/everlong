@@ -86,7 +86,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @dev Time period for the strategy to release profits over.
-    uint256 internal STRATEGY_PROFIT_MAX_UNLOCK_TIME = 1 days;
+    uint256 internal STRATEGY_PROFIT_MAX_UNLOCK_TIME = 0 days;
 
     /// @dev Time period for the strategy to release profits over.
     uint256 internal VAULT_PROFIT_MAX_UNLOCK_TIME = 1 days;
@@ -286,7 +286,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         vault.setProfitMaxUnlockTime(VAULT_PROFIT_MAX_UNLOCK_TIME);
         // Give the `Keeper` role to the keeper address.
         debtAllocator.setKeeper(keeper, true);
-        // Set minimum wait time for updating strategy debt to zero.
+        // Set minimum wait time for updating strategy debt.
         debtAllocator.setMinimumWait(0);
         // Set minimum change in debt for triggering an update.
         debtAllocator.setMinimumChange(
@@ -483,17 +483,23 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     /// @dev Call `everlong.rebalance(...)` as the admin with default options.
     function rebalance() internal {
         vm.startPrank(keeper);
-        debtAllocator.update_debt(
-            address(vault),
-            address(strategy),
-            type(uint256).max
-        );
+        (bool shouldUpdateDebt, bytes memory calldataOrReason) = debtAllocator
+            .shouldUpdateDebt(address(vault), address(strategy));
+        if (shouldUpdateDebt) {
+            (bool success, bytes memory err) = address(debtAllocator).call(
+                calldataOrReason
+            );
+            if (!success) {
+                revert(string(err));
+            }
+            // Advance time slightly to avoid updating debt twice at the same
+            // timestamp.
+            skip(1);
+        }
         strategy.tend();
         vm.stopPrank();
     }
 
-    // TODO: Discuss with yearn team the appropriate frequency and order of
-    //       operations for `tend()`, `report()`, and `process_report()`.
     //
     /// @dev Call `report` on the strategy then call `process_report` on the
     ///      vault.

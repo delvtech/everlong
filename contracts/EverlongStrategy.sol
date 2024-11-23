@@ -142,17 +142,38 @@ contract EverlongStrategy is BaseStrategy {
     }
 
     /// @dev Attempt to free the '_amount' of 'asset'.
-    /// @dev Any difference between `_amount` and what is actually freed will be
-    ///      counted as a loss and passed on to the withdrawer.
+    ///      - Any difference between `_amount` and what is actually freed will be
+    ///        counted as a loss and passed on to the withdrawer.
+    ///      - Unrealized losses must be calculated and proportionally
+    ///        distributed. Otherwise early withdrawers will incur no losses,
+    ///        and the last to withdraw will incur all losses.
     /// @param _amount The amount of 'asset' to be freed.
     function _freeFunds(uint256 _amount) internal override {
-        // Close all matured positions (if any).
-        uint256 output = _closeMaturedPositions(0);
+        // Calculate the current `totalAssets` and retrieve the previous value.
+        uint256 idle = asset.balanceOf(address(this));
+        uint256 currentTotalAssets = calculatePortfolioValue() + idle;
+        uint256 previousTotalAssets = TokenizedStrategy.totalAssets();
 
-        // Close immature positions if additional funds need to be freed.
-        if (_amount > output) {
-            _closePositions(_amount - output);
+        // If the current `totalAssets` is less than the previous, there are
+        // unrealized losses.
+        if (currentTotalAssets < previousTotalAssets) {
+            // Calculate the withdrawer's proportion of losses.
+            //
+            // It's important to use the TOTAL withdrawal amount, not just the
+            // amount being freed, when calculating the withdrawer's share.
+            //
+            //     totalWithdrawalAmount = _amount + idle
+            //
+            uint256 loss = previousTotalAssets - currentTotalAssets;
+            uint256 proportionalLoss = (loss).mulDivDown(
+                _amount + idle,
+                previousTotalAssets
+            );
+            _amount -= proportionalLoss;
         }
+
+        // Close positions until `_amount` is reached.
+        _closePositions(_amount);
     }
 
     /// @dev Internal function to harvest all rewards, redeploy any idle
@@ -169,11 +190,13 @@ contract EverlongStrategy is BaseStrategy {
         // If the strategy isn't shut down, call `_tend()` to close mature
         // positions and spend idle if needed.
         if (!TokenizedStrategy.isShutdown() && _tendTrigger()) {
-            _tend(ERC20(asset).balanceOf(address(this)));
+            _tend(asset.balanceOf(address(this)));
         }
 
         // Recalculate the value of assets the strategy controls.
-        _totalAssets = calculateTotalAssets();
+        _totalAssets =
+            calculatePortfolioValue() +
+            asset.balanceOf(address(this));
     }
 
     /// @dev Can be called inbetween reports to rebalance the portfolio.
@@ -403,8 +426,7 @@ contract EverlongStrategy is BaseStrategy {
     /// @notice Calculates the present portfolio value using the total amount of
     ///      bonds and the weighted average maturity of all positions.
     /// @return value The present portfolio value.
-    function calculateTotalAssets() public view returns (uint256 value) {
-        value = ERC20(asset).balanceOf(address(this));
+    function calculatePortfolioValue() public view returns (uint256 value) {
         if (_portfolio.totalBonds != 0) {
             // NOTE: The maturity time is rounded to the next checkpoint to
             //       underestimate the portfolio value.
