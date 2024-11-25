@@ -44,42 +44,38 @@ to assist in clarifying how each component works with one another.
 
 #### EverlongStrategy
 
-A `TokenizedStrategy` that converts deposited assets into long positions in
-Hyperdrive.
-
-When longs become mature, they are sold and new longs are purchased with the
-proceeds.
-
-Immature longs will be sold to fulfill withdrawals/redemptions.
+- A `TokenizedStrategy` that converts deposited assets into long positions in
+  Hyperdrive.
+- When longs become mature, they are sold and new longs are purchased with the
+  proceeds.
+- Immature longs will be sold to fulfill withdrawals/redemptions.
 
 #### EverlongVault
 
-A Yearn v3 Vault that deposits into an `EverlongStrategy`.
-
-Can maintain a set level of idle liquidity to service withdrawals/redemptions
-without forcing the strategy to sell immature longs.
-
-_Future Plans_: Deposit into multiple `EverlongStrategy`s to receive weighted
-average yields from each.
+- A Yearn v3 Vault that deposits into an `EverlongStrategy`.
+- Can maintain a set level of idle liquidity to service withdrawals/redemptions
+  without forcing the strategy to sell immature longs.
+- _Future Plans_: Deposit into multiple `EverlongStrategy`s to receive weighted
+  average yields from each.
 
 #### RoleManager
 
-Handles assignment and validation of the various privileged roles in the system.
-
-Offers additional functionality via periphery contracts like `DebtAllocator`
-and `Accountant`.
-
-Maintains a list of all vaults under control of the `RoleManager`.
+- Handles assignment and validation of the various privileged roles in the system.
+- Offers additional functionality via periphery contracts like `DebtAllocator`
+  and `Accountant`.
+- Maintains a list of all vaults under control of the `RoleManager`.
 
 #### DebtAllocator
 
-Provides the needed triggers that enable a keeper to perform automated debt updates
-for the vault and its strategies.
+- Provides the needed triggers that enable a keeper to perform automated debt updates
+  for the vault and its strategies.
+- Enables specifying how much liquidity to deposit from a vault into each of its
+  strategies.
 
 #### Accountant
 
-Can charge fees, issue refunds, and run a health check on any reported gains or
-losses during a strategy's report.
+- Can charge fees, issue refunds, and run a health check on any reported gains or
+  losses during a strategy's report.
 
 ### Roles
 
