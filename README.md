@@ -15,42 +15,38 @@ and [Yearn](https://docs.yearn.fi/).
 
 1. Install NPM packages
 
-```sh
-bun install
-```
+   ```sh
+   bun install
+   ```
 
 1. Compile the contracts
 
-```sh
-make build
-```
+   ```sh
+   make build
+   ```
 
 1. Run tests
 
-```sh
-make test
-```
+   ```sh
+   make test
+   ```
 
-## System Overview
+## Components
 
-Everlong is build on top of
+Everlong is built upon
 [Yearn's TokenizedStrategy Framework](https://docs.yearn.fi/developers/v3/strategy_writing_guide)
-and leverages [v3 Vaults](https://docs.yearn.fi/developers/v3/overview) to
-control idle liquidity (and eventually combine multiple strategies). Asset flow
-and role management across the various components is complex. Below are some diagrams
-to assist in clarifying how each component works with one another.
+which involves numerous mandatory and optional components. The primary
+components being used by Everlong are described below.
 
-### Components
+### EverlongStrategy
 
-#### EverlongStrategy
+- A `TokenizedStrategy` that converts deposited assets into long positions in
+  Hyperdrive.
+- When longs become mature, they are sold and new longs are purchased with the
+  proceeds.
+- Immature longs will be sold to fulfill withdrawals/redemptions.
 
-     - A `TokenizedStrategy` that converts deposited assets into long positions in
-       Hyperdrive.
-     - When longs become mature, they are sold and new longs are purchased with the
-       proceeds.
-     - Immature longs will be sold to fulfill withdrawals/redemptions.
-
-#### EverlongVault
+### EverlongVault
 
 - A Yearn v3 Vault that deposits into an `EverlongStrategy`.
 - Can maintain a set level of idle liquidity to service withdrawals/redemptions
@@ -58,32 +54,36 @@ to assist in clarifying how each component works with one another.
 - _Future Plans_: Deposit into multiple `EverlongStrategy`s to receive weighted
   average yields from each.
 
-#### RoleManager
+### RoleManager
 
 - Handles assignment and validation of the various privileged roles in the system.
 - Offers additional functionality via periphery contracts like `DebtAllocator`
   and `Accountant`.
 - Maintains a list of all vaults under control of the `RoleManager`.
 
-#### DebtAllocator
+### DebtAllocator
 
 - Provides the needed triggers that enable a keeper to perform automated debt updates
   for the vault and its strategies.
 - Enables specifying how much liquidity to deposit from a vault into each of its
   strategies.
 
-#### Accountant
+### Accountant
 
 - Can charge fees, issue refunds, and run a health check on any reported gains or
   losses during a strategy's report.
 
-### Roles
+## Roles
 
-#### Deployer
+Multiple privileged roles are needed for the deployment, configuration, and
+maintenance of Everlong vaults and strategies. The roles and their uses are described
+below.
+
+### Deployer
 
 Deployer of the contracts. Does not have any elevated privileges.
 
-#### Governance
+### Governance
 
 Capable of making critical changes to a vault.
 
@@ -94,7 +94,7 @@ For our situation, we use the governance role to:
 - Toggling `auto_allocate` for the vault.
 - Update the vault's fee and `maxLoss` configuration via the `Accountant`.
 
-#### Management
+### Management
 
 Capable of making minor operational changes to the vault and periphery contracts.
 
@@ -105,7 +105,7 @@ For our situation, we use the management role to:
 - Set the `DebtAllocator`'s `minimumChange`.
 - Set the `DebtAllocator`'s `strategyDebtRatio` for a vault's strategy.
 
-#### Keeper
+### Keeper
 
 Capable of performing maintenance on a vault and its strategies.
 
@@ -118,6 +118,15 @@ For our situation, we use the keeper role to:
 - Call `process_report()` on the vault, for all strategies used by the vault,
   to realize gains/losses. This should be called on approximately the same frequency
   as the vault's `profitMaxUnlockTime`.
+
+## Diagrams
+
+Everlong is build on top of
+[Yearn's TokenizedStrategy Framework](https://docs.yearn.fi/developers/v3/strategy_writing_guide)
+and leverages [v3 Vaults](https://docs.yearn.fi/developers/v3/overview) to
+control idle liquidity (and eventually combine multiple strategies). Asset flow
+and role management across the various components is complex. Below are some diagrams
+to assist in clarifying how each component works with one another.
 
 ### Asset Flow
 
