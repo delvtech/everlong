@@ -130,6 +130,9 @@ to assist in clarifying how each component works with one another.
 
 ### Asset Flow
 
+The diagram below outlines the interactions between components at various stages
+in the vault lifecycle (deposit, tend/report, and redeem).
+
 ```mermaid
 sequenceDiagram
     actor User
@@ -150,4 +153,28 @@ sequenceDiagram
     Strategy->>Hyperdrive: close longs
     Strategy->>Vault: transfer assets
     Vault->>User: transfer assets
+```
+
+### Vault Debt Allocation
+
+Yearn vaults can allocate a configurable amount of liquidity to one or more strategies.
+
+Allocating less than 100% of the vault's liquidity to strategies (like the
+`Single-Strategy` vault shown below) results in maintained idle liquidity. This
+idle liquidity is then used to service withdrawals without having to unwind
+assets from the strategy, which reduces gas costs for the withdrawer and position
+churn for the strategy.
+
+Multi-Strategy vaults (like the one shown below) can diversify their debt
+allocation across multiple strategies and vaults in configurable ratios. New strategies
+can be added to existing vaults and the amount of debt allocated to each strategy
+can be updated at any time.
+
+```mermaid
+flowchart TD
+    A[Single-Strategy<br/>Everlong Vault<br/>Morpho wstETH USDC<br/>] -->|80% of Funds| B(Everlong Strategy<br/>Morpho wstETH USDC)
+    A -->|20% of Funds| C(Idle Liquidity)
+    D -->|33% of Funds| E(Everlong Strategy<br/>Moonwell USDC)
+    D -->|33% of Funds| F(Everlong Strategy<br/>Morpho WBTC USDC)
+    D[Multi-Strategy<br/>Everlong Vault<br/>USDC] -->|33% of Funds| B
 ```
