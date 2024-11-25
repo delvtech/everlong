@@ -42,21 +42,13 @@ to assist in clarifying how each component works with one another.
 
 ### Components
 
-<details><summary>EverlongStrategy</summary><p>
-- A `TokenizedStrategy` that converts deposited assets into long positions in
-  Hyperdrive.
-- When longs become mature, they are sold and new longs are purchased with the
-  proceeds.
-- Immature longs will be sold to fulfill withdrawals/redemptions.
-</p></details>
-
 #### EverlongStrategy
 
-- A `TokenizedStrategy` that converts deposited assets into long positions in
-  Hyperdrive.
-- When longs become mature, they are sold and new longs are purchased with the
-  proceeds.
-- Immature longs will be sold to fulfill withdrawals/redemptions.
+     - A `TokenizedStrategy` that converts deposited assets into long positions in
+       Hyperdrive.
+     - When longs become mature, they are sold and new longs are purchased with the
+       proceeds.
+     - Immature longs will be sold to fulfill withdrawals/redemptions.
 
 #### EverlongVault
 
