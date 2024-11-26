@@ -182,16 +182,15 @@ contract EverlongStrategy is BaseStrategy {
         if (currentTotalAssets < previousTotalAssets) {
             // Calculate the withdrawer's proportion of losses.
             //
-            // It's important to use the TOTAL withdrawal amount, not just the
-            // amount being freed, when calculating the withdrawer's share. This
-            // is because it is compared with totalAssets which also includes
-            // idle.
+            // It's important to use only the value of longs being closed, not
+            // the total amount being freed, when calculating the withdrawer's
+            // share.
             //
             //     totalWithdrawalAmount = _amount + idle
             //
             uint256 loss = previousTotalAssets - currentTotalAssets;
             uint256 proportionalLoss = (loss).mulDivDown(
-                _amount + idle,
+                _amount,
                 previousTotalAssets
             );
             _amount -= proportionalLoss;

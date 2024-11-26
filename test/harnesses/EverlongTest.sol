@@ -8,6 +8,7 @@ import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMat
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 import { HyperdriveTest } from "hyperdrive/test/utils/HyperdriveTest.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
+import { CommonReportTrigger } from "lib/vault-periphery/lib/tokenized-strategy-periphery/src/ReportTrigger/CommonReportTrigger.sol";
 import { DebtAllocator } from "vault-periphery/debtAllocators/DebtAllocator.sol";
 import { IVault } from "yearn-vaults-v3/interfaces/IVault.sol";
 import { IAccountant } from "../../contracts/interfaces/IAccountant.sol";
@@ -148,6 +149,11 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     ///      strategy.
     IAprOracle internal aprOracle =
         IAprOracle(0x1981AD9F44F2EA9aDd2dC4AD7D075c102C70aF92);
+
+    /// @dev Shared contract providing default triggers for vault reporting,
+    ///      strategy reporting, and strategy tending.
+    CommonReportTrigger internal reportTrigger =
+        CommonReportTrigger(0xA045D4dAeA28BA7Bfe234c96eAa03daFae85A147);
 
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                             SetUp Helpers                             │
@@ -483,23 +489,93 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
 
     /// @dev Call `everlong.rebalance(...)` as the admin with default options.
     function rebalance() internal {
+        update_debt();
+        tend();
+    }
+
+    /// @dev Call `report` on the strategy then call `process_report` on the
+    ///      vault if needed.
+    function report() internal {
+        strategyReport();
+        processReport();
+    }
+
+    /// @dev Calls `update_debt()` on the vault if needed.
+    function update_debt() internal {
         vm.startPrank(keeper);
-        strategy.tend();
+        (bool shouldUpdateDebt, bytes memory calldataOrReason) = debtAllocator
+            .shouldUpdateDebt(address(vault), address(strategy));
+        if (shouldUpdateDebt) {
+            (bool success, bytes memory err) = address(debtAllocator).call(
+                calldataOrReason
+            );
+            if (!success) {
+                revert(
+                    string.concat("vault update debt failed: ", string(err))
+                );
+            }
+            // Advance time slightly to avoid updating debt twice at the same
+            // timestamp.
+            skip(1);
+        }
         vm.stopPrank();
     }
 
-    //
-    /// @dev Call `report` on the strategy then call `process_report` on the
-    ///      vault.
-    function report() internal {
-        // Call report for the strategy.
+    /// @dev Calls `tend()` on the strategy if needed.
+    function tend() internal {
         vm.startPrank(keeper);
-        strategy.report();
+        (bool shouldTend, bytes memory calldataOrReason) = reportTrigger
+            .strategyTendTrigger(address(strategy));
+        if (shouldTend) {
+            (bool success, bytes memory err) = address(strategy).call(
+                calldataOrReason
+            );
+            if (!success) {
+                revert(string.concat("strategy tend failed: ", string(err)));
+            }
+        }
         vm.stopPrank();
+    }
 
+    /// @dev Calls `report()` on the strategy if needed.
+    function strategyReport() internal {
+        vm.startPrank(keeper);
+        (
+            bool shouldReportStrategy,
+            bytes memory strategyCalldataOrReason
+        ) = reportTrigger.defaultStrategyReportTrigger(address(strategy));
+        if (shouldReportStrategy) {
+            (bool success, bytes memory err) = address(strategy).call(
+                strategyCalldataOrReason
+            );
+            if (!success) {
+                revert(string.concat("strategy report failed: ", string(err)));
+            }
+        }
+        vm.stopPrank();
+    }
+
+    /// @dev Calls `process_report()` on the vault if needed.
+    function processReport() internal {
         // Call process_report for the vault.
         vm.startPrank(management);
-        vault.process_report(address(strategy));
+        (
+            bool shouldReportVault,
+            bytes memory vaultCalldataOrReason
+        ) = reportTrigger.defaultVaultReportTrigger(
+                address(vault),
+                address(strategy)
+            );
+        if (shouldReportVault) {
+            (bool success, bytes memory err) = address(vault).call(
+                vaultCalldataOrReason
+            );
+            if (!success) {
+                revert(
+                    string.concat("vault process_report failed: ", string(err))
+                );
+            }
+        }
         vm.stopPrank();
     }
 

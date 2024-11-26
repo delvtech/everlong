@@ -65,7 +65,7 @@ contract TestIdle is EverlongTest {
     ///
     ///      Expected Behavior:
     ///      - If the deposit WOULD cause idle to exceed the target, update debt
-    ///        and leave the minimum idle in the vault.
+    ///        and leave the target idle in the vault.
     ///      - If the deposit WOULD NOT cause idle to exceed the target, do not
     ///        update debt and leave idle between min and target.
     ///      - If the redemption WOULD cause idle to go beneath the min, free
@@ -74,12 +74,12 @@ contract TestIdle is EverlongTest {
     ///        do not update debt.
     ///
     ///      Test Flow:
-    ///      1. Large Deposit: Idle == MIN
-    ///      2. Small Deposit: MIN < Idle < TARGET
-    ///      3. Medium Deposit: Idle == MIN
-    ///      4. Large Redeem: Idle == TARGET
+    ///      1. Large Deposit: Idle == TARGET
+    ///      2. Small Deposit: Idle == TARGET
+    ///      3. Medium Deposit: Idle == TARGET
+    ///      4. Medium Redeem: Idle == TARGET
     ///      5. Small Redeem: MIN < Idle < TARGET
-    ///      6. Medium Redeem: Idle == 0
+    ///      6. Large Redeem: Idle == 0
     function test_idle() external {
         uint256 bigDepositAmount = 10_000e18;
         uint256 mediumDepositAmount = 7_000e18;
@@ -87,7 +87,7 @@ contract TestIdle is EverlongTest {
 
         // Idle after big deposit should equal min.
         uint256 bigDepositShares = depositVault(bigDepositAmount, alice, true);
-        assertIdleEqMin("after big deposit");
+        assertIdleEqTarget("after big deposit");
 
         // Idle after small deposit should be between min and target.
         uint256 smallDepositShares = depositVault(
@@ -95,7 +95,7 @@ contract TestIdle is EverlongTest {
             alice,
             true
         );
-        assertIdleBetweenMinAndTarget("after small deposit");
+        assertIdleEqTarget("after small deposit");
 
         // Idle after medium deposit should equal min.
         uint256 mediumDepositShares = depositVault(
@@ -103,7 +103,7 @@ contract TestIdle is EverlongTest {
             alice,
             true
         );
-        assertIdleEqMin("after medium deposit");
+        assertIdleEqTarget("after medium deposit");
 
         // Idle after medium redeem should equal target.
         redeemVault(mediumDepositShares, alice, true);
