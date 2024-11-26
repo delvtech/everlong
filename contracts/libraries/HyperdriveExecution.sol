@@ -328,8 +328,6 @@ library HyperdriveExecutionLibrary {
     // │                               Max Long                                │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
-    // HACK: Copied from `delvtech/hyperdrive` repo.
-    //
     /// @dev Calculates the maximum amount of longs that can be opened.
     /// @param _maxIterations The maximum number of iterations to use.
     /// @return baseAmount The cost of buying the maximum amount of longs.
@@ -360,8 +358,6 @@ library HyperdriveExecutionLibrary {
         return baseAmount;
     }
 
-    // HACK: Copied from `delvtech/hyperdrive` repo.
-    //
     /// @dev Calculates the maximum amount of longs that can be opened.
     /// @return baseAmount The cost of buying the maximum amount of longs.
     function calculateMaxLong(
@@ -370,8 +366,6 @@ library HyperdriveExecutionLibrary {
         return calculateMaxLong(self, 7);
     }
 
-    // HACK: Copied from `delvtech/hyperdrive` repo.
-    //
     /// @dev Parameters needed for `calculateMaxLong`.
     ///      Used internally, should typically not be used by external callers
     ///      of the library.
@@ -390,8 +384,6 @@ library HyperdriveExecutionLibrary {
         uint256 governanceLPFee;
     }
 
-    // HACK: Copied from `delvtech/hyperdrive` repo.
-    //
     /// @dev Gets the max long that can be opened given a budget.
     ///
     ///      We start by calculating the long that brings the pool's spot price
@@ -535,8 +527,6 @@ library HyperdriveExecutionLibrary {
         return (maxBaseAmount, maxBondAmount);
     }
 
-    // HACK: Copied from `delvtech/hyperdrive` repo.
-    //
     /// @dev Calculates the largest long that can be opened without buying bonds
     ///      at a negative interest rate. This calculation does not take
     ///      Hyperdrive's solvency constraints into account and shouldn't be
@@ -644,8 +634,6 @@ library HyperdriveExecutionLibrary {
             );
     }
 
-    // HACK: Copied from `delvtech/hyperdrive` repo.
-    //
     /// @dev Calculates an initial guess of the max long that can be opened.
     ///      This is a reasonable estimate that is guaranteed to be less than
     ///      the true max long. We use this to get a reasonable starting point
@@ -696,8 +684,6 @@ library HyperdriveExecutionLibrary {
         return guess;
     }
 
-    // HACK: Copied from `delvtech/hyperdrive` repo.
-    //
     /// @dev Estimates the max long based on the pool's current solvency and a
     ///      conservative price estimate, $p_r$.
     ///
@@ -763,8 +749,6 @@ library HyperdriveExecutionLibrary {
         return estimate;
     }
 
-    // HACK: Copied from `delvtech/hyperdrive` repo.
-    //
     /// @dev Gets the solvency of the pool $S(x)$ after a long is opened with a
     ///      base amount $x$.
     ///
@@ -848,8 +832,6 @@ library HyperdriveExecutionLibrary {
         }
     }
 
-    // HACK: Copied from `delvtech/hyperdrive` repo.
-    //
     /// @dev Gets the negation of the derivative of the pool's solvency with
     ///      respect to the base amount that the long pays.
     ///
@@ -905,8 +887,6 @@ library HyperdriveExecutionLibrary {
         return (derivative.mulDivDown(1e18, _params.vaultSharePrice), success);
     }
 
-    // HACK: Copied from `delvtech/hyperdrive` repo.
-    //
     /// @dev Gets the long amount that will be opened for a given base amount.
     ///
     ///      The long amount $y(x)$ that a trader will receive is given by:
@@ -950,8 +930,6 @@ library HyperdriveExecutionLibrary {
             calculateLongCurveFee(_baseAmount, _spotPrice, _params.curveFee);
     }
 
-    // HACK: Copied from `delvtech/hyperdrive` repo.
-    //
     /// @dev Gets the derivative of [long_amount](long_amount) with respect to
     ///      the base amount.
     ///
@@ -1027,8 +1005,6 @@ library HyperdriveExecutionLibrary {
         return (derivative, true);
     }
 
-    // HACK: Copied from `delvtech/hyperdrive` repo.
-    //
     /// @dev Gets the curve fee paid by longs for a given base amount.
     ///
     ///      The curve fee $c(x)$ paid by longs is given by:
@@ -1048,8 +1024,6 @@ library HyperdriveExecutionLibrary {
         return _curveFee.mulUp(ONE.divUp(_spotPrice) - ONE).mulUp(_baseAmount);
     }
 
-    // HACK: Copied from `delvtech/hyperdrive` repo.
-    //
     /// @dev Gets the governance fee paid by longs for a given base amount.
     ///
     ///      Unlike the [curve fee](long_curve_fee) which is paid in bonds, the

@@ -182,8 +182,6 @@ contract TestHyperdriveExecution is EverlongTest {
         assertEq(actualAssets, previewAssets);
     }
 
-    // HACK: Copied from `delvtech/hyperdrive` repo.
-    //
     /// @dev Test the output of `calculateMaxLong` when there is a substantial
     ///      long held to an entire term already in hyperdrive.
     function test__calculateMaxLong__matureLong(
@@ -220,8 +218,6 @@ contract TestHyperdriveExecution is EverlongTest {
         );
     }
 
-    // HACK: Copied from `delvtech/hyperdrive` repo.
-    //
     /// @dev Test the output of `calculateMaxLong` when there is a substantial
     ///      short held to an entire term already in hyperdrive.
     function test__calculateMaxLong__matureShort(
@@ -258,8 +254,6 @@ contract TestHyperdriveExecution is EverlongTest {
         );
     }
 
-    // HACK: Copied from `delvtech/hyperdrive` repo.
-    //
     /// @dev Test specific edge cases for `calculateMaxLong`.
     function test__calculateMaxLong__edgeCases() external {
         // This is an edge case where pool has a spot price of 1 at the optimal
@@ -284,8 +278,6 @@ contract TestHyperdriveExecution is EverlongTest {
         );
     }
 
-    // HACK: Copied from `delvtech/hyperdrive` repo.
-    //
     /// @dev Broad fuzz testing for `calculateMaxLong`.
     function test__calculateMaxLong__fuzz(
         uint256 fixedRate,
@@ -303,8 +295,6 @@ contract TestHyperdriveExecution is EverlongTest {
         );
     }
 
-    // HACK: Copied from `delvtech/hyperdrive` repo.
-    //
     function _test__calculateMaxLong(
         uint256 fixedRate,
         uint256 contribution,
@@ -329,8 +319,6 @@ contract TestHyperdriveExecution is EverlongTest {
         );
     }
 
-    // HACK: Copied from `delvtech/hyperdrive` repo.
-    //
     /// @dev Helper to ensure that the output of `calculateMaxLong` is actually
     ///      the max long.
     function _verifyMaxLong(
