@@ -21,12 +21,12 @@ contract TestEverlongStrategyFactory is EverlongTest {
     /// @dev Tests that setAddresses succeeds when called by management.
     function test_setAddresses_success() external {
         // Generate some addresses.
-        address management = createUser("management1");
-        address performanceFeeRecipient = createUser(
+        (address management, ) = createUser("management1");
+        (address performanceFeeRecipient, ) = createUser(
             "performanceFeeRecipient1"
         );
-        address keeper = createUser("keeper1");
-        address emergencyAdmin = createUser("emergencyAdmin1");
+        (address keeper, ) = createUser("keeper1");
+        (address emergencyAdmin, ) = createUser("emergencyAdmin1");
 
         // Call setAddresses as the management with new addresses.
         vm.prank(strategyFactory.management());
@@ -50,12 +50,12 @@ contract TestEverlongStrategyFactory is EverlongTest {
     /// @dev Tests that setAddresses fails when not called by management.
     function test_setAddresses_failure_OnlyManagement() external {
         // Generate some addresses.
-        address management = createUser("management1");
-        address performanceFeeRecipient = createUser(
+        (address management, ) = createUser("management1");
+        (address performanceFeeRecipient, ) = createUser(
             "performanceFeeRecipient1"
         );
-        address keeper = createUser("keeper1");
-        address emergencyAdmin = createUser("emergencyAdmin1");
+        (address keeper, ) = createUser("keeper1");
+        (address emergencyAdmin, ) = createUser("emergencyAdmin1");
 
         // Call setAddresses as a non-management.
         // The call should revert with 'OnlyManagement'.
@@ -138,10 +138,12 @@ contract TestEverlongStrategyFactory is EverlongTest {
     function test_isDeployedStrategy_failure() external {
         // Generate some addresses.
         string memory name = "TestingEverlongStrategyFactory";
-        address management = createUser("management");
-        address performanceFeeRecipient = createUser("performanceFeeRecipient");
-        address keeper = createUser("keeper");
-        address emergencyAdmin = createUser("emergencyAdmin");
+        (address management, ) = createUser("management1");
+        (address performanceFeeRecipient, ) = createUser(
+            "performanceFeeRecipient1"
+        );
+        (address keeper, ) = createUser("keeper1");
+        (address emergencyAdmin, ) = createUser("emergencyAdmin1");
 
         // Deploy the factory.
         strategyFactory = new EverlongStrategyFactory(
@@ -160,10 +162,12 @@ contract TestEverlongStrategyFactory is EverlongTest {
     function test_constructor_success() external {
         // Generate some addresses.
         string memory name = "TestingEverlongStrategyFactory";
-        address management = createUser("management");
-        address performanceFeeRecipient = createUser("performanceFeeRecipient");
-        address keeper = createUser("keeper");
-        address emergencyAdmin = createUser("emergencyAdmin");
+        (address management, ) = createUser("management1");
+        (address performanceFeeRecipient, ) = createUser(
+            "performanceFeeRecipient1"
+        );
+        (address keeper, ) = createUser("keeper1");
+        (address emergencyAdmin, ) = createUser("emergencyAdmin1");
 
         // Deploy the factory.
         strategyFactory = new EverlongStrategyFactory(

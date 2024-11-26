@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.22;
+pragma solidity 0.8.24;
 
 import { IEverlongStrategyFactory } from "./interfaces/IEverlongStrategyFactory.sol";
 import { IEverlongStrategy } from "./interfaces/IEverlongStrategy.sol";

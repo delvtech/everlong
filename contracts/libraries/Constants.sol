@@ -8,3 +8,5 @@ string constant EVERLONG_VERSION = "v0.0.1";
 string constant EVERLONG_STRATEGY_KIND = "EverlongStrategy";
 
 string constant EVERLONG_STRATEGY_FACTORY_KIND = "EverlongStrategyFactory";
+
+string constant EVERLONG_STRATEGY_KEEPER_KIND = "EverlongStrategyKeeper";

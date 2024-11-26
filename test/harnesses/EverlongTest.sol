@@ -19,6 +19,7 @@ import { IEverlongStrategyFactory } from "../../contracts/interfaces/IEverlongSt
 import { IRoleManager } from "../../contracts/interfaces/IRoleManager.sol";
 import { IRoleManagerFactory } from "../../contracts/interfaces/IRoleManagerFactory.sol";
 import { EverlongStrategyFactory } from "../../contracts/EverlongStrategyFactory.sol";
+import { EverlongStrategyKeeper } from "../../contracts/EverlongStrategyKeeper.sol";
 
 /// @dev Everlong testing harness contract.
 /// @dev Tests should extend this contract and call its `setUp` function.
@@ -101,15 +102,11 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     /// @dev Everlong token symbol.
     string internal EVERLONG_SYMBOL = "EVRLNG";
 
-    // TODO: Implement and test.
-    //
-    /// @dev Target idle liquidity (in basis points) for the Everlong vault.
-    uint256 internal TARGET_IDLE_LIQUIDITY_BASIS_POINTS = 0;
+    /// @dev Minimum idle liquidity (in basis points) for the Everlong vault.
+    uint256 internal MIN_IDLE_LIQUIDITY_BASIS_POINTS = 500;
 
-    // TODO: Implement and test.
-    //
     /// @dev Target idle liquidity (in basis points) for the Everlong vault.
-    uint256 internal MIN_IDLE_LIQUIDITY_BASIS_POINTS = 0;
+    uint256 internal TARGET_IDLE_LIQUIDITY_BASIS_POINTS = 1000;
 
     /// @dev Everlong vault management address.
     /// @dev Used when interacting with the `DebtAllocator`.
@@ -155,6 +152,10 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     CommonReportTrigger internal reportTrigger =
         CommonReportTrigger(0xA045D4dAeA28BA7Bfe234c96eAa03daFae85A147);
 
+    /// @dev Periphery contract to simplify maintenance operations for vaults
+    ///      and strategies.
+    EverlongStrategyKeeper internal keeperContract;
+
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                             SetUp Helpers                             │
     // ╰───────────────────────────────────────────────────────────────────────╯
@@ -164,6 +165,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         vm.createSelectFork(vm.rpcUrl("mainnet"));
         super.setUp();
         setUpHyperdrive();
+        setUpRoleManager();
         setUpEverlongStrategy();
         setUpEverlongVault();
     }
@@ -193,22 +195,41 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         vm.stopPrank();
     }
 
+    /// @dev Deploy the RoleManager and store the periphery contract addresses.
+    function setUpRoleManager() internal {
+        // Set up the `management` address.
+        (management, ) = createUser("management");
+
+        // Deploy the RoleManager from the factory and store the relevant
+        // RoleManager component addresses.
+        vm.startPrank(deployer);
+        roleManager = IRoleManager(
+            roleManagerFactory.newProject("Everlong", governance, management)
+        );
+        debtAllocator = DebtAllocator(roleManager.getDebtAllocator());
+        accountant = IAccountant(roleManager.getAccountant());
+        vm.stopPrank();
+    }
+
     /// @dev Deploy the Everlong Yearn Tokenized Strategy.
     function setUpEverlongStrategy() internal {
         vm.startPrank(deployer);
-
-        // Set up the `management` address.
-        management = createUser("management");
-
         // Set Up the `keeper` address.
-        keeper = createUser("keeper");
+        (keeper, ) = createUser("keeper");
+
+        // Deploy the EverlongStrategyKeeper helper contract.
+        keeperContract = new EverlongStrategyKeeper(
+            address(roleManager),
+            address(reportTrigger)
+        );
+        keeperContract.transferOwnership(keeper);
 
         // Deploy the EverlongStrategyFactory.
         strategyFactory = new EverlongStrategyFactory(
             "TestEverlongStrategyFactory", // Name
             management, // Management
             governance, // Performance Fee Recipient
-            keeper, // Keeper
+            address(keeperContract), // EverlongStrategyKeeper
             deployer // Emergency Admin
         );
 
@@ -223,15 +244,11 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
                 )
             )
         );
-
         vm.stopPrank();
 
         // As the `management` address:
         //   1. Accept the `management` role for the strategy.
         //   2. Set the `profitMaxUnlockTime` to zero.
-        //  TODO: Ensure this is what we want. Pendle has their strategy
-        //            `profitMaxUnlockTime` set to 0 and their vault's set to
-        //            3 days.
         vm.startPrank(management);
         strategy.acceptManagement();
         strategy.setProfitMaxUnlockTime(STRATEGY_PROFIT_MAX_UNLOCK_TIME);
@@ -241,16 +258,6 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
 
     /// @dev Deploy the Everlong Yearn v3 Vault.
     function setUpEverlongVault() internal {
-        // Deploy the RoleManager from the factory and store the relevant
-        // RoleManager component addresses.
-        vm.startPrank(deployer);
-        roleManager = IRoleManager(
-            roleManagerFactory.newProject("Everlong", governance, management)
-        );
-        debtAllocator = DebtAllocator(roleManager.getDebtAllocator());
-        accountant = IAccountant(roleManager.getAccountant());
-        vm.stopPrank();
-
         // As the `governance` address:
         //   1. Accept the "Fee Manager" role for the Accountant.
         //   2. Set the default `config.maxLoss` for the accountant to be 10%.
@@ -280,7 +287,10 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             address(strategy),
             type(uint256).max
         );
-        vault.set_auto_allocate(true);
+        roleManager.setPositionHolder(
+            roleManager.KEEPER(),
+            address(keeperContract)
+        );
         vm.stopPrank();
 
         // As the `management` address, configure the DebtAllocator to not
@@ -291,8 +301,10 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         //       `profitMaxUnlockTime` set to 0 and their vault's set to
         //       3 days.
         vault.setProfitMaxUnlockTime(VAULT_PROFIT_MAX_UNLOCK_TIME);
-        // Give the `Keeper` role to the keeper address.
-        debtAllocator.setKeeper(keeper, true);
+        // Enable deposits to the strategy from the vault.
+        strategy.setDepositor(address(vault), true);
+        // Give the `EverlongStrategyKeeper` role to the keeper address.
+        debtAllocator.setKeeper(address(keeperContract), true);
         // Set minimum wait time for updating strategy debt.
         debtAllocator.setMinimumWait(0);
         // Set minimum change in debt for triggering an update.
@@ -306,15 +318,13 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             10_000 - TARGET_IDLE_LIQUIDITY_BASIS_POINTS,
             10_000 - MIN_IDLE_LIQUIDITY_BASIS_POINTS
         );
+
         vm.stopPrank();
     }
 
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                            Deposit Helpers                            │
     // ╰───────────────────────────────────────────────────────────────────────╯
-
-    // TODO: Determine the benefits/drawbacks of depositing directly into the
-    //       strategy vs depositing into a vault.
 
     /// @dev Deposit into Everlong strategy.
     /// @param _amount Amount of assets to deposit.
@@ -336,6 +346,11 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     ) internal returns (uint256 shares) {
         // Resolve the appropriate token.
         ERC20Mintable token = ERC20Mintable(vault.asset());
+
+        // Enable deposits from _depositor.
+        vm.startPrank(management);
+        strategy.setDepositor(_depositor, true);
+        vm.stopPrank();
 
         // Mint sufficient tokens to _depositor.
         vm.startPrank(_depositor);
@@ -489,93 +504,37 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
 
     /// @dev Call `everlong.rebalance(...)` as the admin with default options.
     function rebalance() internal {
-        update_debt();
-        tend();
+        vm.startPrank(keeper);
+        keeperContract.update_debt(address(vault), address(strategy));
+        keeperContract.tend(
+            address(strategy),
+            IEverlongStrategy.TendConfig({
+                minOutput: 0,
+                minVaultSharePrice: 0,
+                positionClosureLimit: 0,
+                extraData: ""
+            })
+        );
+        vm.stopPrank();
+        // Skip forward one second so that `update_debt` doesn't get called on
+        // the same timestamp.
+        skip(1);
     }
 
     /// @dev Call `report` on the strategy then call `process_report` on the
     ///      vault if needed.
     function report() internal {
-        strategyReport();
-        processReport();
-    }
-
-    /// @dev Calls `update_debt()` on the vault if needed.
-    function update_debt() internal {
         vm.startPrank(keeper);
-        (bool shouldUpdateDebt, bytes memory calldataOrReason) = debtAllocator
-            .shouldUpdateDebt(address(vault), address(strategy));
-        if (shouldUpdateDebt) {
-            (bool success, bytes memory err) = address(debtAllocator).call(
-                calldataOrReason
-            );
-            if (!success) {
-                revert(
-                    string.concat("vault update debt failed: ", string(err))
-                );
-            }
-            // Advance time slightly to avoid updating debt twice at the same
-            // timestamp.
-            skip(1);
-        }
-        vm.stopPrank();
-    }
-
-    /// @dev Calls `tend()` on the strategy if needed.
-    function tend() internal {
-        vm.startPrank(keeper);
-        (bool shouldTend, bytes memory calldataOrReason) = reportTrigger
-            .strategyTendTrigger(address(strategy));
-        if (shouldTend) {
-            (bool success, bytes memory err) = address(strategy).call(
-                calldataOrReason
-            );
-            if (!success) {
-                revert(string.concat("strategy tend failed: ", string(err)));
-            }
-        }
-        vm.stopPrank();
-    }
-
-    /// @dev Calls `report()` on the strategy if needed.
-    function strategyReport() internal {
-        vm.startPrank(keeper);
-        (
-            bool shouldReportStrategy,
-            bytes memory strategyCalldataOrReason
-        ) = reportTrigger.defaultStrategyReportTrigger(address(strategy));
-        if (shouldReportStrategy) {
-            (bool success, bytes memory err) = address(strategy).call(
-                strategyCalldataOrReason
-            );
-            if (!success) {
-                revert(string.concat("strategy report failed: ", string(err)));
-            }
-        }
-        vm.stopPrank();
-    }
-
-    /// @dev Calls `process_report()` on the vault if needed.
-    function processReport() internal {
-        // Call process_report for the vault.
-        vm.startPrank(management);
-        (
-            bool shouldReportVault,
-            bytes memory vaultCalldataOrReason
-        ) = reportTrigger.defaultVaultReportTrigger(
-                address(vault),
-                address(strategy)
-            );
-        if (shouldReportVault) {
-            (bool success, bytes memory err) = address(vault).call(
-                vaultCalldataOrReason
-            );
-            if (!success) {
-                revert(
-                    string.concat("vault process_report failed: ", string(err))
-                );
-            }
-        }
+        keeperContract.strategyReport(
+            address(strategy),
+            IEverlongStrategy.TendConfig({
+                minOutput: 0,
+                minVaultSharePrice: 0,
+                positionClosureLimit: 0,
+                extraData: ""
+            })
+        );
+        keeperContract.processReport(address(vault), address(strategy));
         vm.stopPrank();
     }
 
@@ -624,7 +583,8 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
                 HyperdriveUtils.latestCheckpoint(hyperdrive),
                 0
             );
-
+            // Update debt for the vault and rebalance the strategy.
+            rebalance();
             // Generate reports for the strategy and vault.
             report();
         }
@@ -642,10 +602,12 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         // advancing time to the next checkpoint.
         while (block.timestamp - startTimeElapsed < _time) {
             advanceTime(CHECKPOINT_DURATION, VARIABLE_RATE);
+            // Create the checkpoint.
             hyperdrive.checkpoint(
                 HyperdriveUtils.latestCheckpoint(hyperdrive),
                 0
             );
+            // Update debt for the vault and rebalance the strategy.
             rebalance();
         }
     }

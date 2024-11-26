@@ -4,9 +4,34 @@ pragma solidity ^0.8.20;
 // WARN: Directly importing `RoleManager.sol` from vault-periphery results in
 //       solidity compiler errors, so needed methods are copied here.
 interface IRoleManager {
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ VAULT CREATION                                          │
-    // ╰─────────────────────────────────────────────────────────╯
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                             Position IDs                              │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
+    /// @notice Position ID for pending governance.
+    function PENDING_GOVERNANCE() external view returns (bytes32);
+
+    /// @notice Position ID for governance.
+    function GOVERNANCE() external view returns (bytes32);
+
+    /// @notice Position ID for management.
+    function MANAGEMENT() external view returns (bytes32);
+
+    /// @notice Position ID for keeper.
+    function KEEPER() external view returns (bytes32);
+
+    /// @notice Position ID for registry.
+    function REGISTRY() external view returns (bytes32);
+
+    /// @notice Position ID for accountant.
+    function ACCOUNTANT() external view returns (bytes32);
+
+    /// @notice Position ID for debt allocator.
+    function DEBT_ALLOCATOR() external view returns (bytes32);
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                            Vault Creation                             │
+    // ╰───────────────────────────────────────────────────────────────────────╯
 
     /**
      * @notice Creates a new endorsed vault with default profit max unlock time.
@@ -115,9 +140,9 @@ interface IRoleManager {
         uint256 _role
     ) external;
 
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ SETTERS                                                 │
-    // ╰─────────────────────────────────────────────────────────╯
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                                Setters                                │
+    // ╰───────────────────────────────────────────────────────────────────────╯
 
     /**
      * @notice Setter function for updating a positions roles.
@@ -149,9 +174,9 @@ interface IRoleManager {
      */
     function acceptGovernance() external;
 
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ VIEW METHODS                                            │
-    // ╰─────────────────────────────────────────────────────────╯
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                                 Views                                 │
+    // ╰───────────────────────────────────────────────────────────────────────╯
 
     /**
      * @notice Get the name of this contract.
