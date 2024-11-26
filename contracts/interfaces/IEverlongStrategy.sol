@@ -82,10 +82,10 @@ interface IEverlongStrategy is IStrategy, IEverlongEvents {
     /// @return Weighted average maturity timestamp of the portfolio.
     function avgMaturityTime() external view returns (uint128);
 
-    /// @notice Calculates the current totalAssets.
+    /// @notice Calculates the current value of Everlong's bond portfolio.
     /// @dev The result of this calculation is used to set the new totalAssets
-    ///      is `_harvestAndReport`.
-    function calculateTotalAssets() external view returns (uint256);
+    ///      in `_harvestAndReport`.
+    function calculatePortfolioValue() external view returns (uint256);
 
     /// @notice Returns whether Everlong has sufficient idle liquidity to open
     ///         a new position.

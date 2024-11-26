@@ -4,7 +4,6 @@ pragma solidity 0.8.22;
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
-import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { BaseStrategy, ERC20 } from "tokenized-strategy/BaseStrategy.sol";
 import { IEverlongStrategy } from "./interfaces/IEverlongStrategy.sol";
@@ -75,7 +74,6 @@ contract EverlongStrategy is BaseStrategy {
     using Portfolio for Portfolio.State;
     using SafeCast for *;
     using SafeERC20 for ERC20;
-    using HyperdriveUtils for *;
 
     /// @notice Amount of additional bonds to close during a partial position
     ///         closure to avoid rounding errors. Represented as a percentage
@@ -100,7 +98,7 @@ contract EverlongStrategy is BaseStrategy {
     IHyperdrive.PoolConfig internal _poolConfig;
 
     // ╭───────────────────────────────────────────────────────────────────────╮
-    // │                                 STATE                                 │
+    // │                                 State                                 │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @dev Configuration for how `_tend(..)` is performed.
@@ -110,7 +108,7 @@ contract EverlongStrategy is BaseStrategy {
     Portfolio.State internal _portfolio;
 
     // ╭───────────────────────────────────────────────────────────────────────╮
-    // │                              CONSTRUCTOR                              │
+    // │                              Constructor                              │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @notice Creates a new EverlongStrategy.
@@ -130,7 +128,7 @@ contract EverlongStrategy is BaseStrategy {
     }
 
     // ╭───────────────────────────────────────────────────────────────────────╮
-    // │                          STRATEGY OVERRIDES                           │
+    // │                        TokenizedStrategy Hooks                        │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @dev Deploy up to '_amount' of 'asset' in the yield source.
@@ -144,19 +142,62 @@ contract EverlongStrategy is BaseStrategy {
     }
 
     /// @dev Attempt to free the '_amount' of 'asset'.
-    /// @dev Any difference between `_amount` and what is actually freed will be
-    ///      counted as a loss and passed on to the withdrawer.
+    ///      - Any difference between `_amount` and what is actually freed will be
+    ///        counted as a loss and passed on to the withdrawer.
+    ///      - Unrealized losses must be calculated and proportionally
+    ///        applied to the withdrawer.
     /// @param _amount The amount of 'asset' to be freed.
     function _freeFunds(uint256 _amount) internal override {
-        // Close all matured positions (if any).
-        // TODO: Determine whether `_tendConfig.positionClosureLimit` should
-        //       affect this.
-        uint256 output = _closeMaturedPositions(0);
+        // The redeemer's proportional share of the portfolio losses is as
+        // follows (assuming losses have occurred):
+        //
+        //   ∆P         : Total portfolio losses.
+        //   ∆P_r       : Redeemer's loss share.
+        //   _amount    : Value of funds to free.
+        //   TA_p       : Previous stored `totalAssets`.
+        //
+        //   ∆P_r  = (∆P * _amount) / TA_p
+        //
+        // Unfortunately totalAssets is a combination of portfolio value and
+        // idle assets, so we don't know the proportions of each. This would be
+        // hugely problematic if idle liquidity varied dramatically, but it
+        // doesn't.
+        //
+        // For our case, the strategy will almost always have zero idle except
+        // right after a redemption (due to the partialPositionClosureBuffer).
+        // Also, the maximum amount of idle the strategy can have for any
+        // extended period is Hyperdrive's minimumTransactionAmount.
+        //
+        // Since idle liquidity won't vary greatly and has little effect on
+        // totalAssets it's likely safe for us to simply use totalAssets to
+        // determine and attribute losses.
 
-        // Close immature positions if additional funds need to be freed.
-        if (_amount > output) {
-            _closePositions(_amount - output);
+        // Calculate the current `totalAssets` and retrieve the previous value.
+        uint256 idle = asset.balanceOf(address(this));
+        uint256 currentTotalAssets = calculatePortfolioValue() + idle;
+        uint256 previousTotalAssets = TokenizedStrategy.totalAssets();
+
+        // If the current `totalAssets` is less than the previous, there are
+        // unrealized losses.
+        if (currentTotalAssets < previousTotalAssets) {
+            // Calculate the withdrawer's proportion of losses.
+            //
+            // It's important to use only the value of longs being closed, not
+            // the total amount being freed, when calculating the withdrawer's
+            // share.
+            //
+            //     totalWithdrawalAmount = _amount + idle
+            //
+            uint256 loss = previousTotalAssets - currentTotalAssets;
+            uint256 proportionalLoss = (loss).mulDivDown(
+                _amount,
+                previousTotalAssets
+            );
+            _amount -= proportionalLoss;
         }
+
+        // Close positions until `_amount` is reached.
+        _closePositions(_amount);
     }
 
     /// @dev Internal function to harvest all rewards, redeploy any idle
@@ -173,30 +214,13 @@ contract EverlongStrategy is BaseStrategy {
         // If the strategy isn't shut down, call `_tend()` to close mature
         // positions and spend idle if needed.
         if (!TokenizedStrategy.isShutdown() && _tendTrigger()) {
-            _tend(ERC20(asset).balanceOf(address(this)));
+            _tend(asset.balanceOf(address(this)));
         }
 
         // Recalculate the value of assets the strategy controls.
-        _totalAssets = calculateTotalAssets();
-    }
-
-    /// @notice Gets the max amount of `asset` that an address can deposit.
-    /// @param . The address that is depositing into the strategy.
-    /// @return The available amount the `_owner` can deposit in terms of
-    ///         `asset`.
-    function availableDepositLimit(
-        address
-    ) public view override returns (uint256) {
-        // Limit deposits to the maximum long that can be opened in hyperdrive.
-        return IHyperdrive(hyperdrive).calculateMaxLong();
-    }
-
-    /// @dev Trigger to override if tend() will be used by the strategy.
-    ///      This must be implemented if the strategy hopes to invoke _tend().
-    ///
-    /// @return Return true if tend() should be called by keeper, false if not.
-    function _tendTrigger() internal view override returns (bool) {
-        return hasMaturedPositions() || canOpenPosition();
+        _totalAssets =
+            calculatePortfolioValue() +
+            asset.balanceOf(address(this));
     }
 
     /// @dev Can be called inbetween reports to rebalance the portfolio.
@@ -227,8 +251,16 @@ contract EverlongStrategy is BaseStrategy {
         }
     }
 
+    /// @dev Trigger to override if tend() will be used by the strategy.
+    ///      This must be implemented if the strategy hopes to invoke _tend().
+    ///
+    /// @return Return true if tend() should be called by keeper, false if not.
+    function _tendTrigger() internal view override returns (bool) {
+        return hasMaturedPositions() || canOpenPosition();
+    }
+
     // ╭───────────────────────────────────────────────────────────────────────╮
-    // │                           POSITION CLOSURE                            │
+    // │                        Position Closure Logic                         │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @dev Close only matured positions in the portfolio.
@@ -358,7 +390,7 @@ contract EverlongStrategy is BaseStrategy {
     }
 
     // ╭───────────────────────────────────────────────────────────────────────╮
-    // │                                SETTERS                                │
+    // │                                Setters                                │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @notice Sets the minimum number of bonds to receive when opening a long.
@@ -395,8 +427,19 @@ contract EverlongStrategy is BaseStrategy {
     }
 
     // ╭───────────────────────────────────────────────────────────────────────╮
-    // │                                 VIEWS                                 │
+    // │                                 Views                                 │
     // ╰───────────────────────────────────────────────────────────────────────╯
+
+    /// @notice Gets the max amount of `asset` that an address can deposit.
+    /// @param . The address that is depositing into the strategy.
+    /// @return The available amount the `_owner` can deposit in terms of
+    ///         `asset`.
+    function availableDepositLimit(
+        address
+    ) public view override returns (uint256) {
+        // Limit deposits to the maximum long that can be opened in hyperdrive.
+        return IHyperdrive(hyperdrive).calculateMaxLong();
+    }
 
     /// @notice Weighted average maturity timestamp of the portfolio.
     /// @return Weighted average maturity timestamp of the portfolio.
@@ -407,8 +450,7 @@ contract EverlongStrategy is BaseStrategy {
     /// @notice Calculates the present portfolio value using the total amount of
     ///      bonds and the weighted average maturity of all positions.
     /// @return value The present portfolio value.
-    function calculateTotalAssets() public view returns (uint256 value) {
-        value = ERC20(asset).balanceOf(address(this));
+    function calculatePortfolioValue() public view returns (uint256 value) {
         if (_portfolio.totalBonds != 0) {
             // NOTE: The maturity time is rounded to the next checkpoint to
             //       underestimate the portfolio value.

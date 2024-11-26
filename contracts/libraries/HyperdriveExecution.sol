@@ -5,6 +5,7 @@ import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { HyperdriveMath } from "hyperdrive/contracts/src/libraries/HyperdriveMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
+import { YieldSpaceMath } from "hyperdrive/contracts/src/libraries/YieldSpaceMath.sol";
 import { ERC20 } from "openzeppelin/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { Packing } from "openzeppelin/utils/Packing.sol";
@@ -25,13 +26,14 @@ uint256 constant HYPERDRIVE_SHARE_ADJUSTMENT_SHORTS_OUTSTANDING_SLOT = 4;
 ///                    particular legal or regulatory significance.
 library HyperdriveExecutionLibrary {
     using FixedPointMath for uint256;
+    using FixedPointMath for int256;
     using SafeCast for *;
     using SafeERC20 for ERC20;
     using Packing for bytes32;
 
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ Open Long                                               │
-    // ╰─────────────────────────────────────────────────────────╯
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                               Open Long                               │
+    // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @dev Opens a long with hyperdrive using amount.
     /// @param _asBase Whether to use hyperdrive's base asset.
@@ -85,9 +87,9 @@ library HyperdriveExecutionLibrary {
         );
     }
 
-    // ╭─────────────────────────────────────────────────────────╮
-    // │ Close Long                                              │
-    // ╰─────────────────────────────────────────────────────────╯
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                              Close Long                               │
+    // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @dev Close a long with the input position's bond amount and maturity.
     /// @param _asBase Whether to receive hyperdrive's base token as output.
@@ -321,6 +323,761 @@ library HyperdriveExecutionLibrary {
         );
         flatFee = flat.mulUp(_flatFee);
     }
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                               Max Long                                │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
+    // HACK: Copied from `delvtech/hyperdrive` repo.
+    //
+    /// @dev Calculates the maximum amount of longs that can be opened.
+    /// @param _maxIterations The maximum number of iterations to use.
+    /// @return baseAmount The cost of buying the maximum amount of longs.
+    function calculateMaxLong(
+        IHyperdrive self,
+        uint256 _maxIterations
+    ) internal view returns (uint256 baseAmount) {
+        IHyperdrive.PoolConfig memory poolConfig = self.getPoolConfig();
+        IHyperdrive.PoolInfo memory poolInfo = self.getPoolInfo();
+        (baseAmount, ) = calculateMaxLong(
+            MaxTradeParams({
+                shareReserves: poolInfo.shareReserves,
+                shareAdjustment: poolInfo.shareAdjustment,
+                bondReserves: poolInfo.bondReserves,
+                longsOutstanding: poolInfo.longsOutstanding,
+                longExposure: poolInfo.longExposure,
+                timeStretch: poolConfig.timeStretch,
+                vaultSharePrice: poolInfo.vaultSharePrice,
+                initialVaultSharePrice: poolConfig.initialVaultSharePrice,
+                minimumShareReserves: poolConfig.minimumShareReserves,
+                curveFee: poolConfig.fees.curve,
+                flatFee: poolConfig.fees.flat,
+                governanceLPFee: poolConfig.fees.governanceLP
+            }),
+            self.getCheckpointExposure(latestCheckpoint(self)),
+            _maxIterations
+        );
+        return baseAmount;
+    }
+
+    // HACK: Copied from `delvtech/hyperdrive` repo.
+    //
+    /// @dev Calculates the maximum amount of longs that can be opened.
+    /// @return baseAmount The cost of buying the maximum amount of longs.
+    function calculateMaxLong(
+        IHyperdrive self
+    ) internal view returns (uint256 baseAmount) {
+        return calculateMaxLong(self, 7);
+    }
+
+    // HACK: Copied from `delvtech/hyperdrive` repo.
+    //
+    /// @dev Parameters needed for `calculateMaxLong`.
+    ///      Used internally, should typically not be used by external callers
+    ///      of the library.
+    struct MaxTradeParams {
+        uint256 shareReserves;
+        int256 shareAdjustment;
+        uint256 bondReserves;
+        uint256 longsOutstanding;
+        uint256 longExposure;
+        uint256 timeStretch;
+        uint256 vaultSharePrice;
+        uint256 initialVaultSharePrice;
+        uint256 minimumShareReserves;
+        uint256 curveFee;
+        uint256 flatFee;
+        uint256 governanceLPFee;
+    }
+
+    // HACK: Copied from `delvtech/hyperdrive` repo.
+    //
+    /// @dev Gets the max long that can be opened given a budget.
+    ///
+    ///      We start by calculating the long that brings the pool's spot price
+    ///      to 1. If we are solvent at this point, then we're done. Otherwise,
+    ///      we approach the max long iteratively using Newton's method.
+    /// @param _params The parameters for the max long calculation.
+    /// @param _checkpointExposure The exposure in the checkpoint.
+    /// @param _maxIterations The maximum number of iterations to use in the
+    ///                       Newton's method loop.
+    /// @return maxBaseAmount The maximum base amount.
+    /// @return maxBondAmount The maximum bond amount.
+    function calculateMaxLong(
+        MaxTradeParams memory _params,
+        int256 _checkpointExposure,
+        uint256 _maxIterations
+    ) internal pure returns (uint256 maxBaseAmount, uint256 maxBondAmount) {
+        // Get the maximum long that brings the spot price to 1. If the pool is
+        // solvent after opening this long, then we're done.
+        uint256 effectiveShareReserves = HyperdriveMath
+            .calculateEffectiveShareReserves(
+                _params.shareReserves,
+                _params.shareAdjustment
+            );
+        uint256 spotPrice = HyperdriveMath.calculateSpotPrice(
+            effectiveShareReserves,
+            _params.bondReserves,
+            _params.initialVaultSharePrice,
+            _params.timeStretch
+        );
+        uint256 absoluteMaxBaseAmount;
+        uint256 absoluteMaxBondAmount;
+        {
+            (
+                absoluteMaxBaseAmount,
+                absoluteMaxBondAmount
+            ) = calculateAbsoluteMaxLong(
+                _params,
+                effectiveShareReserves,
+                spotPrice
+            );
+            (, bool isSolvent_) = calculateSolvencyAfterLong(
+                _params,
+                _checkpointExposure,
+                absoluteMaxBaseAmount,
+                absoluteMaxBondAmount,
+                spotPrice
+            );
+            if (isSolvent_) {
+                return (absoluteMaxBaseAmount, absoluteMaxBondAmount);
+            }
+        }
+
+        // Use Newton's method to iteratively approach a solution. We use pool's
+        // solvency $S(x)$ as our objective function, which will converge to the
+        // amount of base that needs to be paid to open the maximum long. The
+        // derivative of $S(x)$ is negative (since solvency decreases as more
+        // longs are opened). The fixed point library doesn't support negative
+        // numbers, so we use the negation of the derivative to side-step the
+        // issue.
+        //
+        // Given the current guess of $x_n$, Newton's method gives us an updated
+        // guess of $x_{n+1}$:
+        //
+        // $$
+        // x_{n+1} = x_n - \tfrac{S(x_n)}{S'(x_n)} = x_n + \tfrac{S(x_n)}{-S'(x_n)}
+        // $$
+        //
+        // The guess that we make is very important in determining how quickly
+        // we converge to the solution.
+        maxBaseAmount = calculateMaxLongGuess(
+            _params,
+            absoluteMaxBaseAmount,
+            _checkpointExposure,
+            spotPrice
+        );
+        maxBondAmount = calculateLongAmount(
+            _params,
+            maxBaseAmount,
+            effectiveShareReserves,
+            spotPrice
+        );
+        (uint256 solvency_, bool success) = calculateSolvencyAfterLong(
+            _params,
+            _checkpointExposure,
+            maxBaseAmount,
+            maxBondAmount,
+            spotPrice
+        );
+        require(success, "Initial guess in `calculateMaxLong` is insolvent.");
+        for (uint256 i = 0; i < _maxIterations; ++i) {
+            // If the max base amount is equal to or exceeds the absolute max,
+            // we've gone too far and the calculation deviated from reality at
+            // some point.
+            require(
+                maxBaseAmount < absoluteMaxBaseAmount,
+                "Reached absolute max bond amount in `get_max_long`."
+            );
+
+            // TODO: It may be better to gracefully handle crossing over the
+            // root by extending the fixed point math library to handle negative
+            // numbers or even just using an if-statement to handle the negative
+            // numbers.
+            //
+            // Proceed to the next step of Newton's method. Once we have a
+            // candidate solution, we check to see if the pool is solvent if
+            // a long is opened with the candidate amount. If the pool isn't
+            // solvent, then we're done.
+            uint256 derivative;
+            (derivative, success) = calculateSolvencyAfterLongDerivative(
+                _params,
+                maxBaseAmount,
+                effectiveShareReserves,
+                spotPrice
+            );
+            if (!success) {
+                break;
+            }
+            uint256 possibleMaxBaseAmount = maxBaseAmount +
+                solvency_.divDown(derivative);
+            uint256 possibleMaxBondAmount = calculateLongAmount(
+                _params,
+                possibleMaxBaseAmount,
+                effectiveShareReserves,
+                spotPrice
+            );
+            (solvency_, success) = calculateSolvencyAfterLong(
+                _params,
+                _checkpointExposure,
+                possibleMaxBaseAmount,
+                possibleMaxBondAmount,
+                spotPrice
+            );
+            if (success) {
+                maxBaseAmount = possibleMaxBaseAmount;
+                maxBondAmount = possibleMaxBondAmount;
+            } else {
+                break;
+            }
+        }
+
+        return (maxBaseAmount, maxBondAmount);
+    }
+
+    // HACK: Copied from `delvtech/hyperdrive` repo.
+    //
+    /// @dev Calculates the largest long that can be opened without buying bonds
+    ///      at a negative interest rate. This calculation does not take
+    ///      Hyperdrive's solvency constraints into account and shouldn't be
+    ///      used directly.
+    /// @param _params The parameters for the max long calculation.
+    /// @param _effectiveShareReserves The pool's effective share reserves.
+    /// @param _spotPrice The pool's spot price.
+    /// @return absoluteMaxBaseAmount The absolute maximum base amount.
+    /// @return absoluteMaxBondAmount The absolute maximum bond amount.
+    function calculateAbsoluteMaxLong(
+        MaxTradeParams memory _params,
+        uint256 _effectiveShareReserves,
+        uint256 _spotPrice
+    )
+        internal
+        pure
+        returns (uint256 absoluteMaxBaseAmount, uint256 absoluteMaxBondAmount)
+    {
+        // We are targeting the pool's max spot price of:
+        //
+        // p_max = (1 - flatFee) / (1 + curveFee * (1 / p_0 - 1) * (1 - flatFee))
+        //
+        // We can derive a formula for the target bond reserves y_t in
+        // terms of the target share reserves z_t as follows:
+        //
+        // p_max = ((mu * z_t) / y_t) ** t_s
+        //
+        //                       =>
+        //
+        // y_t = (mu * z_t) * ((1 + curveFee * (1 / p_0 - 1) * (1 - flatFee)) / (1 - flatFee)) ** (1 / t_s)
+        //
+        // We can use this formula to solve our YieldSpace invariant for z_t:
+        //
+        // k = (c / mu) * (mu * z_t) ** (1 - t_s) +
+        //     (
+        //         (mu * z_t) * ((1 + curveFee * (1 / p_0 - 1) * (1 - flatFee)) / (1 - flatFee)) ** (1 / t_s)
+        //     ) ** (1 - t_s)
+        //
+        //                       =>
+        //
+        // z_t = (1 / mu) * (
+        //           k / (
+        //               (c / mu) +
+        //               ((1 + curveFee * (1 / p_0 - 1) * (1 - flatFee)) / (1 - flatFee)) ** ((1 - t_s) / t_s))
+        //           )
+        //       ) ** (1 / (1 - t_s))
+        uint256 inner;
+        {
+            uint256 k_ = YieldSpaceMath.kDown(
+                _effectiveShareReserves,
+                _params.bondReserves,
+                ONE - _params.timeStretch,
+                _params.vaultSharePrice,
+                _params.initialVaultSharePrice
+            );
+            inner = _params.curveFee.mulUp(ONE.divUp(_spotPrice) - ONE).mulUp(
+                ONE - _params.flatFee
+            );
+            inner = (ONE + inner).divUp(ONE - _params.flatFee);
+            inner = inner.pow(
+                (ONE - _params.timeStretch).divDown(_params.timeStretch)
+            );
+            inner += _params.vaultSharePrice.divUp(
+                _params.initialVaultSharePrice
+            );
+            inner = k_.divDown(inner);
+            inner = inner.pow(ONE.divDown(ONE - _params.timeStretch));
+        }
+        uint256 targetShareReserves = inner.divDown(
+            _params.initialVaultSharePrice
+        );
+
+        // Now that we have the target share reserves, we can calculate the
+        // target bond reserves using the formula:
+        //
+        // y_t = (mu * z_t) * ((1 + curveFee * (1 / p_0 - 1) * (1 - flatFee)) / (1 - flatFee)) ** (1 / t_s)
+        //
+        // Here we round down to underestimate the number of bonds that can be longed.
+        uint256 targetBondReserves;
+        {
+            uint256 feeAdjustment = _params
+                .curveFee
+                .mulDown(ONE.divDown(_spotPrice) - ONE)
+                .mulDown(ONE - _params.flatFee);
+            targetBondReserves = (
+                (ONE + feeAdjustment).divDown(ONE - _params.flatFee)
+            ).pow(ONE.divUp(_params.timeStretch)).mulDown(inner);
+        }
+
+        // The absolute max base amount is given by:
+        //
+        // absoluteMaxBaseAmount = c * (z_t - z)
+        absoluteMaxBaseAmount = (targetShareReserves - _effectiveShareReserves)
+            .mulDown(_params.vaultSharePrice);
+
+        // The absolute max bond amount is given by:
+        //
+        // absoluteMaxBondAmount = (y - y_t) - c(x)
+        absoluteMaxBondAmount =
+            (_params.bondReserves - targetBondReserves) -
+            calculateLongCurveFee(
+                absoluteMaxBaseAmount,
+                _spotPrice,
+                _params.curveFee
+            );
+    }
+
+    // HACK: Copied from `delvtech/hyperdrive` repo.
+    //
+    /// @dev Calculates an initial guess of the max long that can be opened.
+    ///      This is a reasonable estimate that is guaranteed to be less than
+    ///      the true max long. We use this to get a reasonable starting point
+    ///      for Newton's method.
+    /// @param _params The max long calculation parameters.
+    /// @param _absoluteMaxBaseAmount The absolute max base amount that can be
+    ///        used to open a long.
+    /// @param _checkpointExposure The exposure in the checkpoint.
+    /// @param _spotPrice The spot price of the pool.
+    /// @return A conservative estimate of the max long that the pool can open.
+    function calculateMaxLongGuess(
+        MaxTradeParams memory _params,
+        uint256 _absoluteMaxBaseAmount,
+        int256 _checkpointExposure,
+        uint256 _spotPrice
+    ) internal pure returns (uint256) {
+        // Get an initial estimate of the max long by using the spot price as
+        // our conservative price.
+        uint256 guess = calculateMaxLongEstimate(
+            _params,
+            _checkpointExposure,
+            _spotPrice,
+            _spotPrice
+        );
+
+        // We know that the spot price is 1 when the absolute max base amount is
+        // used to open a long. We also know that our spot price isn't a great
+        // estimate (conservative or otherwise) of the realized price that the
+        // max long will pay, so we calculate a better estimate of the realized
+        // price by interpolating between the spot price and 1 depending on how
+        // large the estimate is.
+        uint256 t = guess
+            .divDown(_absoluteMaxBaseAmount)
+            .pow(ONE.divUp(ONE - _params.timeStretch))
+            .mulDown(0.8e18);
+        uint256 estimateSpotPrice = _spotPrice.mulDown(ONE - t) +
+            ONE.mulDown(t);
+
+        // Recalculate our initial guess using the bootstrapped conservative.
+        // estimate of the realized price.
+        guess = calculateMaxLongEstimate(
+            _params,
+            _checkpointExposure,
+            _spotPrice,
+            estimateSpotPrice
+        );
+
+        return guess;
+    }
+
+    // HACK: Copied from `delvtech/hyperdrive` repo.
+    //
+    /// @dev Estimates the max long based on the pool's current solvency and a
+    ///      conservative price estimate, $p_r$.
+    ///
+    ///      We can use our estimate price $p_r$ to approximate $y(x)$ as
+    ///      $y(x) \approx p_r^{-1} \cdot x - c(x)$. Plugging this into our
+    ///      solvency function $s(x)$, we can calculate the share reserves and
+    ///      exposure after opening a long with $x$ base as:
+    ///
+    ///      \begin{aligned}
+    ///      z(x) &= z_0 + \tfrac{x - g(x)}{c} - z_{min} \\
+    ///      e(x) &= e_0 + min(exposure_{c}, 0) + 2 \cdot y(x) - x + g(x) \\
+    ///           &= e_0 + min(exposure_{c}, 0) + 2 \cdot p_r^{-1} \cdot x -
+    ///                  2 \cdot c(x) - x + g(x)
+    ///      \end{aligned}
+    ///
+    ///      We debit and negative checkpoint exposure from $e_0$ since the
+    ///      global exposure doesn't take into account the negative exposure
+    ///      from non-netted shorts in the checkpoint. These formulas allow us
+    ///      to calculate the approximate ending solvency of:
+    ///
+    ///      $$
+    ///      s(x) \approx z(x) - \tfrac{e(x)}{c} - z_{min}
+    ///      $$
+    ///
+    ///      If we let the initial solvency be given by $s_0$, we can solve for
+    ///      $x$ as:
+    ///
+    ///      $$
+    ///      x = \frac{c}{2} \cdot \frac{s_0 + min(exposure_{c}, 0)}{
+    ///              p_r^{-1} +
+    ///              \phi_{g} \cdot \phi_{c} \cdot \left( 1 - p \right) -
+    ///              1 -
+    ///              \phi_{c} \cdot \left( p^{-1} - 1 \right)
+    ///          }
+    ///      $$
+    /// @param _params The max long calculation parameters.
+    /// @param _checkpointExposure The exposure in the checkpoint.
+    /// @param _spotPrice The spot price of the pool.
+    /// @param _estimatePrice The estimated realized price the max long will pay.
+    /// @return A conservative estimate of the max long that the pool can open.
+    function calculateMaxLongEstimate(
+        MaxTradeParams memory _params,
+        int256 _checkpointExposure,
+        uint256 _spotPrice,
+        uint256 _estimatePrice
+    ) internal pure returns (uint256) {
+        uint256 checkpointExposure = uint256(-_checkpointExposure.min(0));
+        uint256 estimate = (_params.shareReserves +
+            checkpointExposure.divDown(_params.vaultSharePrice) -
+            _params.longExposure.divDown(_params.vaultSharePrice) -
+            _params.minimumShareReserves).mulDivDown(
+                _params.vaultSharePrice,
+                2e18
+            );
+        estimate = estimate.divDown(
+            ONE.divDown(_estimatePrice) +
+                _params.governanceLPFee.mulDown(_params.curveFee).mulDown(
+                    ONE - _spotPrice
+                ) -
+                ONE -
+                _params.curveFee.mulDown(ONE.divDown(_spotPrice) - ONE)
+        );
+        return estimate;
+    }
+
+    // HACK: Copied from `delvtech/hyperdrive` repo.
+    //
+    /// @dev Gets the solvency of the pool $S(x)$ after a long is opened with a
+    ///      base amount $x$.
+    ///
+    ///      Since longs can net out with shorts in this checkpoint, we decrease
+    ///      the global exposure variable by any negative exposure we have
+    ///      in the checkpoint. The pool's solvency is calculated as:
+    ///
+    ///      $$
+    ///      s = z - \tfrac{exposure + min(exposure_{checkpoint}, 0)}{c} - z_{min}
+    ///      $$
+    ///
+    ///      When a long is opened, the share reserves $z$ increase by:
+    ///
+    ///      $$
+    ///      \Delta z = \tfrac{x - g(x)}{c}
+    ///      $$
+    ///
+    ///      Opening the long increases the non-netted longs by the bond amount.
+    ///      From this, the change in the exposure is given by:
+    ///
+    ///      $$
+    ///      \Delta exposure = y(x)
+    ///      $$
+    ///
+    ///      From this, we can calculate $S(x)$ as:
+    ///
+    ///      $$
+    ///      S(x) = \left( z + \Delta z \right) - \left(
+    ///                 \tfrac{
+    ///                     exposure +
+    ///                     min(exposure_{checkpoint}, 0) +
+    ///                     \Delta exposure
+    ///                 }{c}
+    ///             \right) - z_{min}
+    ///      $$
+    ///
+    ///      It's possible that the pool is insolvent after opening a long. In
+    ///      this case, we return `None` since the fixed point library can't
+    ///      represent negative numbers.
+    /// @param _params The max long calculation parameters.
+    /// @param _checkpointExposure The exposure in the checkpoint.
+    /// @param _baseAmount The base amount.
+    /// @param _bondAmount The bond amount.
+    /// @param _spotPrice The spot price.
+    /// @return The solvency of the pool.
+    /// @return A flag indicating that the pool is solvent if true and insolvent
+    ///         if false.
+    function calculateSolvencyAfterLong(
+        MaxTradeParams memory _params,
+        int256 _checkpointExposure,
+        uint256 _baseAmount,
+        uint256 _bondAmount,
+        uint256 _spotPrice
+    ) internal pure returns (uint256, bool) {
+        uint256 governanceFee = calculateLongGovernanceFee(
+            _baseAmount,
+            _spotPrice,
+            _params.curveFee,
+            _params.governanceLPFee
+        );
+        uint256 shareReserves = _params.shareReserves +
+            _baseAmount.divDown(_params.vaultSharePrice) -
+            governanceFee.divDown(_params.vaultSharePrice);
+        uint256 exposure = _params.longExposure + _bondAmount;
+        uint256 checkpointExposure = uint256(-_checkpointExposure.min(0));
+        if (
+            shareReserves +
+                checkpointExposure.divDown(_params.vaultSharePrice) >=
+            exposure.divDown(_params.vaultSharePrice) +
+                _params.minimumShareReserves
+        ) {
+            return (
+                shareReserves +
+                    checkpointExposure.divDown(_params.vaultSharePrice) -
+                    exposure.divDown(_params.vaultSharePrice) -
+                    _params.minimumShareReserves,
+                true
+            );
+        } else {
+            return (0, false);
+        }
+    }
+
+    // HACK: Copied from `delvtech/hyperdrive` repo.
+    //
+    /// @dev Gets the negation of the derivative of the pool's solvency with
+    ///      respect to the base amount that the long pays.
+    ///
+    ///      The derivative of the pool's solvency $S(x)$ with respect to the
+    ///      base amount that the long pays is given by:
+    ///
+    ///      $$
+    ///      S'(x) = \tfrac{1}{c} \cdot \left(
+    ///                  1 - y'(x) - \phi_{g} \cdot p \cdot c'(x)
+    ///              \right) \\
+    ///            = \tfrac{1}{c} \cdot \left(
+    ///                  1 - y'(x) - \phi_{g} \cdot \phi_{c} \cdot \left(
+    ///                      1 - p
+    ///                  \right)
+    ///              \right)
+    ///      $$
+    ///
+    ///      This derivative is negative since solvency decreases as more longs
+    ///      are opened. We use the negation of the derivative to stay in the
+    ///      positive domain, which allows us to use the fixed point library.
+    /// @param _params The max long calculation parameters.
+    /// @param _baseAmount The base amount.
+    /// @param _effectiveShareReserves The effective share reserves.
+    /// @param _spotPrice The spot price.
+    /// @return derivative The negation of the derivative of the pool's solvency
+    ///         w.r.t the base amount.
+    /// @return success A flag indicating whether or not the derivative was
+    ///         successfully calculated.
+    function calculateSolvencyAfterLongDerivative(
+        MaxTradeParams memory _params,
+        uint256 _baseAmount,
+        uint256 _effectiveShareReserves,
+        uint256 _spotPrice
+    ) internal pure returns (uint256 derivative, bool success) {
+        // Calculate the derivative of the long amount. This calculation can
+        // fail when we are close to the root. In these cases, we exit early.
+        (derivative, success) = calculateLongAmountDerivative(
+            _params,
+            _baseAmount,
+            _effectiveShareReserves,
+            _spotPrice
+        );
+        if (!success) {
+            return (0, success);
+        }
+
+        // Finish computing the derivative.
+        derivative += _params.governanceLPFee.mulDown(_params.curveFee).mulDown(
+            ONE - _spotPrice
+        );
+        derivative -= ONE;
+
+        return (derivative.mulDivDown(1e18, _params.vaultSharePrice), success);
+    }
+
+    // HACK: Copied from `delvtech/hyperdrive` repo.
+    //
+    /// @dev Gets the long amount that will be opened for a given base amount.
+    ///
+    ///      The long amount $y(x)$ that a trader will receive is given by:
+    ///
+    ///      $$
+    ///      y(x) = y_{*}(x) - c(x)
+    ///      $$
+    ///
+    ///      Where $y_{*}(x)$ is the amount of long that would be opened if there
+    ///      was no curve fee and [$c(x)$](long_curve_fee) is the curve fee.
+    ///      $y_{*}(x)$ is given by:
+    ///
+    ///      $$
+    ///      y_{*}(x) = y - \left(
+    ///                     k - \tfrac{c}{\mu} \cdot \left(
+    ///                         \mu \cdot \left( z - \zeta + \tfrac{x}{c}
+    ///                     \right) \right)^{1 - t_s}
+    ///                 \right)^{\tfrac{1}{1 - t_s}}
+    ///      $$
+    /// @param _params The max long calculation parameters.
+    /// @param _baseAmount The base amount.
+    /// @param _effectiveShareReserves The effective share reserves.
+    /// @param _spotPrice The spot price.
+    /// @return The long amount.
+    function calculateLongAmount(
+        MaxTradeParams memory _params,
+        uint256 _baseAmount,
+        uint256 _effectiveShareReserves,
+        uint256 _spotPrice
+    ) internal pure returns (uint256) {
+        uint256 longAmount = HyperdriveMath.calculateOpenLong(
+            _effectiveShareReserves,
+            _params.bondReserves,
+            _baseAmount.divDown(_params.vaultSharePrice),
+            _params.timeStretch,
+            _params.vaultSharePrice,
+            _params.initialVaultSharePrice
+        );
+        return
+            longAmount -
+            calculateLongCurveFee(_baseAmount, _spotPrice, _params.curveFee);
+    }
+
+    // HACK: Copied from `delvtech/hyperdrive` repo.
+    //
+    /// @dev Gets the derivative of [long_amount](long_amount) with respect to
+    ///      the base amount.
+    ///
+    ///      We calculate the derivative of the long amount $y(x)$ as:
+    ///
+    ///      $$
+    ///      y'(x) = y_{*}'(x) - c'(x)
+    ///      $$
+    ///
+    ///      Where $y_{*}'(x)$ is the derivative of $y_{*}(x)$ and $c'(x)$ is the
+    ///      derivative of [$c(x)$](long_curve_fee). $y_{*}'(x)$ is given by:
+    ///
+    ///      $$
+    ///      y_{*}'(x) = \left( \mu \cdot (z - \zeta + \tfrac{x}{c}) \right)^{-t_s}
+    ///                  \left(
+    ///                      k - \tfrac{c}{\mu} \cdot
+    ///                      \left(
+    ///                          \mu \cdot (z - \zeta + \tfrac{x}{c}
+    ///                      \right)^{1 - t_s}
+    ///                  \right)^{\tfrac{t_s}{1 - t_s}}
+    ///      $$
+    ///
+    ///      and $c'(x)$ is given by:
+    ///
+    ///      $$
+    ///      c'(x) = \phi_{c} \cdot \left( \tfrac{1}{p} - 1 \right)
+    ///      $$
+    /// @param _params The max long calculation parameters.
+    /// @param _baseAmount The base amount.
+    /// @param _spotPrice The spot price.
+    /// @param _effectiveShareReserves The effective share reserves.
+    /// @return derivative The derivative of the long amount w.r.t. the base
+    ///         amount.
+    /// @return A flag indicating whether or not the derivative was
+    ///         successfully calculated.
+    function calculateLongAmountDerivative(
+        MaxTradeParams memory _params,
+        uint256 _baseAmount,
+        uint256 _effectiveShareReserves,
+        uint256 _spotPrice
+    ) internal pure returns (uint256 derivative, bool) {
+        // Compute the first part of the derivative.
+        uint256 shareAmount = _baseAmount.divDown(_params.vaultSharePrice);
+        uint256 inner = _params.initialVaultSharePrice.mulDown(
+            _effectiveShareReserves + shareAmount
+        );
+        uint256 k_ = YieldSpaceMath.kDown(
+            _effectiveShareReserves,
+            _params.bondReserves,
+            ONE - _params.timeStretch,
+            _params.vaultSharePrice,
+            _params.initialVaultSharePrice
+        );
+        derivative = ONE.divDown(inner.pow(_params.timeStretch));
+
+        // It's possible that k is slightly larger than the rhs in the inner
+        // calculation. If this happens, we are close to the root, and we short
+        // circuit.
+        uint256 rhs = _params.vaultSharePrice.mulDivDown(
+            inner.pow(_params.timeStretch),
+            _params.initialVaultSharePrice
+        );
+        if (k_ < rhs) {
+            return (0, false);
+        }
+        derivative = derivative.mulDown(
+            (k_ - rhs).pow(_params.timeStretch.divUp(ONE - _params.timeStretch))
+        );
+
+        // Finish computing the derivative.
+        derivative -= _params.curveFee.mulDown(ONE.divDown(_spotPrice) - ONE);
+
+        return (derivative, true);
+    }
+
+    // HACK: Copied from `delvtech/hyperdrive` repo.
+    //
+    /// @dev Gets the curve fee paid by longs for a given base amount.
+    ///
+    ///      The curve fee $c(x)$ paid by longs is given by:
+    ///
+    ///      $$
+    ///      c(x) = \phi_{c} \cdot \left( \tfrac{1}{p} - 1 \right) \cdot x
+    ///      $$
+    /// @param _baseAmount The base amount, $x$.
+    /// @param _spotPrice The spot price, $p$.
+    /// @param _curveFee The curve fee, $\phi_{c}$.
+    function calculateLongCurveFee(
+        uint256 _baseAmount,
+        uint256 _spotPrice,
+        uint256 _curveFee
+    ) internal pure returns (uint256) {
+        // fee = curveFee * (1/p - 1) * x
+        return _curveFee.mulUp(ONE.divUp(_spotPrice) - ONE).mulUp(_baseAmount);
+    }
+
+    // HACK: Copied from `delvtech/hyperdrive` repo.
+    //
+    /// @dev Gets the governance fee paid by longs for a given base amount.
+    ///
+    ///      Unlike the [curve fee](long_curve_fee) which is paid in bonds, the
+    ///      governance fee is paid in base. The governance fee $g(x)$ paid by
+    ///      longs is given by:
+    ///
+    ///      $$
+    ///      g(x) = \phi_{g} \cdot p \cdot c(x)
+    ///      $$
+    /// @param _baseAmount The base amount, $x$.
+    /// @param _spotPrice The spot price, $p$.
+    /// @param _curveFee The curve fee, $\phi_{c}$.
+    /// @param _governanceLPFee The governance fee, $\phi_{g}$.
+    function calculateLongGovernanceFee(
+        uint256 _baseAmount,
+        uint256 _spotPrice,
+        uint256 _curveFee,
+        uint256 _governanceLPFee
+    ) internal pure returns (uint256) {
+        return
+            calculateLongCurveFee(_baseAmount, _spotPrice, _curveFee)
+                .mulDown(_governanceLPFee)
+                .mulDown(_spotPrice);
+    }
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                                Helpers                                │
+    // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @dev Obtains the vaultSharePrice from the hyperdrive instance.
     /// @return The current vaultSharePrice.
