@@ -145,10 +145,33 @@ contract EverlongStrategy is BaseStrategy {
     ///      - Any difference between `_amount` and what is actually freed will be
     ///        counted as a loss and passed on to the withdrawer.
     ///      - Unrealized losses must be calculated and proportionally
-    ///        distributed. Otherwise early withdrawers will incur no losses,
-    ///        and the last to withdraw will incur all losses.
+    ///        applied to the withdrawer.
     /// @param _amount The amount of 'asset' to be freed.
     function _freeFunds(uint256 _amount) internal override {
+        // The redeemer's proportional share of the portfolio losses is as
+        // follows (assuming losses have occurred):
+        //
+        //   ∆P         : Total portfolio losses.
+        //   ∆P_r       : Redeemer's loss share.
+        //   _amount    : Value of funds to free.
+        //   TA_p       : Previous stored `totalAssets`.
+        //
+        //   ∆P_r  = (∆P * _amount) / TA_p
+        //
+        // Unfortunately totalAssets is a combination of portfolio value and
+        // idle assets, so we don't know the proportions of each. This would be
+        // hugely problematic if idle liquidity varied dramatically, but it
+        // doesn't.
+        //
+        // For our case, the strategy will almost always have zero idle except
+        // right after a redemption (due to the partialPositionClosureBuffer).
+        // Also, the maximum amount of idle the strategy can have for any
+        // extended period is Hyperdrive's minimumTransactionAmount.
+        //
+        // Since idle liquidity won't vary greatly and has little effect on
+        // totalAssets it's likely safe for us to simply use totalAssets to
+        // determine and attribute losses.
+
         // Calculate the current `totalAssets` and retrieve the previous value.
         uint256 idle = asset.balanceOf(address(this));
         uint256 currentTotalAssets = calculatePortfolioValue() + idle;
@@ -160,7 +183,9 @@ contract EverlongStrategy is BaseStrategy {
             // Calculate the withdrawer's proportion of losses.
             //
             // It's important to use the TOTAL withdrawal amount, not just the
-            // amount being freed, when calculating the withdrawer's share.
+            // amount being freed, when calculating the withdrawer's share. This
+            // is because it is compared with totalAssets which also includes
+            // idle.
             //
             //     totalWithdrawalAmount = _amount + idle
             //
