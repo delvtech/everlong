@@ -274,6 +274,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             address(strategy),
             type(uint256).max
         );
+        vault.set_auto_allocate(true);
         vm.stopPrank();
 
         // As the `management` address, configure the DebtAllocator to not
@@ -483,19 +484,6 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     /// @dev Call `everlong.rebalance(...)` as the admin with default options.
     function rebalance() internal {
         vm.startPrank(keeper);
-        (bool shouldUpdateDebt, bytes memory calldataOrReason) = debtAllocator
-            .shouldUpdateDebt(address(vault), address(strategy));
-        if (shouldUpdateDebt) {
-            (bool success, bytes memory err) = address(debtAllocator).call(
-                calldataOrReason
-            );
-            if (!success) {
-                revert(string(err));
-            }
-            // Advance time slightly to avoid updating debt twice at the same
-            // timestamp.
-            skip(1);
-        }
         strategy.tend();
         vm.stopPrank();
     }
