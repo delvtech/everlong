@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.22;
+pragma solidity 0.8.24;
 
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
@@ -75,6 +75,33 @@ contract EverlongStrategy is BaseStrategy {
     using SafeCast for *;
     using SafeERC20 for ERC20;
 
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                        Transient Storage Slots                        │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
+    /// @notice TEND_ENABLED transient storage slot key.
+    /// @dev The value at this slot must be set for `tend(..)` to be executed.
+    bytes32 constant TEND_ENABLED_SLOT_KEY =
+        keccak256(abi.encode("TEND_ENABLED"));
+
+    /// @notice TendConfig.minOutput transient storage slot key.
+    bytes32 constant MIN_OUTPUT_SLOT_KEY = keccak256(abi.encode("MIN_OUTPUT"));
+
+    /// @notice TendConfig.minVaultSharePrice transient storage slot key.
+    bytes32 constant MIN_VAULT_SHARE_PRICE_SLOT_KEY =
+        keccak256(abi.encode("MIN_VAULT_SHARE_PRICE"));
+
+    /// @notice TendConfig.positionClosureLimit transient storage slot key.
+    bytes32 constant POSITION_CLOSURE_LIMIT_SLOT_KEY =
+        keccak256(abi.encode("POSITION_CLOSURE_LIMIT"));
+
+    /// @notice TendConfig.extraData transient storage slot key.
+    bytes32 constant EXTRA_DATA_SLOT_KEY = keccak256(abi.encode("EXTRA_DATA"));
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                       Constants and Immutables                        │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
     /// @notice Amount of additional bonds to close during a partial position
     ///         closure to avoid rounding errors. Represented as a percentage
     ///         of the positions total  amount of bonds where 1e18 represents
@@ -101,11 +128,16 @@ contract EverlongStrategy is BaseStrategy {
     // │                                 State                                 │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
-    /// @dev Configuration for how `_tend(..)` is performed.
-    IEverlongStrategy.TendConfig internal _tendConfig;
-
     /// @dev Structure to store and account for everlong-controlled positions.
     Portfolio.State internal _portfolio;
+
+    /// @dev Mapping to store valid depositors. Used to limit interactions with
+    ///      this strategy to only approved vaults.
+    ///
+    /// @dev Depositors are restricted since this strategy is intended to be
+    ///      deployed with a `profitMaxUnlockTime` of zero which is manipulable
+    ///      if non-vaults are allowed to interact.
+    mapping(address => bool) internal _depositors;
 
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                              Constructor                              │
@@ -125,6 +157,20 @@ contract EverlongStrategy is BaseStrategy {
         hyperdrive = _hyperdrive;
         asBase = _asBase;
         _poolConfig = IHyperdrive(_hyperdrive).getPoolConfig();
+    }
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                             Permissioning                             │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
+    /// @notice Enable or disable deposits to the strategy `_depositor`.
+    /// @dev Can only be called by the strategy's `Management` address.
+    /// @param _depositor Address to enable/disable deposits for.
+    function setDepositor(
+        address _depositor,
+        bool _enabled
+    ) external onlyManagement {
+        _depositors[_depositor] = _enabled;
     }
 
     // ╭───────────────────────────────────────────────────────────────────────╮
@@ -223,12 +269,27 @@ contract EverlongStrategy is BaseStrategy {
             asset.balanceOf(address(this));
     }
 
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                              Maintenance                              │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
     /// @dev Can be called inbetween reports to rebalance the portfolio.
     /// @param _totalIdle The current amount of idle funds that are available to
     ///         deploy.
     function _tend(uint256 _totalIdle) internal override {
+        // Read the TendConfig from transient storage.
+        (
+            bool tendEnabled,
+            IEverlongStrategy.TendConfig memory tendConfig
+        ) = getTendConfig();
+
+        // If TendConfig hasn't been set, don't run the tend.
+        if (!tendEnabled) {
+            return;
+        }
+
         // Close matured positions.
-        _totalIdle += _closeMaturedPositions(_tendConfig.positionClosureLimit);
+        _totalIdle += _closeMaturedPositions(tendConfig.positionClosureLimit);
 
         // Limit the amount that can be spent by the deposit limit.
         uint256 toSpend = _totalIdle.min(availableDepositLimit(address(this)));
@@ -241,9 +302,9 @@ contract EverlongStrategy is BaseStrategy {
                 .openLong(
                     asBase,
                     toSpend,
-                    _tendConfig.minOutput,
-                    _tendConfig.minVaultSharePrice,
-                    _tendConfig.extraData
+                    tendConfig.minOutput,
+                    tendConfig.minVaultSharePrice,
+                    tendConfig.extraData
                 );
 
             // Account for the new position in the portfolio.
@@ -257,6 +318,76 @@ contract EverlongStrategy is BaseStrategy {
     /// @return Return true if tend() should be called by keeper, false if not.
     function _tendTrigger() internal view override returns (bool) {
         return hasMaturedPositions() || canOpenPosition();
+    }
+
+    /// @notice Sets the temporary tend configuration. Will only persist through
+    ///         the duration of the transaction. Must be called in the same tx
+    ///         as `tend()`.
+    function setTendConfig(
+        IEverlongStrategy.TendConfig memory _config
+    ) external onlyKeepers {
+        // Calculate the slots where each part of the `TendConfig` are stored.
+        bytes32 tendEnabledSlot = TEND_ENABLED_SLOT_KEY;
+        bytes32 minOutputSlot = MIN_OUTPUT_SLOT_KEY;
+        bytes32 minVaultSharePriceSlot = MIN_VAULT_SHARE_PRICE_SLOT_KEY;
+        bytes32 positionClosureLimitSlot = POSITION_CLOSURE_LIMIT_SLOT_KEY;
+        bytes32 extraDataSlot = EXTRA_DATA_SLOT_KEY;
+
+        // Set the flag indicating that TendConfig has been set.
+        // Store each part of the TendConfig in transient storage.
+        uint256 minOutput = _config.minOutput;
+        uint256 minVaultSharePrice = _config.minVaultSharePrice;
+        uint256 positionClosureLimit = _config.positionClosureLimit;
+        bytes memory extraData = _config.extraData;
+        assembly {
+            tstore(tendEnabledSlot, 1)
+            tstore(minOutputSlot, minOutput)
+            tstore(minVaultSharePriceSlot, minVaultSharePrice)
+            tstore(positionClosureLimitSlot, positionClosureLimit)
+            tstore(extraDataSlot, extraData)
+        }
+    }
+
+    /// @notice Reads and returns the current tend configuration from transient
+    ///         storage.
+    /// @return tendEnabled Whether or not TendConfig has been set.
+    /// @return . The current tend configuration.
+    function getTendConfig()
+        public
+        view
+        returns (bool tendEnabled, IEverlongStrategy.TendConfig memory)
+    {
+        // Calculate the slots where each part of the `TendConfig` are stored.
+        bytes32 tendEnabledSlot = TEND_ENABLED_SLOT_KEY;
+        bytes32 minOutputSlot = MIN_OUTPUT_SLOT_KEY;
+        bytes32 minVaultSharePriceSlot = MIN_VAULT_SHARE_PRICE_SLOT_KEY;
+        bytes32 positionClosureLimitSlot = POSITION_CLOSURE_LIMIT_SLOT_KEY;
+
+        // Load each part of the TendConfig from transient storage.
+        // If the TendConfig hasn't been set, revert.
+        bytes32 extraDataSlot = EXTRA_DATA_SLOT_KEY;
+        uint256 minOutput;
+        uint256 minVaultSharePrice;
+        uint256 positionClosureLimit;
+        bytes memory extraData;
+        assembly {
+            tendEnabled := tload(tendEnabledSlot)
+            minOutput := tload(minOutputSlot)
+            minVaultSharePrice := tload(minVaultSharePriceSlot)
+            positionClosureLimit := tload(positionClosureLimitSlot)
+            extraData := tload(extraDataSlot)
+        }
+
+        // Return the TendConfig.
+        return (
+            tendEnabled,
+            IEverlongStrategy.TendConfig({
+                minOutput: minOutput,
+                minVaultSharePrice: minVaultSharePrice,
+                positionClosureLimit: positionClosureLimit,
+                extraData: extraData
+            })
+        );
     }
 
     // ╭───────────────────────────────────────────────────────────────────────╮
@@ -390,55 +521,24 @@ contract EverlongStrategy is BaseStrategy {
     }
 
     // ╭───────────────────────────────────────────────────────────────────────╮
-    // │                                Setters                                │
-    // ╰───────────────────────────────────────────────────────────────────────╯
-
-    /// @notice Sets the minimum number of bonds to receive when opening a long.
-    /// @param _minOutput Minimum number of bonds to receive when opening a
-    ///        long.
-    function setMinOutput(uint256 _minOutput) external onlyKeepers {
-        _tendConfig.minOutput = _minOutput;
-    }
-
-    /// @notice Sets the minimum vault share price when opening a long.
-    /// @param _minVaultSharePrice Minimum vault share price when opening a
-    ///        long.
-    function setMinVaultSharePrice(
-        uint256 _minVaultSharePrice
-    ) external onlyKeepers {
-        _tendConfig.minVaultSharePrice = _minVaultSharePrice;
-    }
-
-    /// @notice Sets the max amount of mature positions to close at a time.
-    /// @param _positionClosureLimit Max amount of mature positions to close at
-    ///        a time.
-    function setPositionClosureLimit(
-        uint256 _positionClosureLimit
-    ) external onlyKeepers {
-        _tendConfig.positionClosureLimit = _positionClosureLimit;
-    }
-
-    /// @notice Sets the extra data to pass to hyperdrive when opening/closing
-    ///         longs.
-    /// @param _extraData Extra data to pass to hyperdrive when opening/closing
-    ///         longs.
-    function setExtraData(bytes memory _extraData) external onlyKeepers {
-        _tendConfig.extraData = _extraData;
-    }
-
-    // ╭───────────────────────────────────────────────────────────────────────╮
     // │                                 Views                                 │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @notice Gets the max amount of `asset` that an address can deposit.
-    /// @param . The address that is depositing into the strategy.
-    /// @return The available amount the `_owner` can deposit in terms of
+    /// @dev Only pre-approved addresses (vaults) are able to deposit.
+    /// @param _depositor The address that is depositing into the strategy.
+    /// @return The available amount the `_depositor` can deposit in terms of
     ///         `asset`.
     function availableDepositLimit(
-        address
+        address _depositor
     ) public view override returns (uint256) {
-        // Limit deposits to the maximum long that can be opened in hyperdrive.
-        return IHyperdrive(hyperdrive).calculateMaxLong();
+        // Only pre-approved addresses are able to deposit.
+        if (_depositors[_depositor] || _depositor == address(this)) {
+            // Limit deposits to the maximum long that can be opened in hyperdrive.
+            return IHyperdrive(hyperdrive).calculateMaxLong();
+        }
+        // Address has not been pre-approved, return 0.
+        return 0;
     }
 
     /// @notice Weighted average maturity timestamp of the portfolio.
@@ -448,7 +548,7 @@ contract EverlongStrategy is BaseStrategy {
     }
 
     /// @notice Calculates the present portfolio value using the total amount of
-    ///      bonds and the weighted average maturity of all positions.
+    ///         bonds and the weighted average maturity of all positions.
     /// @return value The present portfolio value.
     function calculatePortfolioValue() public view returns (uint256 value) {
         if (_portfolio.totalBonds != 0) {
@@ -475,31 +575,6 @@ contract EverlongStrategy is BaseStrategy {
         return
             asset.balanceOf(address(this)) >
             _poolConfig.minimumTransactionAmount;
-    }
-
-    /// @notice Gets the minimum number of bonds to receive when opening a long.
-    /// @return Minimum number of bonds to receive when opening a long.
-    function getMinOutput() external view returns (uint256) {
-        return _tendConfig.minOutput;
-    }
-
-    /// @notice Gets the minimum vault share price when opening a long.
-    /// @return Minimum vault share price when opening a long.
-    function getMinVaultSharePrice() external view returns (uint256) {
-        return _tendConfig.minVaultSharePrice;
-    }
-
-    /// @notice Gets the max amount of mature positions to close at a time.
-    /// @return Max amount of mature positions to close at a time.
-    function getPositionClosureLimit() external view returns (uint256) {
-        return _tendConfig.positionClosureLimit;
-    }
-
-    /// @notice Gets the extra data to pass to hyperdrive when opening/closing
-    ///         longs.
-    /// @return Extra data to pass to hyperdrive when opening/closing longs.
-    function getExtraData() external view returns (bytes memory) {
-        return _tendConfig.extraData;
     }
 
     /// @notice Returns whether the portfolio has matured positions.

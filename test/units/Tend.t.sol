@@ -7,6 +7,7 @@ import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMat
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { EverlongTest } from "../harnesses/EverlongTest.sol";
+import { IEverlongStrategy } from "../../contracts/interfaces/IEverlongStrategy.sol";
 import { HyperdriveExecutionLibrary } from "../../contracts/libraries/HyperdriveExecution.sol";
 
 contract TestTend is EverlongTest {
@@ -35,19 +36,6 @@ contract TestTend is EverlongTest {
         uint256 aliceShares = depositVault(depositAmount, alice, true);
         advanceTimeWithCheckpointsAndReporting(POSITION_DURATION);
         redeemVault(aliceShares, alice);
-
-        console.log(
-            "Vault Profit: %e",
-            (IERC20(vault.asset()).balanceOf(alice) - depositAmount).divDown(
-                depositAmount
-            )
-        );
-        console.log(
-            "Strategy Profit: %e",
-            (IERC20(vault.asset()).balanceOf(bob) - depositAmount).divDown(
-                depositAmount
-            )
-        );
     }
 
     /// @dev Tests that the gas cost for closing the maximum amount of matured
@@ -164,32 +152,45 @@ contract TestTend is EverlongTest {
     // │                              TendConfig                               │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
-    // ── minOutput ───────────────────────────────────────────────────────
-
-    /// @dev Tests that `setMinOutput` cannot be called by a non-keeper.
-    function test_setMinOutput_failure_not_keeper() external {
+    /// @dev Tests that `setTendConfig` cannot be called by a non-keeper.
+    function test_setTendConfig_failure_not_keeper() external {
         // Start a prank as a non-keeper address (alice).
         vm.startPrank(alice);
 
-        // setMinOutput should revert.
+        // setTendConfig should revert.
         vm.expectRevert();
-        strategy.setMinOutput(1);
+        strategy.setTendConfig(
+            IEverlongStrategy.TendConfig({
+                minOutput: 0,
+                minVaultSharePrice: 0,
+                positionClosureLimit: 0,
+                extraData: ""
+            })
+        );
 
         // Stop the prank.
         vm.stopPrank();
     }
 
-    /// @dev Tests that `setMinOutput` succeeds when called by a keeper.
-    function test_setMinOutput_suceeds() external {
-        // Start a prank as a keeper.
-        vm.startPrank(keeper);
+    /// @dev Tests that `setTendConfig` succeeds when called by the keeper.
+    function test_setTendConfig_success() external {
+        // Start a prank as the keeper address.
+        vm.startPrank(address(keeperContract));
 
-        // Call setMinOutput with a non-default value.
-        uint256 minOutput = type(uint256).max;
-        strategy.setMinOutput(minOutput);
+        // setTendConfig should succeed.
+        strategy.setTendConfig(
+            IEverlongStrategy.TendConfig({
+                minOutput: 1,
+                minVaultSharePrice: 0,
+                positionClosureLimit: 0,
+                extraData: ""
+            })
+        );
 
-        // Ensure the new value is reflected.
-        assertEq(minOutput, strategy.getMinOutput());
+        // Check that minOutput was updated.
+        (, IEverlongStrategy.TendConfig memory tendConfig) = strategy
+            .getTendConfig();
+        assertEq(tendConfig.minOutput, 1);
 
         // Stop the prank.
         vm.stopPrank();
@@ -203,44 +204,20 @@ contract TestTend is EverlongTest {
         // Start a prank as a keeper.
         vm.startPrank(keeper);
 
-        // Call setMinOutput with a very high value.
+        // Set minOutput to a very high value.
         uint256 minOutput = type(uint256).max;
-        strategy.setMinOutput(minOutput);
 
         // Ensure `tend()` reverts.
         vm.expectRevert();
-        strategy.tend();
-
-        // Stop the prank.
-        vm.stopPrank();
-    }
-
-    // ── minVaultSharePrice ──────────────────────────────────────────────
-
-    /// @dev Tests that `setMinVaultSharePrice` cannot be called by a non-keeper.
-    function test_setMinVaultSharePrice_failure_not_keeper() external {
-        // Start a prank as a non-keeper address (alice).
-        vm.startPrank(alice);
-
-        // setMinVaultSharePrice should revert.
-        vm.expectRevert();
-        strategy.setMinVaultSharePrice(1);
-
-        // Stop the prank.
-        vm.stopPrank();
-    }
-
-    /// @dev Tests that `setMinVaultSharePrice` succeeds when called by a keeper.
-    function test_setMinVaultSharePrice_suceeds() external {
-        // Start a prank as a keeper.
-        vm.startPrank(keeper);
-
-        // Call setMinVaultSharePrice with a non-default value.
-        uint256 minVaultSharePrice = type(uint256).max;
-        strategy.setMinVaultSharePrice(minVaultSharePrice);
-
-        // Ensure the new value is reflected.
-        assertEq(minVaultSharePrice, strategy.getMinVaultSharePrice());
+        keeperContract.tend(
+            address(strategy),
+            IEverlongStrategy.TendConfig({
+                minOutput: minOutput,
+                minVaultSharePrice: 0,
+                positionClosureLimit: 0,
+                extraData: ""
+            })
+        );
 
         // Stop the prank.
         vm.stopPrank();
@@ -254,44 +231,20 @@ contract TestTend is EverlongTest {
         // Start a prank as a keeper.
         vm.startPrank(keeper);
 
-        // Call setMinVaultSharePrice with a very high value.
+        // Set minVaultSharePrice to a very high value.
         uint256 minVaultSharePrice = type(uint256).max;
-        strategy.setMinVaultSharePrice(minVaultSharePrice);
 
         // Ensure `tend()` reverts.
         vm.expectRevert();
-        strategy.tend();
-
-        // Stop the prank.
-        vm.stopPrank();
-    }
-
-    // ── positionClosureLimit ────────────────────────────────────────────
-
-    /// @dev Tests that `setPositionClosureLimit` cannot be called by a non-keeper.
-    function test_setPositionClosureLimit_failure_not_keeper() external {
-        // Start a prank as a non-keeper address (alice).
-        vm.startPrank(alice);
-
-        // setPositionClosureLimit should revert.
-        vm.expectRevert();
-        strategy.setPositionClosureLimit(1);
-
-        // Stop the prank.
-        vm.stopPrank();
-    }
-
-    /// @dev Tests that `setPositionClosureLimit` succeeds when called by a keeper.
-    function test_TendConfig_setPositionClosureLimit_suceeds() external {
-        // Start a prank as a keeper.
-        vm.startPrank(keeper);
-
-        // Call setPositionClosureLimit with a non-default value.
-        uint256 positionClosureLimit = type(uint256).max;
-        strategy.setPositionClosureLimit(positionClosureLimit);
-
-        // Ensure the new value is reflected.
-        assertEq(positionClosureLimit, strategy.getPositionClosureLimit());
+        keeperContract.tend(
+            address(strategy),
+            IEverlongStrategy.TendConfig({
+                minOutput: 0,
+                minVaultSharePrice: minVaultSharePrice,
+                positionClosureLimit: 0,
+                extraData: ""
+            })
+        );
 
         // Stop the prank.
         vm.stopPrank();
@@ -319,45 +272,22 @@ contract TestTend is EverlongTest {
         // Start a prank as a keeper.
         vm.startPrank(keeper);
 
-        // Call setPositionClosureLimit with the value 1.
+        // Set positionClosureLimit to the value 1.
         uint256 positionClosureLimit = 1;
-        strategy.setPositionClosureLimit(positionClosureLimit);
 
         // Call tend().
-        strategy.tend();
+        keeperContract.tend(
+            address(strategy),
+            IEverlongStrategy.TendConfig({
+                minOutput: 0,
+                minVaultSharePrice: 0,
+                positionClosureLimit: positionClosureLimit,
+                extraData: ""
+            })
+        );
 
         // Ensure that the strategy still has a matured position.
         assertTrue(strategy.hasMaturedPositions());
-
-        // Stop the prank.
-        vm.stopPrank();
-    }
-
-    // ── extraData ───────────────────────────────────────────────────────
-    /// @dev Tests that `setExtraData` cannot be called by a non-keeper.
-    function test_setExtraData_failure_not_keeper() external {
-        // Start a prank as a non-keeper address (alice).
-        vm.startPrank(alice);
-
-        // setExtraData should revert.
-        vm.expectRevert();
-        strategy.setExtraData("hello");
-
-        // Stop the prank.
-        vm.stopPrank();
-    }
-
-    /// @dev Tests that `setExtraData` succeeds when called by a keeper.
-    function test_setExtraData_suceeds() external {
-        // Start a prank as a keeper.
-        vm.startPrank(keeper);
-
-        // Call setExtraData with a non-default value.
-        bytes memory extraData = "hello";
-        strategy.setExtraData(extraData);
-
-        // Ensure the new value is reflected.
-        assertEq(extraData, strategy.getExtraData());
 
         // Stop the prank.
         vm.stopPrank();

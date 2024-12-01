@@ -31,44 +31,20 @@ interface IEverlongStrategy is IStrategy, IEverlongEvents {
         bytes extraData;
     }
 
-    /// @notice Parameters to specify how a rebalance will be performed.
-    struct RebalanceOptions {
-        /// @notice Limit on the amount of idle to spend on a new position.
-        /// @dev A value of zero indicates no limit.
-        uint256 spendingLimit;
-        /// @notice Minimum amount of bonds to receive when opening a position.
-        uint256 minOutput;
-        /// @notice Minimum vault share price when opening a position.
-        uint256 minVaultSharePrice;
-        /// @notice Maximum amount of mature positions that can be closed.
-        /// @dev A value of zero indicates no limit.
-        uint256 positionClosureLimit;
-        /// @notice Passed to hyperdrive `openLong()` and `closeLong()`.
-        bytes extraData;
-    }
-
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                                SETTERS                                │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
-    /// @notice Sets the minimum number of bonds to receive when opening a long.
-    /// @param _minOutput Minimum number of bonds to receive when opening a long.
-    function setMinOutput(uint256 _minOutput) external;
+    /// @notice Enable or disable deposits to the strategy `_depositor`.
+    /// @dev Can only be called by the strategy's `Management` address.
+    /// @param _depositor Address to enable/disable deposits for.
+    function setDepositor(address _depositor, bool _enabled) external;
 
-    /// @notice Sets the minimum vault share price when opening a long.
-    /// @param _minVaultSharePrice Minimum vault share price when opening a long.
-    function setMinVaultSharePrice(uint256 _minVaultSharePrice) external;
-
-    /// @notice Sets the max amount of mature positions to close at a time.
-    /// @param _positionClosureLimit Max amount of mature positions to close at
-    ///        a time.
-    function setPositionClosureLimit(uint256 _positionClosureLimit) external;
-
-    /// @notice Sets the extra data to pass to hyperdrive when opening/closing
-    ///         longs.
-    /// @param _extraData Extra data to pass to hyperdrive when opening/closing
-    ///         longs.
-    function setExtraData(bytes memory _extraData) external;
+    /// @notice Sets the temporary tend configuration. Necessary for `tend()`
+    ///         call to succeed. Must be called in the same tx as `tend()`.
+    function setTendConfig(
+        IEverlongStrategy.TendConfig memory _config
+    ) external;
 
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                                 VIEWS                                 │
@@ -92,22 +68,13 @@ interface IEverlongStrategy is IStrategy, IEverlongEvents {
     /// @return True if a new position can be opened, false otherwise.
     function canOpenPosition() external view returns (bool);
 
-    /// @notice Gets the minimum number of bonds to receive when opening a long.
-    /// @return Minimum number of bonds to receive when opening a long.
-    function getMinOutput() external view returns (uint256);
-
-    /// @notice Gets the minimum vault share price when opening a long.
-    /// @return Minimum vault share price when opening a long.
-    function getMinVaultSharePrice() external view returns (uint256);
-
-    /// @notice Gets the max amount of mature positions to close at a time.
-    /// @return Max amount of mature positions to close at a time.
-    function getPositionClosureLimit() external view returns (uint256);
-
-    /// @notice Gets the extra data to pass to hyperdrive when opening/closing
-    ///         longs.
-    /// @return Extra data to pass to hyperdrive when opening/closing longs.
-    function getExtraData() external view returns (bytes memory);
+    /// @notice Reads and returns the current tend configuration from transient
+    ///         storage.
+    /// @return tendEnabled Whether TendConfig has been set.
+    /// @return The current tend configuration.
+    function getTendConfig()
+        external
+        returns (bool tendEnabled, IEverlongStrategy.TendConfig memory);
 
     /// @notice Determines whether any positions are matured.
     /// @return True if any positions are matured, false otherwise.

@@ -37,11 +37,11 @@ contract TestPartialClosures is EverlongTest {
             aliceShares.mulDown(0.05e18),
             aliceShares.mulDown(0.95e18)
         );
-        redeemStrategy(_redemptionAmount, alice, false);
+        redeemStrategy(_redemptionAmount, alice, true);
         uint256 positionBondsAfterRedeem = strategy.totalBonds();
 
         // Ensure Everlong still has a position open.
-        assertEq(strategy.positionCount(), 1);
+        assertGt(strategy.positionCount(), 0);
 
         // Ensure the remaining Everlong position has proportionally less bonds
         // than it did prior to redemption.

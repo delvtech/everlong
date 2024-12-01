@@ -16,18 +16,22 @@ contract TestIdle is EverlongTest {
     using HyperdriveUtils for *;
     using HyperdriveExecutionLibrary for *;
 
-    function setUp() public virtual override {
-        // Redeploy Hyperdrive + Everlong with specified idle configuration.
-        TARGET_IDLE_LIQUIDITY_BASIS_POINTS = 2_000;
-        MIN_IDLE_LIQUIDITY_BASIS_POINTS = 1_000;
-        super.setUp();
-    }
-
     /// @dev Assert that the vault's current idle liquidity is equal to
     ///      the minimum.
     /// @param _msg Error message displayed if assertion fails.
     function assertIdleEqMin(string memory _msg) internal view {
         assertEq(
+            vault.totalIdle().divDown(vault.totalDebt() + vault.totalIdle()),
+            MIN_IDLE_LIQUIDITY_BASIS_POINTS.divDown(10_000),
+            _msg
+        );
+    }
+
+    /// @dev Assert that the vault's current idle liquidity is greater than the
+    ///      minimum.
+    /// @param _msg Error message displayed if assertion fails.
+    function assertIdleGtMin(string memory _msg) internal view {
+        assertGt(
             vault.totalIdle().divDown(vault.totalDebt() + vault.totalIdle()),
             MIN_IDLE_LIQUIDITY_BASIS_POINTS.divDown(10_000),
             _msg
@@ -45,15 +49,10 @@ contract TestIdle is EverlongTest {
         );
     }
 
-    /// @dev Assert that the vault's current idle liquidity is between the
-    ///      minimum and the target.
+    /// @dev Assert that the vault's current idle liquidity is less than the
+    ///      target.
     /// @param _msg Error message displayed if assertion fails.
-    function assertIdleBetweenMinAndTarget(string memory _msg) internal view {
-        assertGt(
-            vault.totalIdle().divDown(vault.totalDebt() + vault.totalIdle()),
-            MIN_IDLE_LIQUIDITY_BASIS_POINTS.divDown(10_000),
-            _msg
-        );
+    function assertIdleLtTarget(string memory _msg) internal view {
         assertLt(
             vault.totalIdle().divDown(vault.totalDebt() + vault.totalIdle()),
             TARGET_IDLE_LIQUIDITY_BASIS_POINTS.divDown(10_000),
@@ -74,28 +73,28 @@ contract TestIdle is EverlongTest {
     ///        do not update debt.
     ///
     ///      Test Flow:
-    ///      1. Large Deposit: Idle == TARGET
-    ///      2. Small Deposit: Idle == TARGET
-    ///      3. Medium Deposit: Idle == TARGET
+    ///      1. Large Deposit: Idle == MIN
+    ///      2. Small Deposit: Idle > MIN
+    ///      3. Medium Deposit: Idle == MIN
     ///      4. Medium Redeem: Idle == TARGET
     ///      5. Small Redeem: MIN < Idle < TARGET
     ///      6. Large Redeem: Idle == 0
     function test_idle() external {
-        uint256 bigDepositAmount = 10_000e18;
-        uint256 mediumDepositAmount = 7_000e18;
+        uint256 bigDepositAmount = 20_000e18;
+        uint256 mediumDepositAmount = 15_000e18;
         uint256 smallDepositAmount = 50e18;
 
         // Idle after big deposit should equal min.
         uint256 bigDepositShares = depositVault(bigDepositAmount, alice, true);
-        assertIdleEqTarget("after big deposit");
+        assertIdleEqMin("after big deposit");
 
-        // Idle after small deposit should be between min and target.
+        // Idle after small deposit should be greater than min.
         uint256 smallDepositShares = depositVault(
             smallDepositAmount,
             alice,
             true
         );
-        assertIdleEqTarget("after small deposit");
+        assertIdleGtMin("after small deposit");
 
         // Idle after medium deposit should equal min.
         uint256 mediumDepositShares = depositVault(
@@ -103,15 +102,15 @@ contract TestIdle is EverlongTest {
             alice,
             true
         );
-        assertIdleEqTarget("after medium deposit");
+        assertIdleEqMin("after medium deposit");
 
         // Idle after medium redeem should equal target.
         redeemVault(mediumDepositShares, alice, true);
         assertIdleEqTarget("after medium redeem");
 
-        // Idle after small redeem should be between min and target.
+        // Idle after small redeem should be below target.
         redeemVault(smallDepositShares, alice, true);
-        assertIdleBetweenMinAndTarget("after small redeem");
+        assertIdleLtTarget("after small redeem");
 
         // Idle after big redeem should be zero.
         redeemVault(bigDepositShares, alice, true);
