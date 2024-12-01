@@ -79,15 +79,24 @@ contract EverlongStrategy is BaseStrategy {
     // │                        Transient Storage Slots                        │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
-    string constant TEND_ENABLED_SLOT_KEY = "TEND_ENABLED";
+    /// @notice TEND_ENABLED transient storage slot key.
+    /// @dev The value at this slot must be set for `tend(..)` to be executed.
+    bytes32 constant TEND_ENABLED_SLOT_KEY =
+        keccak256(abi.encode("TEND_ENABLED"));
 
-    string constant MIN_OUTPUT_SLOT_KEY = "MIN_OUTPUT";
+    /// @notice TendConfig.minOutput transient storage slot key.
+    bytes32 constant MIN_OUTPUT_SLOT_KEY = keccak256(abi.encode("MIN_OUTPUT"));
 
-    string constant MIN_VAULT_SHARE_PRICE_SLOT_KEY = "MIN_VAULT_SHARE_PRICE";
+    /// @notice TendConfig.minVaultSharePrice transient storage slot key.
+    bytes32 constant MIN_VAULT_SHARE_PRICE_SLOT_KEY =
+        keccak256(abi.encode("MIN_VAULT_SHARE_PRICE"));
 
-    string constant POSITION_CLOSURE_LIMIT_SLOT_KEY = "POSITION_CLOSURE_LIMIT";
+    /// @notice TendConfig.positionClosureLimit transient storage slot key.
+    bytes32 constant POSITION_CLOSURE_LIMIT_SLOT_KEY =
+        keccak256(abi.encode("POSITION_CLOSURE_LIMIT"));
 
-    string constant EXTRA_DATA_SLOT_KEY = "EXTRA_DATA";
+    /// @notice TendConfig.extraData transient storage slot key.
+    bytes32 constant EXTRA_DATA_SLOT_KEY = keccak256(abi.encode("EXTRA_DATA"));
 
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                       Constants and Immutables                        │
@@ -317,19 +326,12 @@ contract EverlongStrategy is BaseStrategy {
     function setTendConfig(
         IEverlongStrategy.TendConfig memory _config
     ) external onlyKeepers {
-        // HACK: Must hash these every time since only direct number constants
-        //       are supported by inline assembly.
-        //
         // Calculate the slots where each part of the `TendConfig` are stored.
-        bytes32 tendEnabledSlot = keccak256(bytes(TEND_ENABLED_SLOT_KEY));
-        bytes32 minOutputSlot = keccak256(bytes(MIN_OUTPUT_SLOT_KEY));
-        bytes32 minVaultSharePriceSlot = keccak256(
-            bytes(MIN_VAULT_SHARE_PRICE_SLOT_KEY)
-        );
-        bytes32 positionClosureLimitSlot = keccak256(
-            bytes(POSITION_CLOSURE_LIMIT_SLOT_KEY)
-        );
-        bytes32 extraDataSlot = keccak256(bytes(EXTRA_DATA_SLOT_KEY));
+        bytes32 tendEnabledSlot = TEND_ENABLED_SLOT_KEY;
+        bytes32 minOutputSlot = MIN_OUTPUT_SLOT_KEY;
+        bytes32 minVaultSharePriceSlot = MIN_VAULT_SHARE_PRICE_SLOT_KEY;
+        bytes32 positionClosureLimitSlot = POSITION_CLOSURE_LIMIT_SLOT_KEY;
+        bytes32 extraDataSlot = EXTRA_DATA_SLOT_KEY;
 
         // Set the flag indicating that TendConfig has been set.
         // Store each part of the TendConfig in transient storage.
@@ -355,22 +357,15 @@ contract EverlongStrategy is BaseStrategy {
         view
         returns (bool tendEnabled, IEverlongStrategy.TendConfig memory)
     {
-        // HACK: Must hash these every time since only direct number constants
-        //       are supported by inline assembly.
-        //
         // Calculate the slots where each part of the `TendConfig` are stored.
-        bytes32 tendEnabledSlot = keccak256(bytes(TEND_ENABLED_SLOT_KEY));
-        bytes32 minOutputSlot = keccak256(bytes(MIN_OUTPUT_SLOT_KEY));
-        bytes32 minVaultSharePriceSlot = keccak256(
-            bytes(MIN_VAULT_SHARE_PRICE_SLOT_KEY)
-        );
-        bytes32 positionClosureLimitSlot = keccak256(
-            bytes(POSITION_CLOSURE_LIMIT_SLOT_KEY)
-        );
+        bytes32 tendEnabledSlot = TEND_ENABLED_SLOT_KEY;
+        bytes32 minOutputSlot = MIN_OUTPUT_SLOT_KEY;
+        bytes32 minVaultSharePriceSlot = MIN_VAULT_SHARE_PRICE_SLOT_KEY;
+        bytes32 positionClosureLimitSlot = POSITION_CLOSURE_LIMIT_SLOT_KEY;
 
         // Load each part of the TendConfig from transient storage.
         // If the TendConfig hasn't been set, revert.
-        bytes32 extraDataSlot = keccak256(bytes(EXTRA_DATA_SLOT_KEY));
+        bytes32 extraDataSlot = EXTRA_DATA_SLOT_KEY;
         uint256 minOutput;
         uint256 minVaultSharePrice;
         uint256 positionClosureLimit;
@@ -553,7 +548,7 @@ contract EverlongStrategy is BaseStrategy {
     }
 
     /// @notice Calculates the present portfolio value using the total amount of
-    ///      bonds and the weighted average maturity of all positions.
+    ///         bonds and the weighted average maturity of all positions.
     /// @return value The present portfolio value.
     function calculatePortfolioValue() public view returns (uint256 value) {
         if (_portfolio.totalBonds != 0) {

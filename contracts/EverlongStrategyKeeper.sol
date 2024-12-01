@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.24;
 
+import { console2 as console } from "forge-std/console2.sol";
 import { DebtAllocator } from "vault-periphery/debtAllocators/DebtAllocator.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import { IERC20 } from "openzeppelin/token/ERC20/IERC20.sol";
 import { BaseStrategy, ERC20 } from "tokenized-strategy/BaseStrategy.sol";
 import { IEverlongStrategy } from "./interfaces/IEverlongStrategy.sol";
-import { EVERLONG_STRATEGY_KEEPER_KIND, EVERLONG_VERSION, ONE } from "./libraries/Constants.sol";
+import { EVERLONG_STRATEGY_KEEPER_KIND, EVERLONG_VERSION, ONE, MAX_BPS } from "./libraries/Constants.sol";
 import { HyperdriveExecutionLibrary } from "./libraries/HyperdriveExecution.sol";
 import { Portfolio } from "./libraries/Portfolio.sol";
 import { IRoleManager } from "./interfaces/IRoleManager.sol";
@@ -31,10 +33,13 @@ contract EverlongStrategyKeeper is Ownable {
     using SafeCast for *;
     using SafeERC20 for ERC20;
 
+    /// @notice Name of the EverlongStrategyKeeper.
     string constant name = "EverlongStrategyKeeper";
 
+    /// @notice Kind of the EverlongStrategyKeeper.
     string constant kind = EVERLONG_STRATEGY_KEEPER_KIND;
 
+    /// @notice Version of the EverlongStrategyKeeper.
     string constant version = EVERLONG_VERSION;
 
     /// @notice Address of the target RoleManager contract.
@@ -63,6 +68,12 @@ contract EverlongStrategyKeeper is Ownable {
         trigger = _trigger;
     }
 
+    /// @notice Updates the address of the RoleManager contract.
+    /// @param _roleManager Address of the RoleManager contract to set.
+    function setRoleManager(address _roleManager) external onlyOwner {
+        roleManager = _roleManager;
+    }
+
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                              Maintenance                              │
     // ╰───────────────────────────────────────────────────────────────────────╯
@@ -72,7 +83,10 @@ contract EverlongStrategyKeeper is Ownable {
     /// @param _vault Address of the vault contract to process the report on.
     /// @param _strategy Address of the strategy contract to process the report
     ///        on.
-    function processReport(address _vault, address _strategy) public onlyOwner {
+    function processReport(
+        address _vault,
+        address _strategy
+    ) external onlyOwner {
         // Bail if this contract doesn't have the REPORTING_MANAGER role.
         uint256 roleMap = IVault(_vault).roles(address(this));
         if (roleMap & Roles.REPORTING_MANAGER != roleMap) {
@@ -103,14 +117,13 @@ contract EverlongStrategyKeeper is Ownable {
     }
 
     /// @dev Calls `report()` on the strategy if needed.
-    ///
     /// @param _strategy Address of the strategy contract to report on.
     /// @param _config Configuration for the `tend()` function called within
     ///        `_harvestAndReport()` in the strategy.
     function strategyReport(
         address _strategy,
         IEverlongStrategy.TendConfig memory _config
-    ) public onlyOwner {
+    ) external onlyOwner {
         // Bail if this contract isn't the keeper.
         if (IStrategy(_strategy).keeper() != address(this)) {
             return;
@@ -143,7 +156,7 @@ contract EverlongStrategyKeeper is Ownable {
     function tend(
         address _strategy,
         IEverlongStrategy.TendConfig memory _config
-    ) public onlyOwner {
+    ) external onlyOwner {
         // Bail if this contract isn't the keeper.
         if (IStrategy(_strategy).keeper() != address(this)) {
             return;
@@ -167,7 +180,7 @@ contract EverlongStrategyKeeper is Ownable {
     /// @dev Calls `update_debt()` on the vault if needed.
     /// @param _vault Address of the vault to update debt for.
     /// @param _strategy Address of the strategy to update debt for.
-    function update_debt(address _vault, address _strategy) public onlyOwner {
+    function update_debt(address _vault, address _strategy) external onlyOwner {
         // Get the DebtAllocator contract address.
         DebtAllocator debtAllocator = DebtAllocator(
             IRoleManager(roleManager).getDebtAllocator(_vault)
@@ -195,5 +208,88 @@ contract EverlongStrategyKeeper is Ownable {
                 );
             }
         }
+    }
+
+    /// @notice Calculates an appropriate `TendConfig.minOutput` for the input
+    ///         `_strategy` given the provided `_slippage` tolerance.
+    /// @param _strategy Strategy to be tended.
+    /// @param _slippage Maximum acceptable slippage in basis points where a
+    ///        value of 10_000 indicates 100% slippage.
+    function calculateMinOutput(
+        address _strategy,
+        uint256 _slippage
+    ) external view returns (uint256) {
+        // Obtain the amount of idle currently present in the strategy.
+        uint256 canSpend = IERC20(IEverlongStrategy(_strategy).asset())
+            .balanceOf(_strategy);
+
+        // Retrieve the strategy's Hyperdrive instance, its PoolConfig, and
+        // determine whether the strategy will be transacting with its
+        // base token.
+        IHyperdrive hyperdrive = IHyperdrive(
+            IEverlongStrategy(_strategy).hyperdrive()
+        );
+        IHyperdrive.PoolConfig memory poolConfig = hyperdrive.getPoolConfig();
+        bool asBase = IEverlongStrategy(_strategy).asBase();
+
+        // If the strategy has matured positions, increase the amount to spend
+        // by the proceeds of closing these positions.
+        if (IEverlongStrategy(_strategy).hasMaturedPositions()) {
+            // Increment the amount that can be spent by the value of each
+            // matured position in the strategy's portfolio. Since the
+            // positions are stored from most to least mature, we can exit
+            // when an immature position is encountered.
+            uint256 positionCount = IEverlongStrategy(_strategy)
+                .positionCount();
+            IEverlongStrategy.Position memory position;
+            for (uint256 i = 0; i < positionCount; i++) {
+                position = IEverlongStrategy(_strategy).positionAt(i);
+                if (hyperdrive.isMature(position)) {
+                    canSpend += hyperdrive.previewCloseLong(
+                        asBase,
+                        poolConfig,
+                        position,
+                        ""
+                    );
+                } else {
+                    break;
+                }
+            }
+        }
+
+        // Skip calculations and return early if no assets are to be spent.
+        if (canSpend == 0) {
+            return 0;
+        }
+
+        // Calculate the amount of bonds that would be received if a long was
+        // opened with `canSpend` assets.
+        uint256 expectedOutput = hyperdrive.previewOpenLong(
+            asBase,
+            poolConfig,
+            canSpend.min(
+                IEverlongStrategy(_strategy).availableDepositLimit(_strategy)
+            ),
+            ""
+        );
+
+        // Decrease the output by the maximum acceptable slippage and return
+        // the result.
+        return expectedOutput.mulDivDown(MAX_BPS - _slippage, MAX_BPS);
+    }
+
+    /// @notice Calculates an appropriate `TendConfig.minVaultSharePrice` for
+    ///         the input `_strategy` given the provided `_slippage` tolerance.
+    /// @param _strategy Strategy to be tended.
+    /// @param _slippage Maximum acceptable slippage in basis points where a
+    ///        value of 10_000 indicates 100% slippage.
+    function calculateMinVaultSharePrice(
+        address _strategy,
+        uint256 _slippage
+    ) external view returns (uint256) {
+        return
+            IHyperdrive(IEverlongStrategy(_strategy).hyperdrive())
+                .vaultSharePrice()
+                .mulDivDown(MAX_BPS - _slippage, MAX_BPS);
     }
 }

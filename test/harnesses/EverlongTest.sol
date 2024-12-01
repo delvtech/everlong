@@ -18,6 +18,7 @@ import { IEverlongStrategy } from "../../contracts/interfaces/IEverlongStrategy.
 import { IEverlongStrategyFactory } from "../../contracts/interfaces/IEverlongStrategyFactory.sol";
 import { IRoleManager } from "../../contracts/interfaces/IRoleManager.sol";
 import { IRoleManagerFactory } from "../../contracts/interfaces/IRoleManagerFactory.sol";
+import { MAX_BPS } from "../../contracts/libraries/Constants.sol";
 import { EverlongStrategyFactory } from "../../contracts/EverlongStrategyFactory.sol";
 import { EverlongStrategyKeeper } from "../../contracts/EverlongStrategyKeeper.sol";
 
@@ -108,6 +109,12 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     /// @dev Target idle liquidity (in basis points) for the Everlong vault.
     uint256 internal TARGET_IDLE_LIQUIDITY_BASIS_POINTS = 1000;
 
+    /// @dev Maximum slippage for bond purchases.
+    uint256 internal MIN_OUTPUT_SLIPPAGE = 500;
+
+    /// @dev Maximum slippage for vault share price.
+    uint256 internal MIN_VAULT_SHARE_PRICE_SLIPPAGE = 500;
+
     /// @dev Everlong vault management address.
     /// @dev Used when interacting with the `DebtAllocator`.
     address internal management;
@@ -191,6 +198,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
             HYPERDRIVE_INITIALIZER = deployer;
         }
         initialize(HYPERDRIVE_INITIALIZER, FIXED_RATE, INITIAL_CONTRIBUTION);
+        advanceTimeWithCheckpoints(1);
 
         vm.stopPrank();
     }
@@ -315,8 +323,8 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         debtAllocator.setStrategyDebtRatio(
             address(vault),
             address(strategy),
-            10_000 - TARGET_IDLE_LIQUIDITY_BASIS_POINTS,
-            10_000 - MIN_IDLE_LIQUIDITY_BASIS_POINTS
+            MAX_BPS - TARGET_IDLE_LIQUIDITY_BASIS_POINTS,
+            MAX_BPS - MIN_IDLE_LIQUIDITY_BASIS_POINTS
         );
 
         vm.stopPrank();
@@ -509,8 +517,14 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         keeperContract.tend(
             address(strategy),
             IEverlongStrategy.TendConfig({
-                minOutput: 0,
-                minVaultSharePrice: 0,
+                minOutput: keeperContract.calculateMinOutput(
+                    address(strategy),
+                    MIN_OUTPUT_SLIPPAGE
+                ),
+                minVaultSharePrice: keeperContract.calculateMinVaultSharePrice(
+                    address(strategy),
+                    MIN_VAULT_SHARE_PRICE_SLIPPAGE
+                ),
                 positionClosureLimit: 0,
                 extraData: ""
             })
@@ -528,8 +542,14 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         keeperContract.strategyReport(
             address(strategy),
             IEverlongStrategy.TendConfig({
-                minOutput: 0,
-                minVaultSharePrice: 0,
+                minOutput: keeperContract.calculateMinOutput(
+                    address(strategy),
+                    MIN_OUTPUT_SLIPPAGE
+                ),
+                minVaultSharePrice: keeperContract.calculateMinVaultSharePrice(
+                    address(strategy),
+                    MIN_VAULT_SHARE_PRICE_SLIPPAGE
+                ),
                 positionClosureLimit: 0,
                 extraData: ""
             })
@@ -620,24 +640,24 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     /// @return Target idle assets for the vault.
     function targetIdleLiquidity() internal virtual returns (uint256) {
         return
-            (10_000 -
+            (MAX_BPS -
                 uint256(
                     debtAllocator
                         .getStrategyConfig(address(vault), address(strategy))
                         .targetRatio
-                )).mulDivDown(vault.totalAssets(), 10_000);
+                )).mulDivDown(vault.totalAssets(), MAX_BPS);
     }
 
     /// @dev Calculates the minimum amount of idle assets for the vault.
     /// @return Minimum idle assets for the vault.
     function minIdleLiquidity() internal virtual returns (uint256) {
         return
-            (10_000 -
+            (MAX_BPS -
                 uint256(
                     debtAllocator
                         .getStrategyConfig(address(vault), address(strategy))
                         .maxRatio
-                )).mulDivDown(vault.totalAssets(), 10_000);
+                )).mulDivDown(vault.totalAssets(), MAX_BPS);
     }
 
     // ╭───────────────────────────────────────────────────────────────────────╮
