@@ -33,10 +33,10 @@ and [Yearn](https://docs.yearn.fi/).
 
 ## Components
 
-Everlong is built upon
+Vaults are built upon
 [Yearn's TokenizedStrategy Framework](https://docs.yearn.fi/developers/v3/strategy_writing_guide)
 which involves numerous mandatory and optional components. The primary
-components being used by Everlong are described below.
+components being used are described below.
 
 ### EverlongStrategy
 
@@ -121,7 +121,7 @@ For our situation, we use the keeper role to:
 
 ## Diagrams
 
-Everlong is build on top of
+Vaults are build on top of
 [Yearn's TokenizedStrategy Framework](https://docs.yearn.fi/developers/v3/strategy_writing_guide)
 and leverages [v3 Vaults](https://docs.yearn.fi/developers/v3/overview) to
 control idle liquidity (and eventually combine multiple strategies). Asset flow
