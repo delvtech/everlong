@@ -6,9 +6,9 @@ import { IERC20 } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
-import { EverlongTest } from "../harnesses/EverlongTest.sol";
-import { IEverlongStrategy } from "../../contracts/interfaces/IEverlongStrategy.sol";
-import { HyperdriveExecutionLibrary } from "../../contracts/libraries/HyperdriveExecution.sol";
+import { EverlongTest } from "../EverlongTest.sol";
+import { IEverlongStrategy } from "../../../contracts/interfaces/IEverlongStrategy.sol";
+import { HyperdriveExecutionLibrary } from "../../../contracts/libraries/HyperdriveExecution.sol";
 
 contract TestTend is EverlongTest {
     using FixedPointMath for uint256;
@@ -61,7 +61,10 @@ contract TestTend is EverlongTest {
         }
 
         // Ensure Everlong has the maximum amount of positions possible.
-        assertEq(strategy.positionCount(), maxPositionCount);
+        assertEq(
+            IEverlongStrategy(address(strategy)).positionCount(),
+            maxPositionCount
+        );
 
         // Advance time so that all positions are mature.
         advanceTimeWithCheckpoints(POSITION_DURATION);
@@ -89,7 +92,7 @@ contract TestTend is EverlongTest {
         // - has no balance
         // - `tendTrigger()` returns false
         assertEq(
-            strategy.positionCount(),
+            IEverlongStrategy(address(strategy)).positionCount(),
             0,
             "everlong should not intialize with positions"
         );
@@ -127,18 +130,17 @@ contract TestTend is EverlongTest {
     ///      position.
     function test_tendTrigger_with_matured_position() external {
         // Mint some tokens to Everlong for opening longs and rebalance.
-        mintApproveEverlongBaseAsset(
-            address(strategy),
-            MINIMUM_TRANSACTION_AMOUNT + 1
-        );
+        mintApproveBaseAsset(address(strategy), MINIMUM_TRANSACTION_AMOUNT + 1);
         rebalance();
 
         // Increase block.timestamp until position is mature.
         // Ensure Everlong has a matured position.
         // Ensure `tendTrigger()` returns true.
-        advanceTimeWithCheckpoints(strategy.positionAt(0).maturityTime);
+        advanceTimeWithCheckpoints(
+            IEverlongStrategy(address(strategy)).positionAt(0).maturityTime
+        );
         assertTrue(
-            strategy.hasMaturedPositions(),
+            IEverlongStrategy(address(strategy)).hasMaturedPositions(),
             "everlong should have matured position after advancing time"
         );
         (bool canTend, ) = strategy.tendTrigger();
@@ -159,7 +161,7 @@ contract TestTend is EverlongTest {
 
         // setTendConfig should revert.
         vm.expectRevert();
-        strategy.setTendConfig(
+        IEverlongStrategy(address(strategy)).setTendConfig(
             IEverlongStrategy.TendConfig({
                 minOutput: 0,
                 minVaultSharePrice: 0,
@@ -178,7 +180,7 @@ contract TestTend is EverlongTest {
         vm.startPrank(address(keeperContract));
 
         // setTendConfig should succeed.
-        strategy.setTendConfig(
+        IEverlongStrategy(address(strategy)).setTendConfig(
             IEverlongStrategy.TendConfig({
                 minOutput: 1,
                 minVaultSharePrice: 0,
@@ -188,8 +190,9 @@ contract TestTend is EverlongTest {
         );
 
         // Check that minOutput was updated.
-        (, IEverlongStrategy.TendConfig memory tendConfig) = strategy
-            .getTendConfig();
+        (, IEverlongStrategy.TendConfig memory tendConfig) = IEverlongStrategy(
+            address(strategy)
+        ).getTendConfig();
         assertEq(tendConfig.minOutput, 1);
 
         // Stop the prank.
@@ -264,7 +267,7 @@ contract TestTend is EverlongTest {
         advanceTimeWithCheckpoints(CHECKPOINT_DURATION);
         depositStrategy(MINIMUM_TRANSACTION_AMOUNT + 1, alice);
         rebalance();
-        assertEq(strategy.positionCount(), 2);
+        assertEq(IEverlongStrategy(address(strategy)).positionCount(), 2);
 
         // Fast forward such that both positions are mature.
         advanceTimeWithCheckpoints(POSITION_DURATION * 2);
@@ -287,7 +290,7 @@ contract TestTend is EverlongTest {
         );
 
         // Ensure that the strategy still has a matured position.
-        assertTrue(strategy.hasMaturedPositions());
+        assertTrue(IEverlongStrategy(address(strategy)).hasMaturedPositions());
 
         // Stop the prank.
         vm.stopPrank();

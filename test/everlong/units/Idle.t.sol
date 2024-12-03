@@ -6,8 +6,8 @@ import { IERC20 } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
-import { EverlongTest } from "../harnesses/EverlongTest.sol";
-import { HyperdriveExecutionLibrary } from "../../contracts/libraries/HyperdriveExecution.sol";
+import { EverlongTest } from "../EverlongTest.sol";
+import { HyperdriveExecutionLibrary } from "../../../contracts/libraries/HyperdriveExecution.sol";
 
 /// @dev Test idle liquidity maintenance for the vault.
 contract TestIdle is EverlongTest {

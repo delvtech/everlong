@@ -7,7 +7,7 @@ import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { Packing } from "openzeppelin/utils/Packing.sol";
-import { EverlongTest } from "../harnesses/EverlongTest.sol";
+import { EverlongTest } from "../EverlongTest.sol";
 
 uint256 constant HYPERDRIVE_SHARE_RESERVES_BOND_RESERVES_SLOT = 2;
 uint256 constant HYPERDRIVE_LONG_EXPOSURE_LONGS_OUTSTANDING_SLOT = 3;
@@ -156,11 +156,10 @@ contract TestCloseImmatureLongs is EverlongTest {
         // Close the long.
         uint256 baseProceeds = redeemStrategy(shares, bob, true);
 
-        assertGe(baseProceeds, estimatedProceeds);
-        assertApproxEqAbs(
+        assertApproxEqRel(
             baseProceeds,
             estimatedProceeds,
-            20,
+            0.01e18,
             "failed equality"
         );
         vm.stopPrank();

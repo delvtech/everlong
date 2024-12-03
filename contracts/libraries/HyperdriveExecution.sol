@@ -250,7 +250,7 @@ library HyperdriveExecutionLibrary {
     function closeLong(
         IHyperdrive self,
         bool _asBase,
-        IEverlongStrategy.Position memory _position,
+        IEverlongStrategy.EverlongPosition memory _position,
         uint256 _minOutput,
         bytes memory _data
     ) internal returns (uint256 proceeds) {
@@ -277,7 +277,7 @@ library HyperdriveExecutionLibrary {
         IHyperdrive self,
         bool _asBase,
         IHyperdrive.PoolConfig memory _poolConfig,
-        IEverlongStrategy.Position memory _position,
+        IEverlongStrategy.EverlongPosition memory _position,
         bytes memory // unused extradata
     ) internal view returns (uint256) {
         // Read select `PoolInfo` fields directly from Hyperdrive's storage to
@@ -341,7 +341,7 @@ library HyperdriveExecutionLibrary {
     function _calculateCloseLong(
         IHyperdrive self,
         CalculateCloseLongParams memory _params,
-        IEverlongStrategy.Position memory _position
+        IEverlongStrategy.EverlongPosition memory _position
     ) internal view returns (uint256) {
         // Use a struct to hold intermediate calculation results and avoid
         // stack-too-deep errors.
@@ -1240,7 +1240,7 @@ library HyperdriveExecutionLibrary {
     /// @return True if the position is mature false otherwise.
     function isMature(
         IHyperdrive self,
-        IEverlongStrategy.Position memory _position
+        IEverlongStrategy.EverlongPosition memory _position
     ) internal view returns (bool) {
         return isMature(self, _position.maturityTime);
     }

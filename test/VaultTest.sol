@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-// solhint-disable-next-line no-console, no-unused-import
 import { console2 as console } from "forge-std/console2.sol";
 import { IERC20 } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
@@ -13,18 +12,14 @@ import { DebtAllocator } from "vault-periphery/debtAllocators/DebtAllocator.sol"
 import { IVault } from "yearn-vaults-v3/interfaces/IVault.sol";
 import { IAccountant } from "../../contracts/interfaces/IAccountant.sol";
 import { IAprOracle } from "../../contracts/interfaces/IAprOracle.sol";
-import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol";
-import { IEverlongStrategy } from "../../contracts/interfaces/IEverlongStrategy.sol";
-import { IEverlongStrategyFactory } from "../../contracts/interfaces/IEverlongStrategyFactory.sol";
+import { IPermissionedStrategy } from "../../contracts/interfaces/IPermissionedStrategy.sol";
 import { IRoleManager } from "../../contracts/interfaces/IRoleManager.sol";
 import { IRoleManagerFactory } from "../../contracts/interfaces/IRoleManagerFactory.sol";
 import { MAX_BPS } from "../../contracts/libraries/Constants.sol";
-import { EverlongStrategyFactory } from "../../contracts/EverlongStrategyFactory.sol";
-import { EverlongStrategyKeeper } from "../../contracts/EverlongStrategyKeeper.sol";
 
-/// @dev Everlong testing harness contract.
-/// @dev Tests should extend this contract and call its `setUp` function.
-contract EverlongTest is HyperdriveTest, IEverlongEvents {
+/// @dev Vault testing harness contract.
+/// @dev Extending contracts must implement `rebalance()` and `report()`.
+abstract contract VaultTest is HyperdriveTest {
     using HyperdriveUtils for *;
     using FixedPointMath for *;
 
@@ -85,7 +80,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     uint256 internal GOVERNANCE_ZOMBIE_FEE = 0.03e18;
 
     // ╭───────────────────────────────────────────────────────────────────────╮
-    // │                           Everlong Storage                            │
+    // │                    Vault + Strategy Configuration                     │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @dev Time period for the strategy to release profits over.
@@ -94,14 +89,8 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     /// @dev Time period for the strategy to release profits over.
     uint256 internal VAULT_PROFIT_MAX_UNLOCK_TIME = 1 days;
 
-    /// @dev Everlong asset.
+    /// @dev Vault/Strategy asset.
     IERC20 internal asset;
-
-    /// @dev Everlong token name.
-    string internal EVERLONG_NAME = "Everlong Testing";
-
-    /// @dev Everlong token symbol.
-    string internal EVERLONG_SYMBOL = "EVRLNG";
 
     /// @dev Minimum idle liquidity (in basis points) for the Everlong vault.
     uint256 internal MIN_IDLE_LIQUIDITY_BASIS_POINTS = 500;
@@ -109,44 +98,16 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     /// @dev Target idle liquidity (in basis points) for the Everlong vault.
     uint256 internal TARGET_IDLE_LIQUIDITY_BASIS_POINTS = 1000;
 
-    /// @dev Maximum slippage for bond purchases.
-    uint256 internal MIN_OUTPUT_SLIPPAGE = 500;
-
-    /// @dev Maximum slippage for vault share price.
-    uint256 internal MIN_VAULT_SHARE_PRICE_SLIPPAGE = 500;
-
-    /// @dev Everlong vault management address.
+    /// @dev Vault management address.
     /// @dev Used when interacting with the `DebtAllocator`.
     address internal management;
 
-    /// @dev Everlong keeper address.
+    /// @dev Keeper address.
     address internal keeper;
 
     /// @dev Mainnet `RoleManager` factory.
     IRoleManagerFactory internal roleManagerFactory =
         IRoleManagerFactory(0xca12459a931643BF28388c67639b3F352fe9e5Ce);
-
-    /// @dev Everlong strategy factory.
-    IEverlongStrategyFactory internal strategyFactory;
-
-    /// @dev Everlong strategy.
-    IEverlongStrategy internal strategy;
-
-    /// @dev Everlong vault.
-    IVault internal vault;
-
-    /// @dev Everlong vault role manager.
-    /// @dev Handles setup and permissioning for
-    ///      vault periphery contracts such as DebtAllocator and Accountant.
-    IRoleManager internal roleManager;
-
-    /// @dev Everlong vault debt allocator.
-    /// @dev Handles vault debt allocation to strategies.
-    DebtAllocator internal debtAllocator;
-
-    /// @dev Everlong vault accountant.
-    /// @dev Handles fee and reporting configuration.
-    IAccountant internal accountant;
 
     /// @dev Yearn apr oracle.
     /// @dev Capable of getting the current and expected apr for any vault or
@@ -159,9 +120,37 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     CommonReportTrigger internal reportTrigger =
         CommonReportTrigger(0xA045D4dAeA28BA7Bfe234c96eAa03daFae85A147);
 
-    /// @dev Periphery contract to simplify maintenance operations for vaults
-    ///      and strategies.
-    EverlongStrategyKeeper internal keeperContract;
+    /// @dev Strategy address.
+    IPermissionedStrategy internal strategy;
+
+    /// @dev Vault address.
+    IVault internal vault;
+
+    /// @dev Vault role manager.
+    /// @dev Handles setup and permissioning for
+    ///      vault periphery contracts such as DebtAllocator and Accountant.
+    IRoleManager internal roleManager;
+
+    /// @dev Vault debt allocator.
+    /// @dev Handles vault debt allocation to strategies.
+    DebtAllocator internal debtAllocator;
+
+    /// @dev Vault accountant.
+    /// @dev Handles fee and reporting configuration.
+    IAccountant internal accountant;
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                         Maintenance Overrides                         │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
+    /// @dev Call `everlong.rebalance(...)` as the admin with default options.
+    /// @dev Must be implemented by extending contract.
+    function rebalance() internal virtual;
+
+    /// @dev Call `report` on the strategy then call `process_report` on the
+    ///      vault if needed.
+    /// @dev Must be implemented by extending contract.
+    function report() internal virtual;
 
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                             SetUp Helpers                             │
@@ -173,8 +162,6 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         super.setUp();
         setUpHyperdrive();
         setUpRoleManager();
-        setUpEverlongStrategy();
-        setUpEverlongVault();
     }
 
     /// @dev Deploy and initialize the hyperdrive instance with seed liquidity.
@@ -212,121 +199,10 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         // RoleManager component addresses.
         vm.startPrank(deployer);
         roleManager = IRoleManager(
-            roleManagerFactory.newProject("Everlong", governance, management)
+            roleManagerFactory.newProject("Delv", governance, management)
         );
         debtAllocator = DebtAllocator(roleManager.getDebtAllocator());
         accountant = IAccountant(roleManager.getAccountant());
-        vm.stopPrank();
-    }
-
-    /// @dev Deploy the Everlong Yearn Tokenized Strategy.
-    function setUpEverlongStrategy() internal {
-        vm.startPrank(deployer);
-        // Set Up the `keeper` address.
-        (keeper, ) = createUser("keeper");
-
-        // Deploy the EverlongStrategyKeeper helper contract.
-        keeperContract = new EverlongStrategyKeeper(
-            address(roleManager),
-            address(reportTrigger)
-        );
-        keeperContract.transferOwnership(keeper);
-
-        // Deploy the EverlongStrategyFactory.
-        strategyFactory = new EverlongStrategyFactory(
-            "TestEverlongStrategyFactory", // Name
-            management, // Management
-            governance, // Performance Fee Recipient
-            address(keeperContract), // EverlongStrategyKeeper
-            deployer // Emergency Admin
-        );
-
-        // Deploy the Strategy.
-        strategy = IEverlongStrategy(
-            address(
-                strategyFactory.newStrategy(
-                    address(asset),
-                    EVERLONG_NAME,
-                    address(hyperdrive),
-                    true
-                )
-            )
-        );
-        vm.stopPrank();
-
-        // As the `management` address:
-        //   1. Accept the `management` role for the strategy.
-        //   2. Set the `profitMaxUnlockTime` to zero.
-        vm.startPrank(management);
-        strategy.acceptManagement();
-        strategy.setProfitMaxUnlockTime(STRATEGY_PROFIT_MAX_UNLOCK_TIME);
-        strategy.setPerformanceFee(0);
-        vm.stopPrank();
-    }
-
-    /// @dev Deploy the Everlong Yearn v3 Vault.
-    function setUpEverlongVault() internal {
-        // As the `governance` address:
-        //   1. Accept the "Fee Manager" role for the Accountant.
-        //   2. Set the default `config.maxLoss` for the accountant to be 10%.
-        //      This will enable losses of up to 10% across reports before
-        //      reverting.
-        //   3. Deploy the Vault using the RoleManager.
-        //   4. Add the EverlongStrategy to the vault.
-        //   5. Update the max debt for the strategy to be the maximum uint256.
-        //   6. Configure the vault to `auto_allocate` which will automatically
-        //      update the strategy's debt on deposit.
-        vm.startPrank(governance);
-        accountant.acceptFeeManager();
-        IAccountant.Fee memory defaultConfig = accountant.defaultConfig();
-        // Must increase the accountant maxLoss for reporting since `totalAssets`
-        // decreases whenever opening longs.
-        accountant.updateDefaultConfig(0, 0, 0, 0, defaultConfig.maxGain, 100);
-        vault = IVault(
-            roleManager.newVault(
-                address(asset),
-                0,
-                EVERLONG_NAME,
-                EVERLONG_SYMBOL
-            )
-        );
-        vault.add_strategy(address(strategy));
-        vault.update_max_debt_for_strategy(
-            address(strategy),
-            type(uint256).max
-        );
-        roleManager.setPositionHolder(
-            roleManager.KEEPER(),
-            address(keeperContract)
-        );
-        vm.stopPrank();
-
-        // As the `management` address, configure the DebtAllocator to not
-        // wait to update a strategy's debt and set the minimum change before
-        // updating to just above hyperdrive's minimum transaction amount.
-        vm.startPrank(management);
-        // TODO: Ensure this is what we want. Pendle has their strategy
-        //       `profitMaxUnlockTime` set to 0 and their vault's set to
-        //       3 days.
-        vault.setProfitMaxUnlockTime(VAULT_PROFIT_MAX_UNLOCK_TIME);
-        // Enable deposits to the strategy from the vault.
-        strategy.setDepositor(address(vault), true);
-        // Give the `EverlongStrategyKeeper` role to the keeper address.
-        debtAllocator.setKeeper(address(keeperContract), true);
-        // Set minimum wait time for updating strategy debt.
-        debtAllocator.setMinimumWait(0);
-        // Set minimum change in debt for triggering an update.
-        debtAllocator.setMinimumChange(
-            address(vault),
-            MINIMUM_TRANSACTION_AMOUNT + 1
-        );
-        debtAllocator.setStrategyDebtRatio(
-            address(vault),
-            address(strategy),
-            MAX_BPS - TARGET_IDLE_LIQUIDITY_BASIS_POINTS,
-            MAX_BPS - MIN_IDLE_LIQUIDITY_BASIS_POINTS
-        );
-
         vm.stopPrank();
     }
 
@@ -334,7 +210,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     // │                            Deposit Helpers                            │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
-    /// @dev Deposit into Everlong strategy.
+    /// @dev Deposit into the strategy.
     /// @param _amount Amount of assets to deposit.
     /// @param _depositor Address to deposit as.
     /// @return shares Amount of shares received from the deposit.
@@ -384,7 +260,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         return shares;
     }
 
-    /// @dev Deposit into Everlong vault.
+    /// @dev Deposit into the vault.
     /// @param _amount Amount of assets to deposit.
     /// @param _depositor Address to deposit as.
     /// @return shares Amount of shares received from the deposit.
@@ -433,7 +309,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
     // │                            Redeem Helpers                             │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
-    /// @dev Redeem shares from Everlong strategy.
+    /// @dev Redeem shares from the strategy.
     /// @param _shares Amount of shares to redeem.
     /// @param _redeemer Address to redeem as.
     /// @return assets Amount of assets received from the redemption.
@@ -463,7 +339,7 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         }
     }
 
-    /// @dev Redeem shares from Everlong vault.
+    /// @dev Redeem shares from the vault.
     /// @param _shares Amount of shares to redeem.
     /// @param _redeemer Address to redeem as.
     /// @return assets Amount of assets received from the redemption.
@@ -493,68 +369,18 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
         }
     }
 
-    /// @dev Mint base token to the provided address and approve Everlong.
+    /// @dev Mint base token to the provided address and approve the vault and
+    ///      strategy.
     /// @param _recipient Receiver of the minted assets.
     /// @param _amount Amount of assets to mint.
-    function mintApproveEverlongBaseAsset(
+    function mintApproveBaseAsset(
         address _recipient,
         uint256 _amount
     ) internal {
         ERC20Mintable(address(asset)).mint(_recipient, _amount);
         vm.startPrank(_recipient);
         ERC20Mintable(address(asset)).approve(address(vault), _amount);
-        vm.stopPrank();
-    }
-
-    // ╭───────────────────────────────────────────────────────────────────────╮
-    // │                          Rebalancing Helpers                          │
-    // ╰───────────────────────────────────────────────────────────────────────╯
-
-    /// @dev Call `everlong.rebalance(...)` as the admin with default options.
-    function rebalance() internal {
-        vm.startPrank(keeper);
-        keeperContract.update_debt(address(vault), address(strategy));
-        keeperContract.tend(
-            address(strategy),
-            IEverlongStrategy.TendConfig({
-                minOutput: keeperContract.calculateMinOutput(
-                    address(strategy),
-                    MIN_OUTPUT_SLIPPAGE
-                ),
-                minVaultSharePrice: keeperContract.calculateMinVaultSharePrice(
-                    address(strategy),
-                    MIN_VAULT_SHARE_PRICE_SLIPPAGE
-                ),
-                positionClosureLimit: 0,
-                extraData: ""
-            })
-        );
-        vm.stopPrank();
-        // Skip forward one second so that `update_debt` doesn't get called on
-        // the same timestamp.
-        skip(1);
-    }
-
-    /// @dev Call `report` on the strategy then call `process_report` on the
-    ///      vault if needed.
-    function report() internal {
-        vm.startPrank(keeper);
-        keeperContract.strategyReport(
-            address(strategy),
-            IEverlongStrategy.TendConfig({
-                minOutput: keeperContract.calculateMinOutput(
-                    address(strategy),
-                    MIN_OUTPUT_SLIPPAGE
-                ),
-                minVaultSharePrice: keeperContract.calculateMinVaultSharePrice(
-                    address(strategy),
-                    MIN_VAULT_SHARE_PRICE_SLIPPAGE
-                ),
-                positionClosureLimit: 0,
-                extraData: ""
-            })
-        );
-        keeperContract.processReport(address(vault), address(strategy));
+        ERC20Mintable(address(asset)).approve(address(strategy), _amount);
         vm.stopPrank();
     }
 
@@ -658,26 +484,5 @@ contract EverlongTest is HyperdriveTest, IEverlongEvents {
                         .getStrategyConfig(address(vault), address(strategy))
                         .maxRatio
                 )).mulDivDown(vault.totalAssets(), MAX_BPS);
-    }
-
-    // ╭───────────────────────────────────────────────────────────────────────╮
-    // │                           Position Helpers                            │
-    // ╰───────────────────────────────────────────────────────────────────────╯
-
-    /// @dev Outputs a table of all positions.
-    function logPositions() internal view {
-        /* solhint-disable no-console */
-        console.log("-- POSITIONS -------------------------------");
-        for (uint128 i = 0; i < strategy.positionCount(); ++i) {
-            IEverlongStrategy.Position memory p = strategy.positionAt(i);
-            console.log(
-                "index: %e - maturityTime: %e - bondAmount: %e",
-                i,
-                p.maturityTime,
-                p.bondAmount
-            );
-        }
-        console.log("--------------------------------------------");
-        /* solhint-enable no-console */
     }
 }

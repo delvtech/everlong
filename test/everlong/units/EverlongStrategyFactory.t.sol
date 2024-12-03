@@ -5,11 +5,11 @@ import { console2 as console } from "forge-std/console2.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
-import { EverlongTest } from "../harnesses/EverlongTest.sol";
-import { IEverlongStrategy } from "../../contracts/interfaces/IEverlongStrategy.sol";
-import { IEverlongStrategyFactory } from "../../contracts/interfaces/IEverlongStrategyFactory.sol";
-import { EverlongStrategyFactory } from "../../contracts/EverlongStrategyFactory.sol";
-import { HyperdriveExecutionLibrary } from "../../contracts/libraries/HyperdriveExecution.sol";
+import { EverlongTest } from "../EverlongTest.sol";
+import { IEverlongStrategy } from "../../../contracts/interfaces/IEverlongStrategy.sol";
+import { IEverlongStrategyFactory } from "../../../contracts/interfaces/IEverlongStrategyFactory.sol";
+import { EverlongStrategyFactory } from "../../../contracts/EverlongStrategyFactory.sol";
+import { HyperdriveExecutionLibrary } from "../../../contracts/libraries/HyperdriveExecution.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 
 contract TestEverlongStrategyFactory is EverlongTest {

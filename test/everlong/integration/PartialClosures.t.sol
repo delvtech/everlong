@@ -4,9 +4,9 @@ pragma solidity ^0.8.20;
 import { console2 as console } from "forge-std/console2.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
-import { EverlongTest } from "../harnesses/EverlongTest.sol";
-import { IEverlongStrategy } from "../../contracts/interfaces/IEverlongStrategy.sol";
-import { HyperdriveExecutionLibrary } from "../../contracts/libraries/HyperdriveExecution.sol";
+import { EverlongTest } from "../EverlongTest.sol";
+import { IEverlongStrategy } from "../../../contracts/interfaces/IEverlongStrategy.sol";
+import { HyperdriveExecutionLibrary } from "../../../contracts/libraries/HyperdriveExecution.sol";
 
 contract TestPartialClosures is EverlongTest {
     using FixedPointMath for uint256;
@@ -28,7 +28,8 @@ contract TestPartialClosures is EverlongTest {
             hyperdrive.calculateMaxLong()
         );
         uint256 aliceShares = depositStrategy(aliceDepositAmount, alice, true);
-        uint256 positionBondsAfterDeposit = strategy.totalBonds();
+        uint256 positionBondsAfterDeposit = IEverlongStrategy(address(strategy))
+            .totalBonds();
 
         // Alice redeems a significant enough portion of her shares to require
         // partially closing the immature position.
@@ -38,10 +39,11 @@ contract TestPartialClosures is EverlongTest {
             aliceShares.mulDown(0.95e18)
         );
         redeemStrategy(_redemptionAmount, alice, true);
-        uint256 positionBondsAfterRedeem = strategy.totalBonds();
+        uint256 positionBondsAfterRedeem = IEverlongStrategy(address(strategy))
+            .totalBonds();
 
         // Ensure Everlong still has a position open.
-        assertGt(strategy.positionCount(), 0);
+        assertGt(IEverlongStrategy(address(strategy)).positionCount(), 0);
 
         // Ensure the remaining Everlong position has proportionally less bonds
         // than it did prior to redemption.
@@ -84,9 +86,13 @@ contract TestPartialClosures is EverlongTest {
 
         // Ensure Everlong has two positions and that the bond prices differ
         // by greater than Everlong's max closeLong slippage.
-        assertEq(strategy.positionCount(), 2);
-        IEverlongStrategy.Position memory oldPosition = strategy.positionAt(0);
-        IEverlongStrategy.Position memory newPosition = strategy.positionAt(1);
+        assertEq(IEverlongStrategy(address(strategy)).positionCount(), 2);
+        IEverlongStrategy.EverlongPosition
+            memory oldPosition = IEverlongStrategy(address(strategy))
+                .positionAt(0);
+        IEverlongStrategy.EverlongPosition
+            memory newPosition = IEverlongStrategy(address(strategy))
+                .positionAt(1);
         uint256 oldBondPrice = hyperdrive
             .previewCloseLong(true, hyperdrive.getPoolConfig(), oldPosition, "")
             .divDown(oldPosition.bondAmount);
@@ -95,7 +101,7 @@ contract TestPartialClosures is EverlongTest {
             .divDown(newPosition.bondAmount);
         assertGt(
             (oldBondPrice - newBondPrice).divDown(oldBondPrice),
-            strategy.partialPositionClosureBuffer()
+            IEverlongStrategy(address(strategy)).partialPositionClosureBuffer()
         );
 
         // Alice redeems enough shares to require closing the first and part
@@ -106,6 +112,6 @@ contract TestPartialClosures is EverlongTest {
         redeemStrategy(aliceRedeemAmount, alice, true);
 
         // Ensure Everlong has one position left.
-        assertEq(strategy.positionCount(), 1);
+        assertEq(IEverlongStrategy(address(strategy)).positionCount(), 1);
     }
 }
