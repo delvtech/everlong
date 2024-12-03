@@ -35,6 +35,8 @@ via_ir = false
 # Enable gas-reporting for all contracts
 gas_reports = ["*"]
 evm_version = "cancun"
+# Path-specific permissions
+fs_permissions = [{ access = "read-write", path = "./deploy" }]
 
 [rpc_endpoints]
 mainnet = "${MAINNET_RPC_URL}"

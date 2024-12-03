@@ -9,7 +9,7 @@ import { HyperdriveMath } from "hyperdrive/contracts/src/libraries/HyperdriveMat
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
-import { EverlongTest } from "../harnesses/EverlongTest.sol";
+import { EverlongTest } from "../EverlongTest.sol";
 import { Packing } from "openzeppelin/utils/Packing.sol";
 
 uint256 constant HYPERDRIVE_SHARE_RESERVES_BOND_RESERVES_SLOT = 2;

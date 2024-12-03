@@ -5,8 +5,8 @@ import { console2 as console } from "forge-std/console2.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
-import { HyperdriveExecutionLibrary } from "../../contracts/libraries/HyperdriveExecution.sol";
-import { EverlongTest } from "../harnesses/EverlongTest.sol";
+import { HyperdriveExecutionLibrary } from "../../../contracts/libraries/HyperdriveExecution.sol";
+import { EverlongTest } from "../EverlongTest.sol";
 
 /// @dev Helper functions for testing sandwich scenarios.
 ///      No tests are in this file.

@@ -8,8 +8,8 @@ import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { BaseStrategy, ERC20 } from "tokenized-strategy/BaseStrategy.sol";
 import { IEverlongStrategy } from "./interfaces/IEverlongStrategy.sol";
 import { EVERLONG_STRATEGY_KIND, EVERLONG_VERSION, ONE } from "./libraries/Constants.sol";
+import { EverlongPortfolioLibrary } from "./libraries/EverlongPortfolio.sol";
 import { HyperdriveExecutionLibrary } from "./libraries/HyperdriveExecution.sol";
-import { Portfolio } from "./libraries/Portfolio.sol";
 
 //           ,---..-.   .-.,---.  ,---.   ,-.    .---.  .-. .-.  ,--,
 //           | .-' \ \ / / | .-'  | .-.\  | |   / .-. ) |  \| |.' .'
@@ -71,7 +71,7 @@ import { Portfolio } from "./libraries/Portfolio.sol";
 contract EverlongStrategy is BaseStrategy {
     using FixedPointMath for uint256;
     using HyperdriveExecutionLibrary for IHyperdrive;
-    using Portfolio for Portfolio.State;
+    using EverlongPortfolioLibrary for EverlongPortfolioLibrary.State;
     using SafeCast for *;
     using SafeERC20 for ERC20;
 
@@ -129,7 +129,7 @@ contract EverlongStrategy is BaseStrategy {
     // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @dev Structure to store and account for everlong-controlled positions.
-    Portfolio.State internal _portfolio;
+    EverlongPortfolioLibrary.State internal _portfolio;
 
     /// @dev Mapping to store valid depositors. Used to limit interactions with
     ///      this strategy to only approved vaults.
@@ -411,7 +411,7 @@ contract EverlongStrategy is BaseStrategy {
         // - There are no more positions.
         // - The current position is not mature.
         // - The limit on closed positions has been reached.
-        IEverlongStrategy.Position memory position;
+        IEverlongStrategy.EverlongPosition memory position;
         for (uint256 count; !_portfolio.isEmpty() && count < _limit; ++count) {
             // Retrieve the most mature position.
             position = _portfolio.head();
@@ -451,7 +451,7 @@ contract EverlongStrategy is BaseStrategy {
         // For each position, use the expected output of closing the entire
         // position to estimate the amount of bonds to sell for a partial
         // closure.
-        IEverlongStrategy.Position memory position;
+        IEverlongStrategy.EverlongPosition memory position;
         uint256 totalPositionValue;
         while (!_portfolio.isEmpty() && output < _targetOutput) {
             // Retrieve the most mature position.
@@ -487,7 +487,7 @@ contract EverlongStrategy is BaseStrategy {
                 // Add the amount of assets received to the total output.
                 output += IHyperdrive(hyperdrive).closeLong(
                     asBase,
-                    IEverlongStrategy.Position({
+                    IEverlongStrategy.EverlongPosition({
                         maturityTime: position.maturityTime,
                         bondAmount: bondsNeeded.toUint128()
                     }),
@@ -557,7 +557,7 @@ contract EverlongStrategy is BaseStrategy {
             value += IHyperdrive(hyperdrive).previewCloseLong(
                 asBase,
                 _poolConfig,
-                IEverlongStrategy.Position({
+                IEverlongStrategy.EverlongPosition({
                     maturityTime: IHyperdrive(hyperdrive)
                         .getCheckpointIdUp(_portfolio.avgMaturityTime)
                         .toUint128(),
@@ -590,7 +590,7 @@ contract EverlongStrategy is BaseStrategy {
     /// @return The position at the specified location.
     function positionAt(
         uint256 _index
-    ) external view returns (IEverlongStrategy.Position memory) {
+    ) external view returns (IEverlongStrategy.EverlongPosition memory) {
         return _portfolio.at(_index);
     }
 

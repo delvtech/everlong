@@ -8,10 +8,10 @@ import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMat
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
-import { IEverlongStrategy } from "../../contracts/interfaces/IEverlongStrategy.sol";
-import { Portfolio } from "../../contracts/libraries/Portfolio.sol";
-import { HyperdriveExecutionLibrary } from "../../contracts/libraries/HyperdriveExecution.sol";
-import { EverlongTest } from "../harnesses/EverlongTest.sol";
+import { IEverlongStrategy } from "../../../contracts/interfaces/IEverlongStrategy.sol";
+import { EverlongPortfolioLibrary } from "../../../contracts/libraries/EverlongPortfolio.sol";
+import { HyperdriveExecutionLibrary } from "../../../contracts/libraries/HyperdriveExecution.sol";
+import { EverlongTest } from "../EverlongTest.sol";
 
 /// @dev Tests the functionality around opening, closing, and valuing hyperdrive positions.
 contract TestHyperdriveExecution is EverlongTest {
@@ -20,7 +20,7 @@ contract TestHyperdriveExecution is EverlongTest {
     using SafeCast for *;
     using Lib for *;
 
-    Portfolio.State public portfolio;
+    EverlongPortfolioLibrary.State public portfolio;
 
     /// @dev Tests that previewCloseLong returns the correct amount when
     ///      immediately closing a long.
@@ -32,9 +32,9 @@ contract TestHyperdriveExecution is EverlongTest {
         // Ensure the preview amount underestimates the actual and is
         // within the tolerance.
         uint256 previewAssets = hyperdrive.previewCloseLong(
-            strategy.asBase(),
+            IEverlongStrategy(address(strategy)).asBase(),
             hyperdrive.getPoolConfig(),
-            IEverlongStrategy.Position({
+            IEverlongStrategy.EverlongPosition({
                 maturityTime: maturityTime.toUint128(),
                 bondAmount: bondAmount.toUint128()
             }),
@@ -60,9 +60,9 @@ contract TestHyperdriveExecution is EverlongTest {
         // Ensure the preview amount underestimates the actual and is
         // within the tolerance.
         uint256 previewAssets = hyperdrive.previewCloseLong(
-            strategy.asBase(),
+            IEverlongStrategy(address(strategy)).asBase(),
             hyperdrive.getPoolConfig(),
-            IEverlongStrategy.Position({
+            IEverlongStrategy.EverlongPosition({
                 maturityTime: maturityTime.toUint128(),
                 bondAmount: bondAmount.toUint128()
             }),
@@ -85,9 +85,9 @@ contract TestHyperdriveExecution is EverlongTest {
         // Ensure the preview amount underestimates the actual and is
         // within the tolerance.
         uint256 previewAssets = hyperdrive.previewCloseLong(
-            strategy.asBase(),
+            IEverlongStrategy(address(strategy)).asBase(),
             hyperdrive.getPoolConfig(),
-            IEverlongStrategy.Position({
+            IEverlongStrategy.EverlongPosition({
                 maturityTime: maturityTime.toUint128(),
                 bondAmount: bondAmount.toUint128()
             }),
@@ -116,9 +116,9 @@ contract TestHyperdriveExecution is EverlongTest {
         // Ensure the preview amount underestimates the actual and is
         // within the tolerance.
         uint256 previewAssets = hyperdrive.previewCloseLong(
-            strategy.asBase(),
+            IEverlongStrategy(address(strategy)).asBase(),
             hyperdrive.getPoolConfig(),
-            IEverlongStrategy.Position({
+            IEverlongStrategy.EverlongPosition({
                 maturityTime: maturityTime.toUint128(),
                 bondAmount: bondAmount.toUint128()
             }),
@@ -141,9 +141,9 @@ contract TestHyperdriveExecution is EverlongTest {
         // Ensure the preview amount underestimates the actual and is
         // within the tolerance.
         uint256 previewAssets = hyperdrive.previewCloseLong(
-            strategy.asBase(),
+            IEverlongStrategy(address(strategy)).asBase(),
             hyperdrive.getPoolConfig(),
-            IEverlongStrategy.Position({
+            IEverlongStrategy.EverlongPosition({
                 maturityTime: maturityTime.toUint128(),
                 bondAmount: bondAmount.toUint128()
             }),
@@ -170,9 +170,9 @@ contract TestHyperdriveExecution is EverlongTest {
         // Ensure the preview amount underestimates the actual and is
         // within the tolerance.
         uint256 previewAssets = hyperdrive.previewCloseLong(
-            strategy.asBase(),
+            IEverlongStrategy(address(strategy)).asBase(),
             hyperdrive.getPoolConfig(),
-            IEverlongStrategy.Position({
+            IEverlongStrategy.EverlongPosition({
                 maturityTime: maturityTime.toUint128(),
                 bondAmount: bondAmount.toUint128()
             }),

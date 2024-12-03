@@ -4,18 +4,18 @@ pragma solidity ^0.8.20;
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { IEverlongStrategy } from "../interfaces/IEverlongStrategy.sol";
-import { PositionLibrary } from "./Position.sol";
+import { EverlongPositionLibrary } from "./EverlongPosition.sol";
 
 /// @author DELV
-/// @title Portfolio
+/// @title EverlongPortfolioLibraryLibrary
 /// @notice Library to handle storage and accounting for a bond portfolio.
 /// @custom:disclaimer The language used in this code is for coding convenience
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
-library Portfolio {
+library EverlongPortfolioLibrary {
     using FixedPointMath for uint256;
     using SafeCast for *;
-    using PositionLibrary for IEverlongStrategy.Position;
+    using EverlongPositionLibrary for IEverlongStrategy.EverlongPosition;
 
     /// @notice Thrown on attempting to access either end of an empty queue.
     error IndexOutOfBounds();
@@ -27,7 +27,7 @@ library Portfolio {
     error QueueFull();
 
     /// @dev The state of the portfolio which contains a double-ended queue
-    ///      of {IEverlongStrategy.Position} along with the portfolio's average
+    ///      of {IEverlongStrategy.EverlongPosition} along with the portfolio's average
     ///      maturity, vault share price, and total bond count.
     struct State {
         /// @dev Starting index for the double-ended queue structure.
@@ -38,9 +38,9 @@ library Portfolio {
         uint128 avgMaturityTime;
         /// @dev Total bond count of the portfolio.
         uint128 totalBonds;
-        /// @dev Mapping of indices to {IEverlongStrategy.Position} for the
+        /// @dev Mapping of indices to {IEverlongStrategy.EverlongPosition} for the
         ///      double-ended queue structure.
-        mapping(uint256 index => IEverlongStrategy.Position) _q;
+        mapping(uint256 index => IEverlongStrategy.EverlongPosition) _q;
     }
 
     /// @notice Update portfolio accounting a newly-opened position.
@@ -62,7 +62,7 @@ library Portfolio {
             // The maturity is not in the portfolio, so add a new position.
             _addPosition(
                 self,
-                IEverlongStrategy.Position(
+                IEverlongStrategy.EverlongPosition(
                     uint128(_maturityTime),
                     uint128(_bondAmount)
                 )
@@ -87,7 +87,9 @@ library Portfolio {
     ///         Since the portfolio handles positions via a queue, the
     ///         position being closed always the oldest at the head.
     function handleClosePosition(State storage self) internal {
-        IEverlongStrategy.Position memory position = _removePosition(self);
+        IEverlongStrategy.EverlongPosition memory position = _removePosition(
+            self
+        );
         self.avgMaturityTime = uint256(self.avgMaturityTime)
             .updateWeightedAverage(
                 self.totalBonds,
@@ -104,7 +106,7 @@ library Portfolio {
     ///         position being closed always the oldest at the head.
     /// @param _amount Amount to reduce the position's bondAmount by.
     function handleClosePosition(State storage self, uint256 _amount) internal {
-        IEverlongStrategy.Position memory position = _decreasePosition(
+        IEverlongStrategy.EverlongPosition memory position = _decreasePosition(
             self,
             _amount.toUint128()
         );
@@ -124,7 +126,7 @@ library Portfolio {
     /// @return Position at the head of the queue.
     function head(
         State storage self
-    ) internal view returns (IEverlongStrategy.Position memory) {
+    ) internal view returns (IEverlongStrategy.EverlongPosition memory) {
         // Revert if the queue is empty.
         if (isEmpty(self)) revert IndexOutOfBounds();
 
@@ -137,7 +139,7 @@ library Portfolio {
     /// @return Position at the tail of the queue.
     function tail(
         State storage self
-    ) internal view returns (IEverlongStrategy.Position storage) {
+    ) internal view returns (IEverlongStrategy.EverlongPosition storage) {
         // Revert if the queue is empty.
         if (isEmpty(self)) revert IndexOutOfBounds();
 
@@ -153,7 +155,7 @@ library Portfolio {
     function at(
         State storage self,
         uint256 _index
-    ) internal view returns (IEverlongStrategy.Position memory) {
+    ) internal view returns (IEverlongStrategy.EverlongPosition memory) {
         // Ensure the requested index is within range.
         if (_index >= positionCount(self)) revert IndexOutOfBounds();
 
@@ -177,11 +179,11 @@ library Portfolio {
         }
     }
 
-    /// @dev Push a new {IEverlongStrategy.Position} to the position queue.
+    /// @dev Push a new {IEverlongStrategy.EverlongPosition} to the position queue.
     /// @param value Position to be pushed.
     function _addPosition(
         State storage self,
-        IEverlongStrategy.Position memory value
+        IEverlongStrategy.EverlongPosition memory value
     ) internal {
         unchecked {
             uint128 backIndex = self._end;
@@ -203,7 +205,7 @@ library Portfolio {
     function _decreasePosition(
         State storage self,
         uint128 _amount
-    ) internal returns (IEverlongStrategy.Position memory value) {
+    ) internal returns (IEverlongStrategy.EverlongPosition memory value) {
         uint128 frontIndex = self._begin;
 
         // Ensure there are items in the queue.
@@ -221,11 +223,11 @@ library Portfolio {
         }
     }
 
-    /// @dev Pop the oldest {IEverlongStrategy.Position} from the position queue.
+    /// @dev Pop the oldest {IEverlongStrategy.EverlongPosition} from the position queue.
     /// @return value A copy of the position that was just popped.
     function _removePosition(
         State storage self
-    ) internal returns (IEverlongStrategy.Position memory value) {
+    ) internal returns (IEverlongStrategy.EverlongPosition memory value) {
         unchecked {
             uint128 frontIndex = self._begin;
 

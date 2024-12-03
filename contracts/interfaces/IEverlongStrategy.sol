@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-import { IStrategy } from "tokenized-strategy/interfaces/IStrategy.sol";
+import { IPermissionedStrategy } from "./IPermissionedStrategy.sol";
 import { IEverlongEvents } from "./IEverlongEvents.sol";
 
-interface IEverlongStrategy is IStrategy, IEverlongEvents {
+interface IEverlongStrategy is IPermissionedStrategy, IEverlongEvents {
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                                STRUCTS                                │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @notice Contains the information needed to identify an open Hyperdrive
     ///         position.
-    struct Position {
+    struct EverlongPosition {
         /// @notice Time when the position matures.
         uint128 maturityTime;
         /// @notice Amount of bonds in the position.
@@ -34,11 +34,6 @@ interface IEverlongStrategy is IStrategy, IEverlongEvents {
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                                SETTERS                                │
     // ╰───────────────────────────────────────────────────────────────────────╯
-
-    /// @notice Enable or disable deposits to the strategy `_depositor`.
-    /// @dev Can only be called by the strategy's `Management` address.
-    /// @param _depositor Address to enable/disable deposits for.
-    function setDepositor(address _depositor, bool _enabled) external;
 
     /// @notice Sets the temporary tend configuration. Necessary for `tend()`
     ///         call to succeed. Must be called in the same tx as `tend()`.
@@ -98,7 +93,9 @@ interface IEverlongStrategy is IStrategy, IEverlongEvents {
     ///         Position `maturityTime` increases with each index.
     /// @param _index The index of the position.
     /// @return The position.
-    function positionAt(uint256 _index) external view returns (Position memory);
+    function positionAt(
+        uint256 _index
+    ) external view returns (EverlongPosition memory);
 
     /// @notice Gets the number of positions managed by the Everlong instance.
     /// @return The number of positions.
