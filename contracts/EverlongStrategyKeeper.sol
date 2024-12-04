@@ -33,14 +33,14 @@ contract EverlongStrategyKeeper is Ownable {
     using SafeCast for *;
     using SafeERC20 for ERC20;
 
-    /// @notice Name of the EverlongStrategyKeeper.
-    string constant name = "EverlongStrategyKeeper";
-
     /// @notice Kind of the EverlongStrategyKeeper.
     string constant kind = EVERLONG_STRATEGY_KEEPER_KIND;
 
     /// @notice Version of the EverlongStrategyKeeper.
     string constant version = EVERLONG_VERSION;
+
+    /// @notice Name of the EverlongStrategyKeeper.
+    string name;
 
     /// @notice Address of the target RoleManager contract.
     /// @dev Helpful for getting periphery contract addresses and enumerating
@@ -52,8 +52,15 @@ contract EverlongStrategyKeeper is Ownable {
     address trigger;
 
     /// @notice Initialize the EverlongStrategyKeeper contract.
+    /// @param _name Name for the keeper contract.
+    /// @param _roleManager Address for the `RoleManager` contract.
     /// @param _trigger Address for the `CommonReportTrigger` contract.
-    constructor(address _roleManager, address _trigger) Ownable(msg.sender) {
+    constructor(
+        string memory _name,
+        address _roleManager,
+        address _trigger
+    ) Ownable(msg.sender) {
+        name = _name;
         roleManager = _roleManager;
         trigger = _trigger;
     }
