@@ -5,6 +5,33 @@
 A money market powered by [Hyperdrive](https://github.com/delvtech/hyperdrive)
 and [Yearn](https://docs.yearn.fi/).
 
+<!--toc:start-->
+
+- [Requirements](#requirements)
+- [Getting Started](#getting-started)
+- [Actions](#actions)
+  - [Start a local fork of mainnet](#start-a-local-fork-of-mainnet)
+  - [Deploy a `RoleManager` to the local fork.](#deploy-a-rolemanager-to-the-local-fork)
+  - [Deploy a `EverlongStrategyKeeper` to the local fork.](#deploy-a-everlongstrategykeeper-to-the-local-fork)
+- [Components](#components)
+  - [Common](#common)
+    - [RoleManager](#rolemanager)
+    - [DebtAllocator](#debtallocator)
+    - [Accountant](#accountant)
+  - [Everlong](#everlong)
+    - [EverlongStrategy](#everlongstrategy)
+    - [EverlongVault](#everlongvault)
+- [Roles](#roles)
+  - [Deployer](#deployer)
+  - [Governance](#governance)
+  - [Management](#management)
+  - [Keeper](#keeper)
+- [Diagrams](#diagrams)
+  - [Asset Flow](#asset-flow)
+  - [Vault Debt Allocation](#vault-debt-allocation)
+
+<!--toc:end-->
+
 ## Requirements
 
 - MacOS or Linux
@@ -33,20 +60,22 @@ and [Yearn](https://docs.yearn.fi/).
 
 ## Actions
 
-### Start a local fork of mainnet
+Deploy and interact with contracts.
+
+### Fork mainnet locally
 
 ```sh
 # Use a different chainid so deployment output files don't get overridden.
 source .env && anvil --rpc-url $MAINNET_RPC_URL --chain-id 6969
 ```
 
-### Deploy a `RoleManager` to the local fork.
+### Deploy a `RoleManager`
 
 ```sh
 source .env && forge script script/DeployRoleManager.s.sol --rpc-url 0.0.0.0:8545 --broadcast
 ```
 
-### Deploy a `EverlongStrategyKeeper` to the local fork.
+### Deploy an `EverlongStrategyKeeper`
 
 ```sh
 source .env && forge script script/DeployEverlongStrategyKeeper.s.sol --rpc-url 0.0.0.0:8545 --broadcast
