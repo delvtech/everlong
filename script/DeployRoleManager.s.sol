@@ -24,21 +24,25 @@ contract DeployRoleManager is Script {
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                               Arguments                               │
     // ╰───────────────────────────────────────────────────────────────────────╯
-    // ────────────────────────────── REQUIRED ───────────────────────────
+
+    // ── Required ────────────────────────────────────────────────────────
+
     uint256 internal DEPLOYER_PRIVATE_KEY;
     uint256 internal GOVERNANCE_PRIVATE_KEY;
     uint256 internal MANAGEMENT_PRIVATE_KEY;
 
-    // ────────────────────────────── OPTIONAL ───────────────────────────
+    // ── Optional ────────────────────────────────────────────────────────
+
     string internal PROJECT_NAME;
     string internal constant PROJECT_NAME_DEFAULT = "DELV";
 
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                                Output                                 │
     // ╰───────────────────────────────────────────────────────────────────────╯
+
     DeployRoleManagerOutput internal output;
 
-    /// @dev Ensures that `/deploy/${CHAIN_ID}/roleManagers` exists.
+    /// @dev Ensures that `/deploy/${CHAIN_ID}/roleManagers` directory exists.
     function validateOutputDir() internal {
         string memory outputDir = string.concat(
             vm.projectRoot(),
