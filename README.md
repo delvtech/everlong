@@ -13,6 +13,7 @@ and [Yearn](https://docs.yearn.fi/).
   - [Fork mainnet locally](#fork-mainnet-locally)
   - [Deploy a `RoleManager`](#deploy-a-rolemanager)
   - [Deploy an `EverlongStrategyKeeper`](#deploy-an-everlongstrategykeeper)
+  - [Deploy an `EverlongStrategy`](#deploy-an-everlongstrategy)
 - [Components](#components)
   - [Common](#common)
     - [RoleManager](#rolemanager)
