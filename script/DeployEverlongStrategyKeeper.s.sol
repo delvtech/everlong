@@ -9,7 +9,7 @@ import { ROLE_MANAGER_FACTORY_ADDRESS, COMMON_REPORT_TRIGGER_ADDRESS } from "../
 import { EverlongStrategyKeeper } from "../contracts/EverlongStrategyKeeper.sol";
 import { ROLE_MANAGER_OUTPUT_DIR_NAME, DeployRoleManagerOutput } from "./DeployRoleManager.s.sol";
 
-string constant KEEPER_CONTRACT_OUTPUT_DIR_NAME = "keeperContracts";
+string constant EVERLONG_KEEPER_CONTRACT_OUTPUT_DIR_NAME = "everlongKeeperContracts";
 
 struct DeployEverlongStrategyKeeperOutput {
     address commonReportTrigger;
@@ -25,18 +25,22 @@ contract DeployEverlongStrategyKeeper is Script {
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                               Arguments                               │
     // ╰───────────────────────────────────────────────────────────────────────╯
-    // ────────────────────────────── REQUIRED ───────────────────────────
+
+    // ── Required ────────────────────────────────────────────────────────
+
     uint256 internal DEPLOYER_PRIVATE_KEY;
     uint256 internal KEEPER_PRIVATE_KEY;
 
-    // ────────────────────────────── OPTIONAL ───────────────────────────
+    // ── Optional ────────────────────────────────────────────────────────
 
     // KEEPER_CONTRACT_NAME
+
     string internal KEEPER_CONTRACT_NAME;
     string internal constant KEEPER_CONTRACT_NAME_DEFAULT =
         "EVERLONG_STRATEGY_KEEPER";
 
     // ROLE_MANAGER_ADDRESS
+
     address internal ROLE_MANAGER_ADDRESS;
     address internal ROLE_MANAGER_ADDRESS_DEFAULT;
 
@@ -77,14 +81,14 @@ contract DeployEverlongStrategyKeeper is Script {
     // ╰───────────────────────────────────────────────────────────────────────╯
     DeployEverlongStrategyKeeperOutput internal output;
 
-    /// @dev Ensures that `/deploy/${CHAIN_ID}/keeperContracts` exists.
+    /// @dev Ensures that `/deploy/${CHAIN_ID}/keeperContracts` dir exists.
     function validateOutputDir() internal {
         string memory outputDir = string.concat(
             vm.projectRoot(),
             "/deploy/",
             vm.toString(block.chainid),
             "/",
-            KEEPER_CONTRACT_OUTPUT_DIR_NAME
+            EVERLONG_KEEPER_CONTRACT_OUTPUT_DIR_NAME
         );
         require(
             vm.isDir(outputDir),
@@ -92,7 +96,7 @@ contract DeployEverlongStrategyKeeper is Script {
         );
     }
 
-    /// @dev `/deploy/${CHAIN_ID}/keeperContracts/${KEEPER_CONTRACT_NAME}.toml`
+    /// @dev `/deploy/${CHAIN_ID}/everlongKeeperContracts/${KEEPER_CONTRACT_NAME}.toml`
     function getOutputFilePath(
         string memory name
     ) internal view returns (string memory path) {
@@ -101,7 +105,7 @@ contract DeployEverlongStrategyKeeper is Script {
             "/deploy/",
             vm.toString(block.chainid),
             "/",
-            KEEPER_CONTRACT_OUTPUT_DIR_NAME,
+            EVERLONG_KEEPER_CONTRACT_OUTPUT_DIR_NAME,
             "/",
             name,
             ".toml"

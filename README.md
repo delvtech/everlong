@@ -10,9 +10,9 @@ and [Yearn](https://docs.yearn.fi/).
 - [Requirements](#requirements)
 - [Getting Started](#getting-started)
 - [Actions](#actions)
-  - [Start a local fork of mainnet](#start-a-local-fork-of-mainnet)
-  - [Deploy a `RoleManager` to the local fork.](#deploy-a-rolemanager-to-the-local-fork)
-  - [Deploy a `EverlongStrategyKeeper` to the local fork.](#deploy-a-everlongstrategykeeper-to-the-local-fork)
+  - [Fork mainnet locally](#fork-mainnet-locally)
+  - [Deploy a `RoleManager`](#deploy-a-rolemanager)
+  - [Deploy an `EverlongStrategyKeeper`](#deploy-an-everlongstrategykeeper)
 - [Components](#components)
   - [Common](#common)
     - [RoleManager](#rolemanager)
@@ -32,32 +32,6 @@ and [Yearn](https://docs.yearn.fi/).
 
 <!--toc:end-->
 
-## Requirements
-
-- MacOS or Linux
-- [Foundry](https://book.getfoundry.sh/)
-- [Bun](https://bun.sh/)
-
-## Getting Started
-
-1. Install NPM packages
-
-   ```sh
-   bun install
-   ```
-
-1. Compile the contracts
-
-   ```sh
-   make build
-   ```
-
-1. Run tests
-
-   ```sh
-   make test
-   ```
-
 ## Actions
 
 Deploy and interact with contracts.
@@ -65,20 +39,40 @@ Deploy and interact with contracts.
 ### Fork mainnet locally
 
 ```sh
-# Use a different chainid so deployment output files don't get overridden.
-source .env && anvil --rpc-url $MAINNET_RPC_URL --chain-id 6969
+# Use a different chain id so deployment output files don't get overridden.
+source .env && \
+  anvil \
+  --rpc-url $MAINNET_RPC_URL \
+  --chain-id 6969
 ```
 
 ### Deploy a `RoleManager`
 
 ```sh
-source .env && forge script script/DeployRoleManager.s.sol --rpc-url 0.0.0.0:8545 --broadcast
+source .env && \
+  forge script script/DeployRoleManager.s.sol \
+  --rpc-url 0.0.0.0:8545 \
+  --broadcast
 ```
 
 ### Deploy an `EverlongStrategyKeeper`
 
 ```sh
-source .env && forge script script/DeployEverlongStrategyKeeper.s.sol --rpc-url 0.0.0.0:8545 --broadcast
+source .env && \
+  forge script script/DeployEverlongStrategyKeeper.s.sol \
+  --rpc-url 0.0.0.0:8545 \
+  --broadcast
+```
+
+### Deploy an `EverlongStrategy`
+
+```sh
+source .env && \
+  STRATEGY_NAME='<your_strategy_name>' \
+  HYPERDRIVE='<your_hyperdrive_address>' \
+  forge script script/DeployEverlongStrategy.s.sol \
+  --rpc-url 0.0.0.0:8545 \
+  --broadcast
 ```
 
 ## Components
