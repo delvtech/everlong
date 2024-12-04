@@ -199,7 +199,7 @@ abstract contract VaultTest is HyperdriveTest {
         // RoleManager component addresses.
         vm.startPrank(deployer);
         roleManager = IRoleManager(
-            roleManagerFactory.newProject("Delv", governance, management)
+            roleManagerFactory.newProject("DELV", governance, management)
         );
         debtAllocator = DebtAllocator(roleManager.getDebtAllocator());
         accountant = IAccountant(roleManager.getAccountant());

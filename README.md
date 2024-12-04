@@ -31,6 +31,27 @@ and [Yearn](https://docs.yearn.fi/).
    make test
    ```
 
+## Actions
+
+### Start a local fork of mainnet
+
+```sh
+# Use a different chainid so deployment output files don't get overridden.
+source .env && anvil --rpc-url $MAINNET_RPC_URL --chain-id 6969
+```
+
+### Deploy a `RoleManager` to the local fork.
+
+```sh
+source .env && forge script script/DeployRoleManager.s.sol --rpc-url 0.0.0.0:8545 --broadcast
+```
+
+### Deploy a `EverlongStrategyKeeper` to the local fork.
+
+```sh
+source .env && forge script script/DeployEverlongStrategyKeeper.s.sol --rpc-url 0.0.0.0:8545 --broadcast
+```
+
 ## Components
 
 Vaults are built upon

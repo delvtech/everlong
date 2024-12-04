@@ -67,6 +67,7 @@ contract EverlongTest is VaultTest, IEverlongEvents {
 
         // Deploy the EverlongStrategyKeeper helper contract.
         keeperContract = new EverlongStrategyKeeper(
+            "EVERLONG_STRATEGY_KEEPER",
             address(roleManager),
             address(reportTrigger)
         );
@@ -121,7 +122,14 @@ contract EverlongTest is VaultTest, IEverlongEvents {
         IAccountant.Fee memory defaultConfig = accountant.defaultConfig();
         // Must increase the accountant maxLoss for reporting since `totalAssets`
         // decreases whenever opening longs.
-        accountant.updateDefaultConfig(0, 0, 0, 0, defaultConfig.maxGain, 100);
+        accountant.updateDefaultConfig(
+            0,
+            0,
+            0,
+            0,
+            defaultConfig.maxGain,
+            defaultConfig.maxLoss
+        );
         vault = IVault(
             roleManager.newVault(
                 address(asset),
