@@ -44,25 +44,21 @@ Deploy and interact with contracts.
 source .env && \
   anvil \
   --rpc-url $MAINNET_RPC_URL \
-  --chain-id 6969
+  --chain-id 1234
 ```
 
 ### Deploy a `RoleManager`
 
 ```sh
 source .env && \
-  forge script script/DeployRoleManager.s.sol \
-  --rpc-url 0.0.0.0:8545 \
-  --broadcast
+  forge script script/DeployRoleManager.s.sol --rpc-url 0.0.0.0:8545 --broadcast
 ```
 
 ### Deploy an `EverlongStrategyKeeper`
 
 ```sh
 source .env && \
-  forge script script/DeployEverlongStrategyKeeper.s.sol \
-  --rpc-url 0.0.0.0:8545 \
-  --broadcast
+  forge script script/DeployEverlongStrategyKeeper.s.sol --rpc-url 0.0.0.0:8545 --broadcast
 ```
 
 ### Deploy an `EverlongStrategy`
@@ -71,9 +67,17 @@ source .env && \
 source .env && \
   STRATEGY_NAME='<your_strategy_name>' \
   HYPERDRIVE='<your_hyperdrive_address>' \
-  forge script script/DeployEverlongStrategy.s.sol \
-  --rpc-url 0.0.0.0:8545 \
-  --broadcast
+  forge script script/DeployEverlongStrategy.s.sol --rpc-url 0.0.0.0:8545 --broadcast
+```
+
+### Deploy a `Vault`
+
+```sh
+source .env && \
+  STRATEGY_NAME='<name_of_a_deployed_strategy>' \
+  NAME='<your_vault>' \
+  SYMBOL='<your_vault_symbol>' \
+  forge script script/DeployVault.s.sol --rpc-url 0.0.0.0:8545 --broadcast
 ```
 
 ## Components

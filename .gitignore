@@ -143,8 +143,5 @@ lcov.info
 NOTES.md
 TODO.md
 
-# test chain deploy artifacts
-deploy/6969
-
 # foundry deploy artifacts
 broadcast
