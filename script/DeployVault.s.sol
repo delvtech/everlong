@@ -87,8 +87,8 @@ contract DeployVault is BaseDeployScript {
         ROLE_MANAGER_PROJECT_NAME_DEFAULT = hasDefaultRoleManagerArtifact()
             ? getDefaultRoleManagerArtifact().projectName
             : "";
-        KEEPER_CONTRACT_NAME_DEFAULT = hasDefaultKeeperContractArtifact(
-            strategyArtifact.keeperContractName
+        KEEPER_CONTRACT_NAME_DEFAULT = vm.isFile(
+            getKeeperContractArtifactPath(strategyArtifact.keeperContractName)
         )
             ? strategyArtifact.keeperContractName
             : "";
