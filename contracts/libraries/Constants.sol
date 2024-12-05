@@ -13,12 +13,11 @@ address constant ROLE_MANAGER_FACTORY_ADDRESS = 0xca12459a931643BF28388c67639b3F
 /// @dev Yearn CommonReportTrigger address for mainnet, base, and arbitrum.
 address constant COMMON_REPORT_TRIGGER_ADDRESS = 0xA045D4dAeA28BA7Bfe234c96eAa03daFae85A147;
 
+/// @dev Version the contract was deployed with.
 string constant EVERLONG_VERSION = "v0.0.1";
 
+/// @dev Kind for the Everlong strategy.
 string constant EVERLONG_STRATEGY_KIND = "EverlongStrategy";
 
-string constant EVERLONG_STRATEGY_FACTORY_KIND = "EverlongStrategyFactory";
-
+/// @dev Kind for the Everlong strategy keeper contract.
 string constant EVERLONG_STRATEGY_KEEPER_KIND = "EverlongStrategyKeeper";
-
-string constant STRATEGY_OUTPUT_DIR_NAME = "strategies";

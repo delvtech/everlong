@@ -37,6 +37,18 @@ and [Yearn](https://docs.yearn.fi/).
 
 Deploy and interact with contracts.
 
+Deployed contract artifacts will be saved to `./deploy/${CHAIN_ID}/`.
+
+Deploy commands will currently fail if the appropriate directories have not been
+created. The following command can be run to create the directories:
+
+```sh
+mkdir -p deploy/${CHAIN_ID}/roleManagers \
+  && mkdir -p deploy/${CHAIN_ID}/keeperContracts \
+  && mkdir -p deploy/${CHAIN_ID}/strategies \
+  && mkdir -p deploy/${CHAIN_ID}/vaults
+```
+
 ### Fork mainnet locally
 
 ```sh
@@ -65,7 +77,7 @@ source .env && \
 
 ```sh
 source .env && \
-  STRATEGY_NAME='<your_strategy_name>' \
+  NAME='<your_strategy_name>' \
   HYPERDRIVE='<your_hyperdrive_address>' \
   forge script script/DeployEverlongStrategy.s.sol --rpc-url 0.0.0.0:8545 --broadcast
 ```

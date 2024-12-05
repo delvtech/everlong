@@ -174,7 +174,7 @@ contract BaseDeployScript is Script {
     }
 
     function hasDefaultKeeperContractArtifact(
-        string memory _name
+        string memory _kind
     ) internal view returns (bool) {
         VmSafe.DirEntry[] memory entries = vm.readDir(
             getKeeperContractArtifactDir()
@@ -185,7 +185,7 @@ contract BaseDeployScript is Script {
                 vm.parseToml(vm.readFile(entries[i].path)),
                 (KeeperContractArtifact)
             );
-            if (keccak256(bytes(tmp.name)) == keccak256(bytes(_name))) {
+            if (keccak256(bytes(tmp.kind)) == keccak256(bytes(_kind))) {
                 return true;
             }
         }
@@ -193,7 +193,7 @@ contract BaseDeployScript is Script {
     }
 
     function getDefaultKeeperContractArtifact(
-        string memory _name
+        string memory _kind
     ) internal returns (KeeperContractArtifact memory) {
         VmSafe.DirEntry[] memory entries = vm.readDir(
             getKeeperContractArtifactDir()
@@ -206,7 +206,7 @@ contract BaseDeployScript is Script {
                     (KeeperContractArtifact)
                 );
                 if (
-                    keccak256(bytes(tmp.name)) == keccak256(bytes(_name)) &&
+                    keccak256(bytes(tmp.kind)) == keccak256(bytes(_kind)) &&
                     tmp.timestamp > keeperContractArtifact.timestamp
                 ) {
                     keeperContractArtifact = tmp;
