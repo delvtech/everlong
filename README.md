@@ -5,31 +5,92 @@
 A money market powered by [Hyperdrive](https://github.com/delvtech/hyperdrive)
 and [Yearn](https://docs.yearn.fi/).
 
-## Requirements
+<!--toc:start-->
 
-- MacOS or Linux
-- [Foundry](https://book.getfoundry.sh/)
-- [Bun](https://bun.sh/)
+- [Requirements](#requirements)
+- [Getting Started](#getting-started)
+- [Actions](#actions)
+  - [Fork mainnet locally](#fork-mainnet-locally)
+  - [Deploy a `RoleManager`](#deploy-a-rolemanager)
+  - [Deploy an `EverlongStrategyKeeper`](#deploy-an-everlongstrategykeeper)
+  - [Deploy an `EverlongStrategy`](#deploy-an-everlongstrategy)
+- [Components](#components)
+  - [Common](#common)
+    - [RoleManager](#rolemanager)
+    - [DebtAllocator](#debtallocator)
+    - [Accountant](#accountant)
+  - [Everlong](#everlong)
+    - [EverlongStrategy](#everlongstrategy)
+    - [EverlongVault](#everlongvault)
+- [Roles](#roles)
+  - [Deployer](#deployer)
+  - [Governance](#governance)
+  - [Management](#management)
+  - [Keeper](#keeper)
+- [Diagrams](#diagrams)
+  - [Asset Flow](#asset-flow)
+  - [Vault Debt Allocation](#vault-debt-allocation)
 
-## Getting Started
+<!--toc:end-->
 
-1. Install NPM packages
+## Actions
 
-   ```sh
-   bun install
-   ```
+Deploy and interact with contracts.
 
-1. Compile the contracts
+Deployed contract artifacts will be saved to `./deploy/${CHAIN_ID}/`.
 
-   ```sh
-   make build
-   ```
+Deploy commands will currently fail if the appropriate directories have not been
+created. The following command can be run to create the directories:
 
-1. Run tests
+```sh
+mkdir -p deploy/${CHAIN_ID}/roleManagers \
+  && mkdir -p deploy/${CHAIN_ID}/keeperContracts \
+  && mkdir -p deploy/${CHAIN_ID}/strategies \
+  && mkdir -p deploy/${CHAIN_ID}/vaults
+```
 
-   ```sh
-   make test
-   ```
+### Fork mainnet locally
+
+```sh
+# Use a different chain id so deployment output files don't get overridden.
+source .env && \
+  anvil \
+  --rpc-url $MAINNET_RPC_URL \
+  --chain-id 1234
+```
+
+### Deploy a `RoleManager`
+
+```sh
+source .env && \
+  forge script script/DeployRoleManager.s.sol --rpc-url 0.0.0.0:8545 --broadcast
+```
+
+### Deploy an `EverlongStrategyKeeper`
+
+```sh
+source .env && \
+  forge script script/DeployEverlongStrategyKeeper.s.sol --rpc-url 0.0.0.0:8545 --broadcast
+```
+
+### Deploy an `EverlongStrategy`
+
+```sh
+source .env && \
+  NAME='<your_strategy_name>' \
+  HYPERDRIVE='<your_hyperdrive_address>' \
+  forge script script/DeployEverlongStrategy.s.sol --rpc-url 0.0.0.0:8545 --broadcast
+```
+
+### Deploy a `Vault`
+
+```sh
+source .env && \
+  STRATEGY_NAME='<name_of_a_deployed_strategy>' \
+  NAME='<your_vault>' \
+  SYMBOL='<your_vault_symbol>' \
+  forge script script/DeployVault.s.sol --rpc-url 0.0.0.0:8545 --broadcast
+```
 
 ## Components
 
