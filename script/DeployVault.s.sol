@@ -1,45 +1,71 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.24;
 
-import { BaseDeployScript } from "./shared/BaseDeployScript.sol";
-import { IVault } from "yearn-vaults-v3/interfaces/IVault.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
-import { IRoleManager } from "../contracts/interfaces/IRoleManager.sol";
-import { IPermissionedStrategy } from "../contracts/interfaces/IPermissionedStrategy.sol";
-import { EVERLONG_STRATEGY_KIND, MAX_BPS } from "../contracts/libraries/Constants.sol";
 import { IStrategy } from "tokenized-strategy/interfaces/IStrategy.sol";
 import { DebtAllocator } from "vault-periphery/debtAllocators/DebtAllocator.sol";
+import { IVault } from "yearn-vaults-v3/interfaces/IVault.sol";
+import { IPermissionedStrategy } from "../contracts/interfaces/IPermissionedStrategy.sol";
+import { IRoleManager } from "../contracts/interfaces/IRoleManager.sol";
+import { EVERLONG_STRATEGY_KIND, MAX_BPS } from "../contracts/libraries/Constants.sol";
+import { BaseDeployScript } from "./shared/BaseDeployScript.sol";
 
+/// @title DeployVault
+/// @notice Vault deployment script.
+/// @custom:disclaimer The language used in this code is for coding convenience
+///                    only, and is not intended to, and does not, have any
+///                    particular legal or regulatory significance.
 contract DeployVault is BaseDeployScript {
-    // Required Arguments
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                          Required Arguments                           │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+    /// @dev Deployer account private key;
     uint256 internal GOVERNANCE_PRIVATE_KEY;
+    /// @dev Management account private key;
     uint256 internal MANAGEMENT_PRIVATE_KEY;
+    /// @dev Name of the strategy for the vault to deposit assets into.
     string internal STRATEGY_NAME;
+    /// @dev Name for the vault.
     string internal NAME;
+    /// @dev Symbol for the vault.
     string internal SYMBOL;
 
-    // Optional Arguments
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                          Optional Arguments                           │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+    /// @dev ProfitMaxUnlock for the vault. Should be the same interval that the
+    ///      underlying yield source accrues on.
     uint256 internal PROFIT_MAX_UNLOCK;
     uint256 internal PROFIT_MAX_UNLOCK_DEFAULT = 1 days;
 
+    /// @dev Minimum idle liquidity for the vault.
     uint256 internal MIN_IDLE_LIQUIDITY;
     uint256 internal MIN_IDLE_LIQUIDITY_DEFAULT = 500; // 5%
 
+    /// @dev Target idle liquidity for the vault.
     uint256 internal TARGET_IDLE_LIQUIDITY;
     uint256 internal TARGET_IDLE_LIQUIDITY_DEFAULT = 1000; // 10%
 
+    /// @dev Minimum change in assets to trigger debt updates..
     uint256 internal MIN_CHANGE;
     uint256 internal MIN_CHANGE_DEFAULT;
 
+    /// @dev Name of the project used to create the RoleManager.
     string internal ROLE_MANAGER_PROJECT_NAME;
     string internal ROLE_MANAGER_PROJECT_NAME_DEFAULT;
 
+    /// @dev Name of the keeper contract to use for the vault. Should be the
+    ///      same keeper contract as the underlying strategy.
     string internal KEEPER_CONTRACT_NAME;
     string internal KEEPER_CONTRACT_NAME_DEFAULT;
 
-    // Artifact struct.
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                           Artifact Struct.                            │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+    /// @dev Struct containing deployment artifact information.
     VaultArtifact internal output;
 
+    /// @dev Deploys and configures a Vault.
     function run() external {
         // Read required arguments.
         GOVERNANCE_PRIVATE_KEY = vm.envUint("GOVERNANCE_PRIVATE_KEY");

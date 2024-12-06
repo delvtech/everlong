@@ -1,25 +1,42 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.24;
 
-import { BaseDeployScript } from "./shared/BaseDeployScript.sol";
-import { COMMON_REPORT_TRIGGER_ADDRESS, EVERLONG_STRATEGY_KEEPER_KIND } from "../contracts/libraries/Constants.sol";
 import { EverlongStrategyKeeper } from "../contracts/EverlongStrategyKeeper.sol";
+import { COMMON_REPORT_TRIGGER_ADDRESS, EVERLONG_STRATEGY_KEEPER_KIND } from "../contracts/libraries/Constants.sol";
+import { BaseDeployScript } from "./shared/BaseDeployScript.sol";
 
+/// @title DeployEverlongStrategyKeeper
+/// @notice EverlongStrategyKeeper deployment script.
+/// @custom:disclaimer The language used in this code is for coding convenience
+///                    only, and is not intended to, and does not, have any
+///                    particular legal or regulatory significance.
 contract DeployEverlongStrategyKeeper is BaseDeployScript {
-    // Required Arguments
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                          Required Arguments                           │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+    /// @dev Deployer account private key;
     uint256 internal DEPLOYER_PRIVATE_KEY;
+    /// @dev Keeper account private key;
     uint256 internal KEEPER_PRIVATE_KEY;
 
-    // Optional Arguments
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                          Optional Arguments                           │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+    /// @dev Name of the keeper contract.
     string internal NAME;
     string internal constant NAME_DEFAULT = "EVERLONG_STRATEGY_KEEPER";
 
+    /// @dev Name of the project used to create the RoleManager.
     string internal ROLE_MANAGER_PROJECT_NAME;
     string internal ROLE_MANAGER_PROJECT_NAME_DEFAULT;
 
-    // Artifact struct
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                            Artifact Struct                            │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+    /// @dev Struct containing deployment artifact information.
     KeeperContractArtifact internal output;
 
+    /// @dev Deploys an EverlongStrategyKeeper.
     function run() external {
         // Read required arguments.
         DEPLOYER_PRIVATE_KEY = vm.envUint("DEPLOYER_PRIVATE_KEY");

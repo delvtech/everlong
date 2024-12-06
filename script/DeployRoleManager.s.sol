@@ -1,24 +1,40 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.24;
 
-import { BaseDeployScript } from "./shared/BaseDeployScript.sol";
+import { DebtAllocator } from "vault-periphery/debtAllocators/DebtAllocator.sol";
 import { IAccountant } from "../contracts/interfaces/IAccountant.sol";
 import { IRoleManager } from "../contracts/interfaces/IRoleManager.sol";
 import { IRoleManagerFactory } from "../contracts/interfaces/IRoleManagerFactory.sol";
 import { ROLE_MANAGER_FACTORY_ADDRESS } from "../contracts/libraries/Constants.sol";
-import { DebtAllocator } from "vault-periphery/debtAllocators/DebtAllocator.sol";
+import { BaseDeployScript } from "./shared/BaseDeployScript.sol";
 
+/// @title DeployRoleManager
+/// @notice RoleManager deployment script.
+/// @custom:disclaimer The language used in this code is for coding convenience
+///                    only, and is not intended to, and does not, have any
+///                    particular legal or regulatory significance.
 contract DeployRoleManager is BaseDeployScript {
-    // Required Arguments
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                          Required Arguments                           │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+    /// @dev Deployer account private key;
     uint256 internal DEPLOYER_PRIVATE_KEY;
+    /// @dev Governance account private key;
     uint256 internal GOVERNANCE_PRIVATE_KEY;
+    /// @dev Management account private key;
     uint256 internal MANAGEMENT_PRIVATE_KEY;
 
-    // Optional Arguments
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                          Optional Arguments                           │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+    /// @dev Name of the project used when creating the RoleManager.
     string internal PROJECT_NAME;
     string internal constant PROJECT_NAME_DEFAULT = "DELV";
 
-    // Artifact struct
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                            Artifact Struct                            │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+    /// @dev Struct containing deployment artifact information.
     RoleManagerArtifact internal output;
 
     /// @dev Deploys a RoleManager and configures the default vault fee values

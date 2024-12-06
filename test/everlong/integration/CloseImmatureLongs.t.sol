@@ -4,8 +4,8 @@ pragma solidity ^0.8.20;
 import { console2 as console } from "forge-std/console2.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
-import { Lib } from "hyperdrive/test/utils/Lib.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
+import { Lib } from "hyperdrive/test/utils/Lib.sol";
 import { Packing } from "openzeppelin/utils/Packing.sol";
 import { EverlongTest } from "../EverlongTest.sol";
 
@@ -134,6 +134,7 @@ contract TestCloseImmatureLongs is EverlongTest {
     ) internal {
         INITIAL_VAULT_SHARE_PRICE = initialVaultSharePrice;
         VARIABLE_RATE = preTradeVariableInterest;
+        setUpHyperdrive();
         VARIABLE_RATE = variableInterest;
 
         vm.startPrank(bob);
@@ -156,10 +157,10 @@ contract TestCloseImmatureLongs is EverlongTest {
         // Close the long.
         uint256 baseProceeds = redeemStrategy(shares, bob, true);
 
-        assertApproxEqRel(
+        assertApproxEqAbs(
             baseProceeds,
             estimatedProceeds,
-            0.01e18,
+            20,
             "failed equality"
         );
         vm.stopPrank();

@@ -3,7 +3,14 @@ pragma solidity ^0.8.20;
 import { Script, VmSafe } from "forge-std/Script.sol";
 import { IRoleManager } from "../../contracts/interfaces/IRoleManager.sol";
 
+/// @title BaseDeployScript
+/// @notice Deploy scripting utilities.
+/// @custom:disclaimer The language used in this code is for coding convenience
+///                    only, and is not intended to, and does not, have any
+///                    particular legal or regulatory significance.
 contract BaseDeployScript is Script {
+    /// @dev Returns the base directory for deployment artifacts for the current
+    ///      chain.
     function getBaseArtifactDir() internal view returns (string memory) {
         return
             string.concat(
@@ -18,8 +25,10 @@ contract BaseDeployScript is Script {
     // │                              RoleManager                              │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
-    string constant ROLE_MANAGER_DIR_NAME = "roleManagers/";
+    /// @dev Directory for RoleManager artifacts.
+    string internal constant ROLE_MANAGER_DIR_NAME = "roleManagers/";
 
+    /// @dev RoleManager artifact fields.
     struct RoleManagerArtifact {
         address deployer;
         address governance;
@@ -29,10 +38,14 @@ contract BaseDeployScript is Script {
         uint256 timestamp;
     }
 
+    /// @dev Returns the full path to the RoleManager artifact directory for
+    ///      the current chain.
     function getRoleManagerArtifactDir() internal view returns (string memory) {
         return string.concat(getBaseArtifactDir(), ROLE_MANAGER_DIR_NAME);
     }
 
+    /// @dev Returns the full path to the RoleManagerArtifact for the current
+    ///      chain.
     function getRoleManagerArtifactPath(
         string memory _projectName
     ) internal view returns (string memory) {
@@ -40,6 +53,8 @@ contract BaseDeployScript is Script {
             string.concat(getRoleManagerArtifactDir(), _projectName, ".toml");
     }
 
+    /// @dev Parses the RoleManagerArtifact at the provided path into the
+    ///      RoleManagerArtifact struct.
     function readRoleManagerArtifact(
         string memory _path
     ) internal view returns (RoleManagerArtifact memory artifact) {
@@ -49,6 +64,7 @@ contract BaseDeployScript is Script {
         );
     }
 
+    /// @dev Writes the provided RoleManagerArtifact to a toml file.
     function writeRoleManagerArtifact(
         RoleManagerArtifact memory _artifact
     ) internal {
@@ -69,6 +85,8 @@ contract BaseDeployScript is Script {
         );
     }
 
+    /// @dev Returns true if a RoleManagerArtifact exists for the current chain,
+    ///      false otherwise.
     function hasDefaultRoleManagerArtifact() internal view returns (bool) {
         VmSafe.DirEntry[] memory entries = vm.readDir(
             getRoleManagerArtifactDir()
@@ -76,6 +94,7 @@ contract BaseDeployScript is Script {
         return entries.length > 0;
     }
 
+    /// @dev Returns the default RoleManagerArtifact for the current chain.
     function getDefaultRoleManagerArtifact()
         internal
         returns (RoleManagerArtifact memory)
@@ -98,6 +117,7 @@ contract BaseDeployScript is Script {
         return roleManagerArtifact;
     }
 
+    /// @dev Returns the RoleManagerArtifact with the provided name.
     function getRoleManagerArtifact(
         string memory _projectName
     ) internal view returns (RoleManagerArtifact memory) {
@@ -109,8 +129,10 @@ contract BaseDeployScript is Script {
     // │                           Keeper Contracts                            │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
+    /// @dev Directory for KeeperContractArtifacts.
     string constant KEEPER_CONTRACT_DIR_NAME = "keeperContracts/";
 
+    /// @dev Keeper contract artifact fields.
     struct KeeperContractArtifact {
         address deployer;
         address keeper;
@@ -121,6 +143,8 @@ contract BaseDeployScript is Script {
         uint256 timestamp;
     }
 
+    /// @dev Returns the full path to the KeeperContractArtifact directory for
+    ///      the current chain.
     function getKeeperContractArtifactDir()
         internal
         view
@@ -129,12 +153,16 @@ contract BaseDeployScript is Script {
         return string.concat(getBaseArtifactDir(), KEEPER_CONTRACT_DIR_NAME);
     }
 
+    /// @dev Returns the full path to the KeeperContractArtifact for the current
+    ///      chain.
     function getKeeperContractArtifactPath(
         string memory _name
     ) internal view returns (string memory) {
         return string.concat(getKeeperContractArtifactDir(), _name, ".toml");
     }
 
+    /// @dev Parses the KeeperContractArtifact at the provided path into the
+    ///      KeeperContractArtifact struct.
     function readKeeperContractArtifact(
         string memory _path
     ) internal view returns (KeeperContractArtifact memory artifact) {
@@ -144,6 +172,7 @@ contract BaseDeployScript is Script {
         );
     }
 
+    /// @dev Writes the provided KeeperContractArtifact to a toml file.
     function writeKeeperContractArtifact(
         KeeperContractArtifact memory _artifact
     ) internal {
@@ -173,6 +202,8 @@ contract BaseDeployScript is Script {
         );
     }
 
+    /// @dev Returns true if a KeeperContractArtifact exists for the current
+    ///      chain, false otherwise.
     function hasDefaultKeeperContractArtifact(
         string memory _kind
     ) internal view returns (bool) {
@@ -192,6 +223,7 @@ contract BaseDeployScript is Script {
         return false;
     }
 
+    /// @dev Returns the default KeeperContractArtifact for the current chain.
     function getDefaultKeeperContractArtifact(
         string memory _kind
     ) internal returns (KeeperContractArtifact memory) {
@@ -216,6 +248,7 @@ contract BaseDeployScript is Script {
         return keeperContractArtifact;
     }
 
+    /// @dev Returns the KeeperContractArtifact with the provided name.
     function getKeeperContractArtifact(
         string memory _name
     ) internal view returns (KeeperContractArtifact memory) {
@@ -226,8 +259,10 @@ contract BaseDeployScript is Script {
     // │                              Strategies                               │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
+    /// @dev Directory for StrategyArtifacts.
     string constant STRATEGY_DIR_NAME = "strategies/";
 
+    /// @dev Strategy artifact fields.
     struct StrategyArtifact {
         address deployer;
         address emergencyAdmin;
@@ -241,16 +276,22 @@ contract BaseDeployScript is Script {
         uint256 timestamp;
     }
 
+    /// @dev Returns the full path to the StrategyArtifact directory for
+    ///      the current chain.
     function getStrategyArtifactDir() internal view returns (string memory) {
         return string.concat(getBaseArtifactDir(), STRATEGY_DIR_NAME);
     }
 
+    /// @dev Returns the full path to the StrategyArtifact for the current
+    ///      chain.
     function getStrategyArtifactPath(
         string memory _name
     ) internal view returns (string memory) {
         return string.concat(getStrategyArtifactDir(), _name, ".toml");
     }
 
+    /// @dev Parses the StrategyArtifact at the provided path into the
+    ///      StrategyArtifact struct.
     function readStrategyArtifact(
         string memory _path
     ) internal view returns (StrategyArtifact memory artifact) {
@@ -260,6 +301,7 @@ contract BaseDeployScript is Script {
         );
     }
 
+    /// @dev Writes the provided StrategyArtifact to a toml file.
     function writeStrategyArtifact(StrategyArtifact memory _artifact) internal {
         string memory outputToml = "output";
         vm.serializeAddress(outputToml, "deployer", _artifact.deployer);
@@ -287,6 +329,7 @@ contract BaseDeployScript is Script {
         vm.writeToml(finalOutputToml, getStrategyArtifactPath(_artifact.name));
     }
 
+    /// @dev Returns the StrategyArtifact with the provided name.
     function getStrategyArtifact(
         string memory _name
     ) internal view returns (StrategyArtifact memory) {
@@ -297,8 +340,10 @@ contract BaseDeployScript is Script {
     // │                                Vaults                                 │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
+    /// @dev Directory for VaultArtifacts.
     string constant VAULT_DIR_NAME = "vaults/";
 
+    /// @dev Vault artifact fields.
     struct VaultArtifact {
         address governance;
         string keeperContractName;
@@ -311,16 +356,22 @@ contract BaseDeployScript is Script {
         address vault;
     }
 
+    /// @dev Returns the full path to the VaultArtifact directory for
+    ///      the current chain.
     function getVaultArtifactDir() internal view returns (string memory) {
         return string.concat(getBaseArtifactDir(), VAULT_DIR_NAME);
     }
 
+    /// @dev Returns the full path to the VaultArtifact for the current
+    ///      chain.
     function getVaultArtifactPath(
         string memory _name
     ) internal view returns (string memory) {
         return string.concat(getVaultArtifactDir(), _name, ".toml");
     }
 
+    /// @dev Parses the VaultArtifact at the provided path into the
+    ///      VaultArtifact struct.
     function readVaultArtifact(
         string memory _path
     ) internal view returns (VaultArtifact memory artifact) {
@@ -330,6 +381,7 @@ contract BaseDeployScript is Script {
         );
     }
 
+    /// @dev Writes the provided VaultArtifact to a toml file.
     function writeVaultArtifact(VaultArtifact memory _artifact) internal {
         string memory outputToml = "output";
         vm.serializeAddress(outputToml, "governance", _artifact.governance);
@@ -356,6 +408,7 @@ contract BaseDeployScript is Script {
         vm.writeToml(finalOutputToml, getVaultArtifactPath(_artifact.name));
     }
 
+    /// @dev Returns the VaultArtifact with the provided name.
     function getVaultArtifact(
         string memory _name
     ) internal view returns (VaultArtifact memory) {
