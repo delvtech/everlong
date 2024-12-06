@@ -1,34 +1,60 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.24;
 
-import { BaseDeployScript } from "./shared/BaseDeployScript.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { IEverlongStrategy } from "../contracts/interfaces/IEverlongStrategy.sol";
 import { EVERLONG_STRATEGY_KIND, EVERLONG_STRATEGY_KEEPER_KIND } from "../contracts/libraries/Constants.sol";
 import { EverlongStrategy } from "../contracts/EverlongStrategy.sol";
+import { BaseDeployScript } from "./shared/BaseDeployScript.sol";
 
+/// @title DeployEverlongStrategy
+/// @notice EverlongStrategy deployment script.
+/// @custom:disclaimer The language used in this code is for coding convenience
+///                    only, and is not intended to, and does not, have any
+///                    particular legal or regulatory significance.
 contract DeployEverlongStrategy is BaseDeployScript {
-    // Required Arguments
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                          Required Arguments                           │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+    /// @dev Deployer account private key;
     uint256 internal DEPLOYER_PRIVATE_KEY;
+    /// @dev Governance account private key;
     uint256 internal GOVERNANCE_PRIVATE_KEY;
+    /// @dev Management account private key;
     uint256 internal MANAGEMENT_PRIVATE_KEY;
+    /// @dev EmergencyAdmin account private key;
     uint256 internal EMERGENCY_ADMIN_PRIVATE_KEY;
+    /// @dev Name for the deployed EverlongStrategy.
     string internal NAME;
+    /// @dev Address of the Hyperdrive instance for the strategy.
     address internal HYPERDRIVE;
 
-    // Optional Arguments
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                          Optional Arguments                           │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+    /// @dev Whether to use Hyperdrive's base asset as the asset of the
+    ///      strategy.
     bool internal AS_BASE;
     bool internal constant AS_BASE_DEFAULT = true;
 
+    /// @dev ProfitMaxUnlockTime for the strategy. If zero, deposits should
+    ///      be limited to only vaults.
     uint256 internal PROFIT_MAX_UNLOCK;
     uint256 internal PROFIT_MAX_UNLOCK_DEFAULT = 0;
 
+    /// @dev Name of the keeper contract to use for the strategy. Must have the
+    ///      `EverlongStrategyKeeper` kind.
     string internal KEEPER_CONTRACT_NAME;
     string internal KEEPER_CONTRACT_NAME_DEFAULT;
 
-    // Artifact struct.
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                           Artifact Struct.                            │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+    /// @dev Struct containing deployment artifact information.
     StrategyArtifact internal output;
 
+    /// @dev Deploys a Strategy and enables permissioning for the keeper
+    ///      contract to perform maintenance.
     function run() external {
         // Read required arguments.
         DEPLOYER_PRIVATE_KEY = vm.envUint("DEPLOYER_PRIVATE_KEY");

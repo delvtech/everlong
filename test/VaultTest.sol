@@ -105,6 +105,9 @@ abstract contract VaultTest is HyperdriveTest {
     /// @dev Keeper address.
     address internal keeper;
 
+    /// @dev Emergency admin address.
+    address internal emergencyAdmin;
+
     /// @dev Mainnet `RoleManager` factory.
     IRoleManagerFactory internal roleManagerFactory =
         IRoleManagerFactory(0xca12459a931643BF28388c67639b3F352fe9e5Ce);
