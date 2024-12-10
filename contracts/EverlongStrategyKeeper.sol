@@ -169,12 +169,12 @@ contract EverlongStrategyKeeper is Ownable {
         }
 
         // Check if tend should be called.
-        (bool shouldTend, bytes memory calldataOrReason) = CommonReportTrigger(
+        (bool shouldTend_, bytes memory calldataOrReason) = CommonReportTrigger(
             trigger
         ).strategyTendTrigger(_strategy);
 
         // If tend should be called, call it with the recommended parameters.
-        if (shouldTend) {
+        if (shouldTend_) {
             IEverlongStrategy(_strategy).setTendConfig(_config);
             (bool success, bytes memory err) = _strategy.call(calldataOrReason);
             if (!success) {
@@ -202,9 +202,9 @@ contract EverlongStrategyKeeper is Ownable {
         }
 
         // If update_debt should be called, call it with the recommended parameters.
-        (bool shouldUpdateDebt, bytes memory calldataOrReason) = debtAllocator
+        (bool shouldUpdateDebt_, bytes memory calldataOrReason) = debtAllocator
             .shouldUpdateDebt(_vault, _strategy);
-        if (shouldUpdateDebt) {
+        if (shouldUpdateDebt_) {
             (bool success, bytes memory err) = address(debtAllocator).call(
                 calldataOrReason
             );
@@ -215,6 +215,76 @@ contract EverlongStrategyKeeper is Ownable {
             }
         }
     }
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                               Triggers                                │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
+    /// @notice Returns true if `processReport(..)` should be called on the
+    ///         vault/strategy combination.
+    /// @param _vault Address of the vault to process the report on.
+    /// @param _strategy Address of the strategy to process the report on.
+    /// @return shouldProcessReport_ True if `processReport(..)` should be
+    ///         called, false otherwise.
+    function shouldProcessReport(
+        address _vault,
+        address _strategy
+    ) external view returns (bool shouldProcessReport_) {
+        // Check if report should be called on the vault/strategy combination.
+        (shouldProcessReport_, ) = CommonReportTrigger(trigger)
+            .defaultVaultReportTrigger(_vault, _strategy);
+    }
+
+    /// @notice Returns whether `report(..)` should be called on the strategy.
+    /// @param _strategy Address of the strategy.
+    /// @return shouldStrategyReport_ True if `report(..)` should be called,
+    ///                               false otherwise.
+    function shouldStrategyReport(
+        address _strategy
+    ) external view returns (bool shouldStrategyReport_) {
+        // Check if report should be called on the strategy.
+        (shouldStrategyReport_, ) = CommonReportTrigger(trigger)
+            .defaultStrategyReportTrigger(_strategy);
+    }
+
+    /// @notice Returns whether `tend(..)` should be called on the strategy.
+    /// @param _strategy Address of the strategy.
+    /// @return shouldTend_ True if `tend(..)` should be called on the strategy,
+    ///                     false otherwise.
+    function shouldTend(
+        address _strategy
+    ) external view returns (bool shouldTend_) {
+        // Check if tend should be called.
+        (shouldTend_, ) = CommonReportTrigger(trigger).strategyTendTrigger(
+            _strategy
+        );
+    }
+
+    /// @notice Returns whether `update_debt(..)` should be called for the
+    ///         vault/strategy combination.
+    /// @param _vault Address of the vault.
+    /// @param _strategy Address of the strategy.
+    /// @return shouldUpdateDebt_ True if `update_debt(..)` should be called
+    ///                           on the vault/strategy combination, false
+    ///                           otherwise.
+    function shouldUpdateDebt(
+        address _vault,
+        address _strategy
+    ) external view returns (bool shouldUpdateDebt_) {
+        // Get the DebtAllocator contract address.
+        DebtAllocator debtAllocator = DebtAllocator(
+            IRoleManager(roleManager).getDebtAllocator(_vault)
+        );
+        // If update_debt should be called, call it with the recommended parameters.
+        (shouldUpdateDebt_, ) = debtAllocator.shouldUpdateDebt(
+            _vault,
+            _strategy
+        );
+    }
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                 IEverlongStrategy.TendConfig Helpers                  │
+    // ╰───────────────────────────────────────────────────────────────────────╯
 
     /// @notice Calculates an appropriate `TendConfig.minOutput` for the input
     ///         `_strategy` given the provided `_slippage` tolerance.
