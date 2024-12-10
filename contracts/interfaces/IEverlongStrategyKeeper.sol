@@ -75,6 +75,49 @@ interface IEverlongStrategyKeeper {
     function update_debt(address _vault, address _strategy) external;
 
     // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                               Triggers                                │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
+    /// @notice Returns true if `processReport(..)` should be called on the
+    ///         vault/strategy combination.
+    /// @param _vault Address of the vault to process the report on.
+    /// @param _strategy Address of the strategy to process the report on.
+    /// @return _shouldProcessReport True if `processReport(..)` should be
+    ///         called, false otherwise.
+    function shouldProcessReport(
+        address _vault,
+        address _strategy
+    ) external view returns (bool _shouldProcessReport);
+
+    /// @notice Returns whether `report(..)` should be called on the strategy.
+    /// @param _strategy Address of the strategy.
+    /// @return _shouldStrategyReport True if `report(..)` should be called,
+    ///                               false otherwise.
+    function shouldStrategyReport(
+        address _strategy
+    ) external view returns (bool _shouldStrategyReport);
+
+    /// @notice Returns whether `tend(..)` should be called on the strategy.
+    /// @param _strategy Address of the strategy.
+    /// @return _shouldTend True if `tend(..)` should be called on the strategy,
+    ///                     false otherwise.
+    function shouldTend(
+        address _strategy
+    ) external view returns (bool _shouldTend);
+
+    /// @notice Returns whether `update_debt(..)` should be called for the
+    ///         vault/strategy combination.
+    /// @param _vault Address of the vault.
+    /// @param _strategy Address of the strategy.
+    /// @return _shouldUpdateDebt True if `update_debt(..)` should be called
+    ///                           on the vault/strategy combination, false
+    ///                           otherwise.
+    function shouldUpdateDebt(
+        address _vault,
+        address _strategy
+    ) external view returns (bool _shouldUpdateDebt);
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
     // │                 IEverlongStrategy.TendConfig Helpers                  │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
@@ -102,16 +145,29 @@ interface IEverlongStrategyKeeper {
     // │                                 Views                                 │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
-    /// @notice Gets the Everlong instance's kind.
-    /// @return The Everlong instance's kind.
+    /// @notice Gets the EverlongStrategyKeeper's kind.
+    /// @return The EverlongStrategyKeeper's kind.
     function kind() external pure returns (string memory);
 
-    /// @notice Gets the Everlong instance's version.
-    /// @return The Everlong instance's version.
-    function version() external pure returns (string memory);
+    /// @notice Name of the EverlongStrategyKeeper.
+    /// @return The EverlongStrategyKeeper's name.
+    function name() external pure returns (string memory);
 
-    /// @dev Returns the address of the current owner.
+    /// @notice Returns the address of the current owner.
+    /// @return The current owner's address.
     function owner() external view returns (address);
+
+    /// @notice Returns the address of the current RoleManager contract.
+    /// @return The current RoleManager contract address.
+    function roleManager() external view returns (address);
+
+    /// @notice Returns the address of the current CommonReportTrigger contract.
+    /// @return The current CommonReportTrigger address.
+    function trigger() external view returns (address);
+
+    /// @notice Gets the EverlongStrategyKeeper's version.
+    /// @return The EverlongStrategyKeeper's version.
+    function version() external pure returns (string memory);
 
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                                Errors                                 │
