@@ -169,12 +169,12 @@ contract EverlongStrategyKeeper is Ownable {
         }
 
         // Check if tend should be called.
-        (bool _shouldTend, bytes memory calldataOrReason) = CommonReportTrigger(
+        (bool shouldTend_, bytes memory calldataOrReason) = CommonReportTrigger(
             trigger
         ).strategyTendTrigger(_strategy);
 
         // If tend should be called, call it with the recommended parameters.
-        if (_shouldTend) {
+        if (shouldTend_) {
             IEverlongStrategy(_strategy).setTendConfig(_config);
             (bool success, bytes memory err) = _strategy.call(calldataOrReason);
             if (!success) {
@@ -202,9 +202,9 @@ contract EverlongStrategyKeeper is Ownable {
         }
 
         // If update_debt should be called, call it with the recommended parameters.
-        (bool _shouldUpdateDebt, bytes memory calldataOrReason) = debtAllocator
+        (bool shouldUpdateDebt_, bytes memory calldataOrReason) = debtAllocator
             .shouldUpdateDebt(_vault, _strategy);
-        if (_shouldUpdateDebt) {
+        if (shouldUpdateDebt_) {
             (bool success, bytes memory err) = address(debtAllocator).call(
                 calldataOrReason
             );
@@ -224,38 +224,38 @@ contract EverlongStrategyKeeper is Ownable {
     ///         vault/strategy combination.
     /// @param _vault Address of the vault to process the report on.
     /// @param _strategy Address of the strategy to process the report on.
-    /// @return _shouldProcessReport True if `processReport(..)` should be
+    /// @return shouldProcessReport_ True if `processReport(..)` should be
     ///         called, false otherwise.
     function shouldProcessReport(
         address _vault,
         address _strategy
-    ) external view returns (bool _shouldProcessReport) {
+    ) external view returns (bool shouldProcessReport_) {
         // Check if report should be called on the vault/strategy combination.
-        (_shouldProcessReport, ) = CommonReportTrigger(trigger)
+        (shouldProcessReport_, ) = CommonReportTrigger(trigger)
             .defaultVaultReportTrigger(_vault, _strategy);
     }
 
     /// @notice Returns whether `report(..)` should be called on the strategy.
     /// @param _strategy Address of the strategy.
-    /// @return _shouldStrategyReport True if `report(..)` should be called,
+    /// @return shouldStrategyReport_ True if `report(..)` should be called,
     ///                               false otherwise.
     function shouldStrategyReport(
         address _strategy
-    ) external view returns (bool _shouldStrategyReport) {
+    ) external view returns (bool shouldStrategyReport_) {
         // Check if report should be called on the strategy.
-        (_shouldStrategyReport, ) = CommonReportTrigger(trigger)
+        (shouldStrategyReport_, ) = CommonReportTrigger(trigger)
             .defaultStrategyReportTrigger(_strategy);
     }
 
     /// @notice Returns whether `tend(..)` should be called on the strategy.
     /// @param _strategy Address of the strategy.
-    /// @return _shouldTend True if `tend(..)` should be called on the strategy,
+    /// @return shouldTend_ True if `tend(..)` should be called on the strategy,
     ///                     false otherwise.
     function shouldTend(
         address _strategy
-    ) external view returns (bool _shouldTend) {
+    ) external view returns (bool shouldTend_) {
         // Check if tend should be called.
-        (_shouldTend, ) = CommonReportTrigger(trigger).strategyTendTrigger(
+        (shouldTend_, ) = CommonReportTrigger(trigger).strategyTendTrigger(
             _strategy
         );
     }
@@ -264,19 +264,19 @@ contract EverlongStrategyKeeper is Ownable {
     ///         vault/strategy combination.
     /// @param _vault Address of the vault.
     /// @param _strategy Address of the strategy.
-    /// @return _shouldUpdateDebt True if `update_debt(..)` should be called
+    /// @return shouldUpdateDebt_ True if `update_debt(..)` should be called
     ///                           on the vault/strategy combination, false
     ///                           otherwise.
     function shouldUpdateDebt(
         address _vault,
         address _strategy
-    ) external view returns (bool _shouldUpdateDebt) {
+    ) external view returns (bool shouldUpdateDebt_) {
         // Get the DebtAllocator contract address.
         DebtAllocator debtAllocator = DebtAllocator(
             IRoleManager(roleManager).getDebtAllocator(_vault)
         );
         // If update_debt should be called, call it with the recommended parameters.
-        (_shouldUpdateDebt, ) = debtAllocator.shouldUpdateDebt(
+        (shouldUpdateDebt_, ) = debtAllocator.shouldUpdateDebt(
             _vault,
             _strategy
         );

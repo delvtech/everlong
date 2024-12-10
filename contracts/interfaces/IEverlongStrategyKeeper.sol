@@ -82,40 +82,40 @@ interface IEverlongStrategyKeeper {
     ///         vault/strategy combination.
     /// @param _vault Address of the vault to process the report on.
     /// @param _strategy Address of the strategy to process the report on.
-    /// @return _shouldProcessReport True if `processReport(..)` should be
+    /// @return shouldProcessReport_ True if `processReport(..)` should be
     ///         called, false otherwise.
     function shouldProcessReport(
         address _vault,
         address _strategy
-    ) external view returns (bool _shouldProcessReport);
+    ) external view returns (bool shouldProcessReport_);
 
     /// @notice Returns whether `report(..)` should be called on the strategy.
     /// @param _strategy Address of the strategy.
-    /// @return _shouldStrategyReport True if `report(..)` should be called,
+    /// @return shouldStrategyReport_ True if `report(..)` should be called,
     ///                               false otherwise.
     function shouldStrategyReport(
         address _strategy
-    ) external view returns (bool _shouldStrategyReport);
+    ) external view returns (bool shouldStrategyReport_);
 
     /// @notice Returns whether `tend(..)` should be called on the strategy.
     /// @param _strategy Address of the strategy.
-    /// @return _shouldTend True if `tend(..)` should be called on the strategy,
+    /// @return shouldTend_ True if `tend(..)` should be called on the strategy,
     ///                     false otherwise.
     function shouldTend(
         address _strategy
-    ) external view returns (bool _shouldTend);
+    ) external view returns (bool shouldTend_);
 
     /// @notice Returns whether `update_debt(..)` should be called for the
     ///         vault/strategy combination.
     /// @param _vault Address of the vault.
     /// @param _strategy Address of the strategy.
-    /// @return _shouldUpdateDebt True if `update_debt(..)` should be called
+    /// @return shouldUpdateDebt_ True if `update_debt(..)` should be called
     ///                           on the vault/strategy combination, false
     ///                           otherwise.
     function shouldUpdateDebt(
         address _vault,
         address _strategy
-    ) external view returns (bool _shouldUpdateDebt);
+    ) external view returns (bool shouldUpdateDebt_);
 
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                 IEverlongStrategy.TendConfig Helpers                  │
