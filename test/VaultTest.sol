@@ -10,12 +10,12 @@ import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { CommonReportTrigger } from "lib/vault-periphery/lib/tokenized-strategy-periphery/src/ReportTrigger/CommonReportTrigger.sol";
 import { DebtAllocator } from "vault-periphery/debtAllocators/DebtAllocator.sol";
 import { IVault } from "yearn-vaults-v3/interfaces/IVault.sol";
-import { IAccountant } from "../../contracts/interfaces/IAccountant.sol";
-import { IAprOracle } from "../../contracts/interfaces/IAprOracle.sol";
-import { IPermissionedStrategy } from "../../contracts/interfaces/IPermissionedStrategy.sol";
-import { IRoleManager } from "../../contracts/interfaces/IRoleManager.sol";
-import { IRoleManagerFactory } from "../../contracts/interfaces/IRoleManagerFactory.sol";
-import { MAX_BPS } from "../../contracts/libraries/Constants.sol";
+import { IAccountant } from "../contracts/interfaces/IAccountant.sol";
+import { IAprOracle } from "../contracts/interfaces/IAprOracle.sol";
+import { IPermissionedStrategy } from "../contracts/interfaces/IPermissionedStrategy.sol";
+import { IRoleManager } from "../contracts/interfaces/IRoleManager.sol";
+import { IRoleManagerFactory } from "../contracts/interfaces/IRoleManagerFactory.sol";
+import { MAX_BPS } from "../contracts/libraries/Constants.sol";
 
 /// @dev Vault testing harness contract.
 /// @dev Extending contracts must implement `rebalance()` and `report()`.
@@ -104,6 +104,9 @@ abstract contract VaultTest is HyperdriveTest {
 
     /// @dev Keeper address.
     address internal keeper;
+
+    /// @dev Emergency admin address.
+    address internal emergencyAdmin;
 
     /// @dev Mainnet `RoleManager` factory.
     IRoleManagerFactory internal roleManagerFactory =
@@ -199,7 +202,7 @@ abstract contract VaultTest is HyperdriveTest {
         // RoleManager component addresses.
         vm.startPrank(deployer);
         roleManager = IRoleManager(
-            roleManagerFactory.newProject("Delv", governance, management)
+            roleManagerFactory.newProject("DELV", governance, management)
         );
         debtAllocator = DebtAllocator(roleManager.getDebtAllocator());
         accountant = IAccountant(roleManager.getAccountant());

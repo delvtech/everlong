@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-import { IPermissionedStrategy } from "./IPermissionedStrategy.sol";
 import { IEverlongEvents } from "./IEverlongEvents.sol";
+import { IPermissionedStrategy } from "./IPermissionedStrategy.sol";
 
 interface IEverlongStrategy is IPermissionedStrategy, IEverlongEvents {
     // ╭───────────────────────────────────────────────────────────────────────╮

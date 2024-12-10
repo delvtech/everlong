@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-// solhint-disable-next-line no-console, no-unused-import
 import { console2 as console } from "forge-std/console2.sol";
 import { IERC20 } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
@@ -11,16 +10,16 @@ import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { CommonReportTrigger } from "lib/vault-periphery/lib/tokenized-strategy-periphery/src/ReportTrigger/CommonReportTrigger.sol";
 import { DebtAllocator } from "vault-periphery/debtAllocators/DebtAllocator.sol";
 import { IVault } from "yearn-vaults-v3/interfaces/IVault.sol";
-import { IAccountant } from "../../../contracts/interfaces/IAccountant.sol";
-import { IAprOracle } from "../../../contracts/interfaces/IAprOracle.sol";
-import { IEverlongEvents } from "../../../contracts/interfaces/IEverlongEvents.sol";
-import { IEverlongStrategy } from "../../../contracts/interfaces/IEverlongStrategy.sol";
-import { IEverlongStrategyFactory } from "../../../contracts/interfaces/IEverlongStrategyFactory.sol";
-import { IRoleManager } from "../../../contracts/interfaces/IRoleManager.sol";
-import { IRoleManagerFactory } from "../../../contracts/interfaces/IRoleManagerFactory.sol";
-import { MAX_BPS } from "../../../contracts/libraries/Constants.sol";
-import { EverlongStrategyFactory } from "../../../contracts/EverlongStrategyFactory.sol";
-import { EverlongStrategyKeeper } from "../../../contracts/EverlongStrategyKeeper.sol";
+import { IAccountant } from "../../contracts/interfaces/IAccountant.sol";
+import { IAprOracle } from "../../contracts/interfaces/IAprOracle.sol";
+import { IEverlongEvents } from "../../contracts/interfaces/IEverlongEvents.sol";
+import { IEverlongStrategy } from "../../contracts/interfaces/IEverlongStrategy.sol";
+import { IRoleManager } from "../../contracts/interfaces/IRoleManager.sol";
+import { IRoleManagerFactory } from "../../contracts/interfaces/IRoleManagerFactory.sol";
+import { MAX_BPS } from "../../contracts/libraries/Constants.sol";
+import { EverlongStrategy } from "../../contracts/EverlongStrategy.sol";
+import { EverlongStrategyKeeper } from "../../contracts/EverlongStrategyKeeper.sol";
+import { IPermissionedStrategy } from "../../contracts/interfaces/IPermissionedStrategy.sol";
 import { VaultTest } from "../VaultTest.sol";
 
 /// @dev Everlong testing harness contract.
@@ -28,6 +27,9 @@ import { VaultTest } from "../VaultTest.sol";
 contract EverlongTest is VaultTest, IEverlongEvents {
     using HyperdriveUtils for *;
     using FixedPointMath for *;
+
+    /// @dev Whether to use the base token from the hyperdrive instance.
+    bool internal AS_BASE = true;
 
     /// @dev Everlong token name.
     string internal EVERLONG_NAME = "Everlong Testing";
@@ -40,9 +42,6 @@ contract EverlongTest is VaultTest, IEverlongEvents {
 
     /// @dev Maximum slippage for vault share price.
     uint256 internal MIN_VAULT_SHARE_PRICE_SLIPPAGE = 500;
-
-    /// @dev Everlong strategy factory.
-    IEverlongStrategyFactory internal strategyFactory;
 
     /// @dev Periphery contract to simplify maintenance operations for vaults
     ///      and strategies.
@@ -67,31 +66,30 @@ contract EverlongTest is VaultTest, IEverlongEvents {
 
         // Deploy the EverlongStrategyKeeper helper contract.
         keeperContract = new EverlongStrategyKeeper(
+            "EVERLONG_STRATEGY_KEEPER",
             address(roleManager),
             address(reportTrigger)
         );
         keeperContract.transferOwnership(keeper);
 
-        // Deploy the EverlongStrategyFactory.
-        strategyFactory = new EverlongStrategyFactory(
-            "TestEverlongStrategyFactory", // Name
-            management, // Management
-            governance, // Performance Fee Recipient
-            address(keeperContract), // EverlongStrategyKeeper
-            deployer // Emergency Admin
-        );
-
-        // Deploy the Strategy.
-        strategy = IEverlongStrategy(
+        // Deploy and configure the strategy.
+        strategy = IPermissionedStrategy(
             address(
-                strategyFactory.newStrategy(
-                    address(asset),
+                new EverlongStrategy(
+                    AS_BASE
+                        ? hyperdrive.baseToken()
+                        : hyperdrive.vaultSharesToken(),
                     EVERLONG_NAME,
                     address(hyperdrive),
-                    true
+                    AS_BASE
                 )
             )
         );
+        strategy.setPerformanceFeeRecipient(governance);
+        strategy.setKeeper(address(keeperContract));
+        strategy.setPendingManagement(management);
+        (emergencyAdmin, ) = createUser("emergencyAdmin");
+        strategy.setEmergencyAdmin(emergencyAdmin);
         vm.stopPrank();
 
         // As the `management` address:
@@ -121,7 +119,14 @@ contract EverlongTest is VaultTest, IEverlongEvents {
         IAccountant.Fee memory defaultConfig = accountant.defaultConfig();
         // Must increase the accountant maxLoss for reporting since `totalAssets`
         // decreases whenever opening longs.
-        accountant.updateDefaultConfig(0, 0, 0, 0, defaultConfig.maxGain, 100);
+        accountant.updateDefaultConfig(
+            0,
+            0,
+            0,
+            0,
+            defaultConfig.maxGain,
+            defaultConfig.maxLoss
+        );
         vault = IVault(
             roleManager.newVault(
                 address(asset),

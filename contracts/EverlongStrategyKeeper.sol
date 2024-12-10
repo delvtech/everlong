@@ -1,24 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.24;
 
-import { console2 as console } from "forge-std/console2.sol";
-import { DebtAllocator } from "vault-periphery/debtAllocators/DebtAllocator.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { CommonReportTrigger } from "lib/vault-periphery/lib/tokenized-strategy-periphery/src/ReportTrigger/CommonReportTrigger.sol";
 import { Ownable } from "openzeppelin/access/Ownable.sol";
-import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { IERC20 } from "openzeppelin/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { BaseStrategy, ERC20 } from "tokenized-strategy/BaseStrategy.sol";
 import { IStrategy } from "tokenized-strategy/interfaces/IStrategy.sol";
+import { DebtAllocator } from "vault-periphery/debtAllocators/DebtAllocator.sol";
 import { IVault } from "yearn-vaults-v3/interfaces/IVault.sol";
 import { Roles } from "yearn-vaults-v3/interfaces/Roles.sol";
 import { IEverlongStrategy } from "./interfaces/IEverlongStrategy.sol";
 import { IRoleManager } from "./interfaces/IRoleManager.sol";
 import { EVERLONG_STRATEGY_KEEPER_KIND, EVERLONG_VERSION, ONE, MAX_BPS } from "./libraries/Constants.sol";
-import { HyperdriveExecutionLibrary } from "./libraries/HyperdriveExecution.sol";
 import { EverlongPortfolioLibrary } from "./libraries/EverlongPortfolio.sol";
+import { HyperdriveExecutionLibrary } from "./libraries/HyperdriveExecution.sol";
 
 /// @author DELV
 /// @title EverlongStrategyKeeper
@@ -33,14 +32,14 @@ contract EverlongStrategyKeeper is Ownable {
     using SafeCast for *;
     using SafeERC20 for ERC20;
 
-    /// @notice Name of the EverlongStrategyKeeper.
-    string constant name = "EverlongStrategyKeeper";
-
     /// @notice Kind of the EverlongStrategyKeeper.
     string constant kind = EVERLONG_STRATEGY_KEEPER_KIND;
 
     /// @notice Version of the EverlongStrategyKeeper.
     string constant version = EVERLONG_VERSION;
+
+    /// @notice Name of the EverlongStrategyKeeper.
+    string name;
 
     /// @notice Address of the target RoleManager contract.
     /// @dev Helpful for getting periphery contract addresses and enumerating
@@ -52,8 +51,15 @@ contract EverlongStrategyKeeper is Ownable {
     address trigger;
 
     /// @notice Initialize the EverlongStrategyKeeper contract.
+    /// @param _name Name for the keeper contract.
+    /// @param _roleManager Address for the `RoleManager` contract.
     /// @param _trigger Address for the `CommonReportTrigger` contract.
-    constructor(address _roleManager, address _trigger) Ownable(msg.sender) {
+    constructor(
+        string memory _name,
+        address _roleManager,
+        address _trigger
+    ) Ownable(msg.sender) {
+        name = _name;
         roleManager = _roleManager;
         trigger = _trigger;
     }
