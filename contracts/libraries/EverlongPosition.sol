@@ -6,19 +6,19 @@ import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { IEverlongStrategy } from "../interfaces/IEverlongStrategy.sol";
 
 /// @author DELV
-/// @title PositionLibrary
-/// @notice Library for interacting with {IEverlong.Position}s.
+/// @title EverlongPositionLibrary
+/// @notice Library for interacting with {IEverlongStrategy.EverlongPosition}s.
 /// @custom:disclaimer The language used in this code is for coding convenience
 ///                    only, and is not intended to, and does not, have any
 ///                    particular legal or regulatory significance.
-library PositionLibrary {
+library EverlongPositionLibrary {
     using FixedPointMath for uint256;
     using SafeCast for *;
 
     /// @notice Increase the position's bond count.
     /// @param _bondAmount Amount to increase the position's bond count by.
     function increase(
-        IEverlongStrategy.Position storage self,
+        IEverlongStrategy.EverlongPosition storage self,
         uint256 _bondAmount
     ) internal {
         self.bondAmount += _bondAmount.toUint128();
@@ -27,14 +27,14 @@ library PositionLibrary {
     /// @notice Decrease the position's bond count.
     /// @param _bondAmount Amount to increase the position's bond count by.
     function decrease(
-        IEverlongStrategy.Position storage self,
+        IEverlongStrategy.EverlongPosition storage self,
         uint256 _bondAmount
     ) internal {
         self.bondAmount -= _bondAmount.toUint128();
     }
 
     /// @notice Reset the contents of a position.
-    function clear(IEverlongStrategy.Position storage self) internal {
+    function clear(IEverlongStrategy.EverlongPosition storage self) internal {
         self.maturityTime = 0;
         self.bondAmount = 0;
     }

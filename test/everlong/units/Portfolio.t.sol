@@ -5,15 +5,15 @@ pragma solidity ^0.8.20;
 import { console2 as console } from "forge-std/console2.sol";
 import { ERC20Mintable } from "hyperdrive/contracts/test/ERC20Mintable.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
-import { IEverlongStrategy } from "../../contracts/interfaces/IEverlongStrategy.sol";
-import { Portfolio } from "../../contracts/libraries/Portfolio.sol";
-import { EverlongTest } from "../harnesses/EverlongTest.sol";
+import { IEverlongStrategy } from "../../../contracts/interfaces/IEverlongStrategy.sol";
+import { EverlongPortfolioLibrary } from "../../../contracts/libraries/EverlongPortfolio.sol";
+import { EverlongTest } from "../EverlongTest.sol";
 
 /// @dev Tests for position management functionality.
 contract TestPortfolio is EverlongTest {
-    using Portfolio for Portfolio.State;
+    using EverlongPortfolioLibrary for EverlongPortfolioLibrary.State;
 
-    Portfolio.State public portfolio;
+    EverlongPortfolioLibrary.State public portfolio;
 
     /// @dev Asserts that the position at the specified index is equal
     ///      to the input `position`.
@@ -22,10 +22,10 @@ contract TestPortfolio is EverlongTest {
     /// @param _error Message to display for failing assertions.
     function assertPosition(
         uint256 _index,
-        IEverlongStrategy.Position memory _position,
+        IEverlongStrategy.EverlongPosition memory _position,
         string memory _error
     ) public view {
-        IEverlongStrategy.Position memory p = portfolio.at(_index);
+        IEverlongStrategy.EverlongPosition memory p = portfolio.at(_index);
         assertEq(_position.maturityTime, p.maturityTime, _error);
         assertEq(_position.bondAmount, p.bondAmount, _error);
     }
@@ -67,12 +67,18 @@ contract TestPortfolio is EverlongTest {
         // Check position order is [(1,1),(2,2)].
         assertPosition(
             0,
-            IEverlongStrategy.Position({ maturityTime: 1, bondAmount: 1 }),
+            IEverlongStrategy.EverlongPosition({
+                maturityTime: 1,
+                bondAmount: 1
+            }),
             "position at index 0 should be (1,1) after opening 2 longs with distinct maturities"
         );
         assertPosition(
             1,
-            IEverlongStrategy.Position({ maturityTime: 2, bondAmount: 2 }),
+            IEverlongStrategy.EverlongPosition({
+                maturityTime: 2,
+                bondAmount: 2
+            }),
             "position at index 1 should be (2,2) after opening 2 longs with distinct maturities"
         );
     }
@@ -95,7 +101,7 @@ contract TestPortfolio is EverlongTest {
         // Check position is now (1,2).
         assertPosition(
             0,
-            IEverlongStrategy.Position(uint128(1), uint128(2)),
+            IEverlongStrategy.EverlongPosition(uint128(1), uint128(2)),
             "position at index 0 should be (1,2) after opening two longs with same maturity"
         );
     }

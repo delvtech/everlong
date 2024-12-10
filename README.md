@@ -33,12 +33,38 @@ and [Yearn](https://docs.yearn.fi/).
 
 ## Components
 
-Everlong is built upon
+Vaults are built upon
 [Yearn's TokenizedStrategy Framework](https://docs.yearn.fi/developers/v3/strategy_writing_guide)
-which involves numerous mandatory and optional components. The primary
-components being used by Everlong are described below.
+which involves numerous mandatory and optional components.
 
-### EverlongStrategy
+### Common
+
+The contracts below are common to all vaults.
+
+#### RoleManager
+
+- Handles assignment and validation of the various privileged roles in the system.
+- Offers additional functionality via periphery contracts like `DebtAllocator`
+  and `Accountant`.
+- Maintains a list of all vaults under control of the `RoleManager`.
+
+#### DebtAllocator
+
+- Provides the needed triggers that enable a keeper to perform automated debt updates
+  for the vault and its strategies.
+- Enables specifying how much liquidity to deposit from a vault into each of its
+  strategies.
+
+#### Accountant
+
+- Can charge fees, issue refunds, and run a health check on any reported gains or
+  losses during a strategy's report.
+
+### Everlong
+
+The contracts below are specific to Everlong vaults.
+
+#### EverlongStrategy
 
 - A `TokenizedStrategy` that converts deposited assets into long positions in
   Hyperdrive.
@@ -46,32 +72,13 @@ components being used by Everlong are described below.
   proceeds.
 - Immature longs will be sold to fulfill withdrawals/redemptions.
 
-### EverlongVault
+#### EverlongVault
 
 - A Yearn v3 Vault that deposits into an `EverlongStrategy`.
 - Can maintain a set level of idle liquidity to service withdrawals/redemptions
   without forcing the strategy to sell immature longs.
 - _Future Plans_: Deposit into multiple `EverlongStrategy`s to receive weighted
   average yields from each.
-
-### RoleManager
-
-- Handles assignment and validation of the various privileged roles in the system.
-- Offers additional functionality via periphery contracts like `DebtAllocator`
-  and `Accountant`.
-- Maintains a list of all vaults under control of the `RoleManager`.
-
-### DebtAllocator
-
-- Provides the needed triggers that enable a keeper to perform automated debt updates
-  for the vault and its strategies.
-- Enables specifying how much liquidity to deposit from a vault into each of its
-  strategies.
-
-### Accountant
-
-- Can charge fees, issue refunds, and run a health check on any reported gains or
-  losses during a strategy's report.
 
 ## Roles
 
@@ -121,7 +128,7 @@ For our situation, we use the keeper role to:
 
 ## Diagrams
 
-Everlong is build on top of
+Vaults are build on top of
 [Yearn's TokenizedStrategy Framework](https://docs.yearn.fi/developers/v3/strategy_writing_guide)
 and leverages [v3 Vaults](https://docs.yearn.fi/developers/v3/overview) to
 control idle liquidity (and eventually combine multiple strategies). Asset flow
@@ -144,13 +151,13 @@ sequenceDiagram
     Keeper-->>Vault: call `update_debt(..)`
     Vault->>Strategy: transfer assets
     Keeper-->>Strategy: call `tend()`
-    Strategy->>Hyperdrive: open longs
+    Strategy->>Hyperdrive: open positions
     Keeper-->>Strategy: call `report()`
     Keeper-->>Vault: call `process_report(vault,strategy)`
     Note over Vault,Strategy: Vault/Strategy Profits Up-to-Date
     User->>Vault: call `redeem(..)`
     Vault->>Strategy: free funds
-    Strategy->>Hyperdrive: close longs
+    Strategy->>Hyperdrive: close positions
     Strategy->>Vault: transfer assets
     Vault->>User: transfer assets
 ```

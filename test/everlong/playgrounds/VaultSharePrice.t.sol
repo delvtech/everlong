@@ -6,8 +6,8 @@ import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMat
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
 import { HyperdriveUtils } from "hyperdrive/test/utils/HyperdriveUtils.sol";
 import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
-import { EverlongTest } from "../harnesses/EverlongTest.sol";
-import { HyperdriveExecutionLibrary } from "../../contracts/libraries/HyperdriveExecution.sol";
+import { EverlongTest } from "../EverlongTest.sol";
+import { HyperdriveExecutionLibrary } from "../../../contracts/libraries/HyperdriveExecution.sol";
 
 contract TestVaultSharePrice is EverlongTest {
     using FixedPointMath for uint256;
