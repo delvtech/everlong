@@ -130,7 +130,7 @@ contract TestTend is EverlongTest {
     ///      position.
     function test_tendTrigger_with_matured_position() external {
         // Mint some tokens to Everlong for opening longs and rebalance.
-        mintApproveBaseAsset(address(strategy), MINIMUM_TRANSACTION_AMOUNT + 1);
+        mintApproveAsset(address(strategy), MINIMUM_TRANSACTION_AMOUNT + 1);
         rebalance();
 
         // Increase block.timestamp until position is mature.

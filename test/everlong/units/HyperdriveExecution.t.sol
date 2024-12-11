@@ -196,11 +196,10 @@ contract TestHyperdriveExecution is EverlongTest {
     ) external {
         // Deploy Hyperdrive.
         fixedRate = fixedRate.normalizeToRange(0.001e18, 0.5e18);
-        deploy(alice, fixedRate, 0, 0, 0, 0);
-
-        // Initialize the Hyperdrive pool.
+        FIXED_RATE = fixedRate;
         contribution = contribution.normalizeToRange(1_000e18, 500_000_000e18);
-        initialize(alice, fixedRate, contribution);
+        INITIAL_CONTRIBUTION = contribution;
+        super.setUp();
 
         // Open a long position that will be held for an entire term. This will
         // decrease the value of the share adjustment to a non-trivial value.
@@ -234,11 +233,10 @@ contract TestHyperdriveExecution is EverlongTest {
     ) external {
         // Deploy Hyperdrive.
         fixedRate = fixedRate.normalizeToRange(0.001e18, 0.5e18);
-        deploy(alice, fixedRate, 0, 0, 0, 0);
-
-        // Initialize the Hyperdrive pool.
+        FIXED_RATE = fixedRate;
         contribution = contribution.normalizeToRange(1_000e18, 500_000_000e18);
-        initialize(alice, fixedRate, contribution);
+        INITIAL_CONTRIBUTION = contribution;
+        super.setUp();
 
         // Open a short position that will be held for an entire term. This will
         // increase the value of the share adjustment to a non-trivial value.
@@ -314,11 +312,10 @@ contract TestHyperdriveExecution is EverlongTest {
     ) internal {
         // Deploy Hyperdrive.
         fixedRate = fixedRate.normalizeToRange(0.001e18, 0.5e18);
-        deploy(alice, fixedRate, 0, 0, 0, 0);
-
-        // Initialize the Hyperdrive pool.
+        FIXED_RATE = fixedRate;
         contribution = contribution.normalizeToRange(1_000e18, 500_000_000e18);
-        initialize(alice, fixedRate, contribution);
+        INITIAL_CONTRIBUTION = contribution;
+        super.setUp();
 
         // Ensure that the max long is actually the max long.
         _verifyMaxLong(

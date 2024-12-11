@@ -33,6 +33,14 @@ contract DeployVault is BaseDeployScript {
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                          Optional Arguments                           │
     // ╰───────────────────────────────────────────────────────────────────────╯
+
+    /// @dev Category for the vault.
+    /// @dev Yearn docs state that vaults with a category of 0 are arbitrary,
+    ///      however a category of 1 indicates lowest risk. Whatever method we
+    ///      choose, let's try to be consistent.
+    uint256 internal CATEGORY;
+    uint256 internal CATEGORY_DEFAULT = 0;
+
     /// @dev ProfitMaxUnlock for the vault. Should be the same interval that the
     ///      underlying yield source accrues on.
     uint256 internal PROFIT_MAX_UNLOCK;
@@ -120,6 +128,7 @@ contract DeployVault is BaseDeployScript {
             : "";
 
         // Read optional arguments.
+        CATEGORY = vm.envOr("CATEGORY", CATEGORY_DEFAULT);
         PROFIT_MAX_UNLOCK = vm.envOr(
             "PROFIT_MAX_UNLOCK",
             PROFIT_MAX_UNLOCK_DEFAULT
@@ -172,7 +181,7 @@ contract DeployVault is BaseDeployScript {
         IVault vault = IVault(
             IRoleManager(roleManagerAddress).newVault(
                 IStrategy(strategyAddress).asset(),
-                0,
+                CATEGORY,
                 output.name,
                 output.symbol
             )

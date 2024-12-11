@@ -89,6 +89,7 @@ source .env && \
   STRATEGY_NAME='<name_of_a_deployed_strategy>' \
   NAME='<your_vault>' \
   SYMBOL='<your_vault_symbol>' \
+  CATEGORY=<your_category_number> \
   forge script script/DeployVault.s.sol --rpc-url 0.0.0.0:8545 --broadcast
 ```
 

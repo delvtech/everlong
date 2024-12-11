@@ -7,6 +7,24 @@ uint256 constant ONE = 1e18;
 /// @dev Maximum basis points value (10_000 == 100%).
 uint256 constant MAX_BPS = 10_000;
 
+/// @dev We can assume that almost all Hyperdrive deployments have the
+///      `convertToBase` and `convertToShares` functions, but there is
+///      one legacy sDAI pool that was deployed before these functions
+///      were written. We explicitly special case conversions for this
+///      pool.
+address constant LEGACY_SDAI_HYPERDRIVE = address(
+    0x324395D5d835F84a02A75Aa26814f6fD22F25698
+);
+
+/// @dev We can assume that almost all Hyperdrive deployments have the
+///      `convertToBase` and `convertToShares` functions, but there is
+///      one legacy stETH pool that was deployed before these functions
+///      were written. We explicitly special case conversions for this
+///      pool.
+address constant LEGACY_STETH_HYPERDRIVE = address(
+    0xd7e470043241C10970953Bd8374ee6238e77D735
+);
+
 /// @dev Yearn RoleManagerFactory address for mainnet, base, and arbitrum.
 address constant ROLE_MANAGER_FACTORY_ADDRESS = 0xca12459a931643BF28388c67639b3F352fe9e5Ce;
 

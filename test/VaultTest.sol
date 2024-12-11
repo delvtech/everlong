@@ -24,6 +24,11 @@ abstract contract VaultTest is HyperdriveTest {
     using FixedPointMath for *;
 
     // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                          Fork Configuration                           │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+    uint256 FORK_BLOCK_NUMBER = 21_381_521;
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
     // │                        HyperdriveTest Storage                         │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
@@ -161,7 +166,7 @@ abstract contract VaultTest is HyperdriveTest {
 
     /// @dev Set up the testing environment on a fork of mainnet.
     function setUp() public virtual override {
-        vm.createSelectFork(vm.rpcUrl("mainnet"));
+        vm.createSelectFork(vm.rpcUrl("mainnet"), FORK_BLOCK_NUMBER);
         super.setUp();
         setUpHyperdrive();
         setUpRoleManager();
@@ -181,7 +186,6 @@ abstract contract VaultTest is HyperdriveTest {
             GOVERNANCE_LP_FEE,
             GOVERNANCE_ZOMBIE_FEE
         );
-        asset = IERC20(hyperdrive.baseToken());
 
         // Seed liquidity for the hyperdrive instance.
         if (HYPERDRIVE_INITIALIZER == address(0)) {
@@ -206,6 +210,26 @@ abstract contract VaultTest is HyperdriveTest {
         );
         debtAllocator = DebtAllocator(roleManager.getDebtAllocator());
         accountant = IAccountant(roleManager.getAccountant());
+        vm.stopPrank();
+
+        // As the `governance` address:
+        //   1. Accept the "Fee Manager" role for the Accountant.
+        //   2. Set the default `config.maxLoss` for the accountant to be 10%.
+        //      This will enable losses of up to 10% across reports before
+        //      reverting.
+        vm.startPrank(governance);
+        accountant.acceptFeeManager();
+        IAccountant.Fee memory defaultConfig = accountant.defaultConfig();
+        // Must increase the accountant maxLoss for reporting since `totalAssets`
+        // decreases whenever opening longs.
+        accountant.updateDefaultConfig(
+            0,
+            0,
+            0,
+            0,
+            defaultConfig.maxGain,
+            defaultConfig.maxLoss
+        );
         vm.stopPrank();
     }
 
@@ -372,14 +396,11 @@ abstract contract VaultTest is HyperdriveTest {
         }
     }
 
-    /// @dev Mint base token to the provided address and approve the vault and
+    /// @dev Mint token to the provided address and approve the vault and
     ///      strategy.
     /// @param _recipient Receiver of the minted assets.
     /// @param _amount Amount of assets to mint.
-    function mintApproveBaseAsset(
-        address _recipient,
-        uint256 _amount
-    ) internal {
+    function mintApproveAsset(address _recipient, uint256 _amount) internal {
         ERC20Mintable(address(asset)).mint(_recipient, _amount);
         vm.startPrank(_recipient);
         ERC20Mintable(address(asset)).approve(address(vault), _amount);

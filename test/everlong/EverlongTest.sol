@@ -92,6 +92,9 @@ contract EverlongTest is VaultTest, IEverlongEvents {
         strategy.setEmergencyAdmin(emergencyAdmin);
         vm.stopPrank();
 
+        // Set the appropriate asset.
+        asset = IERC20(hyperdrive.baseToken());
+
         // As the `management` address:
         //   1. Accept the `management` role for the strategy.
         //   2. Set the `profitMaxUnlockTime` to zero.
@@ -105,28 +108,12 @@ contract EverlongTest is VaultTest, IEverlongEvents {
     /// @dev Deploy the Everlong Yearn v3 Vault.
     function setUpEverlongVault() internal {
         // As the `governance` address:
-        //   1. Accept the "Fee Manager" role for the Accountant.
-        //   2. Set the default `config.maxLoss` for the accountant to be 10%.
-        //      This will enable losses of up to 10% across reports before
-        //      reverting.
-        //   3. Deploy the Vault using the RoleManager.
-        //   4. Add the EverlongStrategy to the vault.
-        //   5. Update the max debt for the strategy to be the maximum uint256.
-        //   6. Configure the vault to `auto_allocate` which will automatically
+        //   1. Deploy the Vault using the RoleManager.
+        //   2. Add the EverlongStrategy to the vault.
+        //   3. Update the max debt for the strategy to be the maximum uint256.
+        //   4. Configure the vault to `auto_allocate` which will automatically
         //      update the strategy's debt on deposit.
         vm.startPrank(governance);
-        accountant.acceptFeeManager();
-        IAccountant.Fee memory defaultConfig = accountant.defaultConfig();
-        // Must increase the accountant maxLoss for reporting since `totalAssets`
-        // decreases whenever opening longs.
-        accountant.updateDefaultConfig(
-            0,
-            0,
-            0,
-            0,
-            defaultConfig.maxGain,
-            defaultConfig.maxLoss
-        );
         vault = IVault(
             roleManager.newVault(
                 address(asset),
