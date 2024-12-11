@@ -33,7 +33,7 @@ contract TestSDAIVaultSharesToken is EverlongTest {
 
     /// @dev Deposit into the SDAI everlong vault.
     /// @param _assets Amount of assets to deposit.
-    /// @param _to Source of the tokens.
+    /// @param _from Source of the tokens.
     /// @return shares Amount of shares received from the deposit.
     function depositSDAI(
         uint256 _assets,
@@ -47,9 +47,9 @@ contract TestSDAIVaultSharesToken is EverlongTest {
     }
 
     /// @dev Redeem shares from the SDAI everlong vault.
-    /// @param _assets Amount of shares to redeem.
-    /// @param _to Source of the shares.
-    /// @return shares Amount of assets received from the redemption.
+    /// @param _shares Amount of shares to redeem.
+    /// @param _from Source of the shares.
+    /// @return assets Amount of assets received from the redemption.
     function redeemSDAI(
         uint256 _shares,
         address _from
