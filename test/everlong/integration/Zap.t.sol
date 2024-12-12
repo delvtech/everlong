@@ -3,7 +3,11 @@ pragma solidity ^0.8.20;
 
 import { console2 as console } from "forge-std/console2.sol";
 import { IERC20, IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
+import { ISwapRouter } from "hyperdrive/contracts/src/interfaces/ISwapRouter.sol";
+import { IUniV3Zap } from "hyperdrive/contracts/src/interfaces/IUniV3Zap.sol";
+import { IWETH } from "hyperdrive/contracts/src/interfaces/IWETH.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
+import { UniV3Zap } from "hyperdrive/contracts/src/zaps/UniV3Zap.sol";
 import { Lib } from "hyperdrive/test/utils/Lib.sol";
 import { IVault } from "yearn-vaults-v3/interfaces/IVault.sol";
 import { IEverlongStrategy } from "../../../contracts/interfaces/IEverlongStrategy.sol";
@@ -13,50 +17,104 @@ import { HyperdriveExecutionLibrary } from "../../../contracts/libraries/Hyperdr
 import { EverlongStrategy } from "../../../contracts/EverlongStrategy.sol";
 import { EverlongTest } from "../EverlongTest.sol";
 
-/// @dev Test ensuring that Everlong works with sDAI Hyperdrive and
-///      AS_BASE=false.
-contract TestSDAIVaultSharesToken is EverlongTest {
+/// @dev Test ensuring that Everlong works with UniV3 zaps when interacting with
+///      hyperdrive
+contract TestZap is EverlongTest {
     using FixedPointMath for *;
     using Lib for *;
     using HyperdriveExecutionLibrary for *;
 
-    /// @dev SDAI whale account used for easy token minting.
-    address WHALE = 0x0740c011A4160139Bd2E4EA091581d35ee3454da;
+    /// @dev Uniswap's lowest fee tier.
+    uint24 internal constant LOWEST_FEE_TIER = 100;
+
+    /// @dev Uniswap's low fee tier.
+    uint24 internal constant LOW_FEE_TIER = 500;
+
+    /// @dev Uniswap's medium fee tier.
+    uint24 internal constant MEDIUM_FEE_TIER = 3_000;
+
+    /// @dev Uniswap's high fee tier.
+    uint24 internal constant HIGH_FEE_TIER = 10_000;
+
+    /// @dev The USDC token address.
+    address internal constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+
+    /// @dev The DAI token address.
+    address internal constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
+
+    /// @dev The sDAI token address.
+    address internal constant SDAI = 0x83F20F44975D03b1b09e64809B757c47f942BEeA;
+
+    /// @dev The Wrapped Ether token address.
+    address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+
+    /// @dev The rETH token address.
+    address internal constant RETH = 0xae78736Cd615f374D3085123A210448E74Fc6393;
+
+    /// @dev The stETH token address.
+    address internal constant STETH =
+        0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84;
+
+    /// @dev The wstETH token address.
+    address internal constant WSTETH =
+        0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0;
+
+    /// @dev The USDC whale address
+    address internal constant USDC_WHALE =
+        0x37305B1cD40574E4C5Ce33f8e8306Be057fD7341;
+
+    /// @dev The DAI whale address
+    address internal constant DAI_WHALE =
+        0x40ec5B33f54e0E8A33A975908C5BA1c14e5BbbDf;
+
+    /// @dev The sDAI whale address
+    address internal constant SDAI_WHALE =
+        0x4C612E3B15b96Ff9A6faED838F8d07d479a8dD4c;
+
+    /// @dev The WETH whale address
+    address internal constant WETH_WHALE =
+        0xF04a5cC80B1E94C69B48f5ee68a08CD2F09A7c3E;
+
+    /// @dev The rETH whale address
+    address internal constant RETH_WHALE =
+        0xCc9EE9483f662091a1de4795249E24aC0aC2630f;
+
+    /// @dev The stETH whale address
+    address internal constant STETH_WHALE =
+        0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0;
+
+    /// @dev The Uniswap swap router.
+    ISwapRouter internal constant SWAP_ROUTER =
+        ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+
+    /// @dev The Hyperdrive mainnet sDAI pool.
+    IHyperdrive internal constant SDAI_HYPERDRIVE =
+        IHyperdrive(0x324395D5d835F84a02A75Aa26814f6fD22F25698);
+
+    /// @dev The Hyperdrive mainnet stETH pool.
+    IHyperdrive internal constant STETH_HYPERDRIVE =
+        IHyperdrive(0xd7e470043241C10970953Bd8374ee6238e77D735);
+
+    /// @dev The Hyperdrive mainnet rETH pool.
+    IHyperdrive internal constant RETH_HYPERDRIVE =
+        IHyperdrive(0xca5dB9Bb25D09A9bF3b22360Be3763b5f2d13589);
+
+    /// @dev The Uniswap v3 zap contract.
+    IUniV3Zap internal zap;
 
     /// @dev "Mint" tokens to an account by transferring from the whale.
+    /// @param _asset Asset to mint.
+    /// @param _whale Account to mint from.
     /// @param _amount Amount of tokens to "mint".
     /// @param _to Destination for the tokens.
-    function mintAsset(uint256 _amount, address _to) internal {
-        vm.startPrank(WHALE);
-        asset.transfer(_to, _amount);
-        vm.stopPrank();
-    }
-
-    /// @dev Deposit into the SDAI everlong vault.
-    /// @param _assets Amount of assets to deposit.
-    /// @param _from Source of the tokens.
-    /// @return shares Amount of shares received from the deposit.
-    function depositSDAI(
-        uint256 _assets,
-        address _from
-    ) internal returns (uint256 shares) {
-        mintAsset(_assets, _from);
-        vm.startPrank(_from);
-        asset.approve(address(vault), _assets);
-        shares = vault.deposit(_assets, _from);
-        vm.stopPrank();
-    }
-
-    /// @dev Redeem shares from the SDAI everlong vault.
-    /// @param _shares Amount of shares to redeem.
-    /// @param _from Source of the shares.
-    /// @return assets Amount of assets received from the redemption.
-    function redeemSDAI(
-        uint256 _shares,
-        address _from
-    ) internal returns (uint256 assets) {
-        vm.startPrank(_from);
-        assets = vault.redeem(_shares, _from, _from);
+    function mint(
+        address _asset,
+        address _whale,
+        uint256 _amount,
+        address _to
+    ) internal {
+        vm.startPrank(_whale);
+        IERC20(_asset).transfer(_to, _amount);
         vm.stopPrank();
     }
 
@@ -65,24 +123,35 @@ contract TestSDAIVaultSharesToken is EverlongTest {
     function setUp() public virtual override {
         super.setUp();
 
-        // sDai Hyperdrive mainnet address.
-        hyperdrive = IHyperdrive(0x324395D5d835F84a02A75Aa26814f6fD22F25698);
+        // Instantiate the zap contract.
+        zap = IUniV3Zap(new UniV3Zap("Test Zap", SWAP_ROUTER, IWETH(WETH)));
+
+        // StETH Hyperdrive mainnet address.
+        hyperdrive = STETH_HYPERDRIVE;
 
         // Set the correct asset.
-        asset = IERC20(hyperdrive.vaultSharesToken());
+        asset = IERC20(WETH);
 
         vm.startPrank(deployer);
 
         // Deploy and configure the strategy.
-        IEverlongStrategy.ZapConfig memory zapConfig;
-        zapConfig.asBase = AS_BASE;
+        AS_BASE = false;
         strategy = IPermissionedStrategy(
             address(
                 new EverlongStrategy(
                     address(asset),
-                    "sDAI Strategy",
+                    "WETH StETHHyperdrive Strategy",
                     address(hyperdrive),
-                    zapConfig
+                    IEverlongStrategy.ZapConfig({
+                        asBase: AS_BASE,
+                        zap: address(zap),
+                        shouldWrap: true,
+                        isRebasing: true,
+                        inputExpiry: 1 minutes,
+                        outputExpiry: 1 minutes,
+                        inputPath: abi.encodePacked(WETH, LOW_FEE_TIER, STETH),
+                        outputPath: abi.encodePacked(STETH, LOW_FEE_TIER, WETH)
+                    })
                 )
             )
         );
@@ -162,35 +231,18 @@ contract TestSDAIVaultSharesToken is EverlongTest {
 
     /// @dev Ensure the deposit functions work as expected.
     function test_deposit() external {
-        // Alice and Bob deposit into the vault.
+        // Alice deposit into the vault.
         uint256 depositAmount = 100e18;
-        uint256 aliceShares = depositSDAI(depositAmount, alice);
-        uint256 bobShares = depositSDAI(depositAmount, bob);
+        mint(WETH, WETH_WHALE, depositAmount, alice);
 
-        // Alice and Bob should have non-zero share amounts.
-        assertGt(aliceShares, 0);
-        assertGt(bobShares, 0);
-    }
+        vm.startPrank(alice);
+        asset.approve(address(vault), depositAmount);
+        uint256 aliceShares = vault.deposit(depositAmount, alice);
+        vm.stopPrank();
 
-    /// @dev Ensure the rebalance and redeem functions work as expected.
-    function test_redeem() external {
-        // Alice and Bob deposit into the vault.
-        uint256 depositAmount = 100e18;
-        uint256 aliceShares = depositSDAI(depositAmount, alice);
-        uint256 bobShares = depositSDAI(depositAmount, bob);
-
-        // The vault allocates funds to the strategy.
         rebalance();
 
-        // Alice and Bob redeem their shares from the vault.
-        uint256 aliceRedeemAssets = redeemSDAI(aliceShares, alice);
-        uint256 bobRedeemAssets = redeemSDAI(bobShares, bob);
-
-        console.log("Alice Redeem: %e", aliceRedeemAssets);
-        console.log("Bob Redeem: %e", bobRedeemAssets);
-
-        // Neither Alice nor Bob should have more assets than they began with.
-        assertLe(aliceRedeemAssets, depositAmount);
-        assertLe(bobRedeemAssets, depositAmount);
+        // Alice should have non-zero share amounts.
+        assertGt(aliceShares, 0);
     }
 }

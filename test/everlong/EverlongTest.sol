@@ -73,6 +73,8 @@ contract EverlongTest is VaultTest, IEverlongEvents {
         keeperContract.transferOwnership(keeper);
 
         // Deploy and configure the strategy.
+        IEverlongStrategy.ZapConfig memory zapConfig;
+        zapConfig.asBase = AS_BASE;
         strategy = IPermissionedStrategy(
             address(
                 new EverlongStrategy(
@@ -81,7 +83,7 @@ contract EverlongTest is VaultTest, IEverlongEvents {
                         : hyperdrive.vaultSharesToken(),
                     EVERLONG_NAME,
                     address(hyperdrive),
-                    AS_BASE
+                    zapConfig
                 )
             )
         );

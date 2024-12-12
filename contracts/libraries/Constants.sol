@@ -7,6 +7,18 @@ uint256 constant ONE = 1e18;
 /// @dev Maximum basis points value (10_000 == 100%).
 uint256 constant MAX_BPS = 10_000;
 
+/// @dev Uniswap's lowest fee tier.
+uint24 constant LOWEST_FEE_TIER = 100;
+
+/// @dev Uniswap's low fee tier.
+uint24 constant LOW_FEE_TIER = 500;
+
+/// @dev Uniswap's medium fee tier.
+uint24 constant MEDIUM_FEE_TIER = 3_000;
+
+/// @dev Uniswap's high fee tier.
+uint24 constant HIGH_FEE_TIER = 10_000;
+
 /// @dev We can assume that almost all Hyperdrive deployments have the
 ///      `convertToBase` and `convertToShares` functions, but there is
 ///      one legacy sDAI pool that was deployed before these functions

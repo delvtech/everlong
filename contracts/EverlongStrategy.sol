@@ -2,6 +2,8 @@
 pragma solidity 0.8.24;
 
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
+import { ISwapRouter } from "hyperdrive/contracts/src/interfaces/ISwapRouter.sol";
+import { IUniV3Zap } from "hyperdrive/contracts/src/interfaces/IUniV3Zap.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
@@ -121,8 +123,14 @@ contract EverlongStrategy is BaseStrategy {
     ///         If false, use the Hyperdrive's `vaultSharesToken`.
     bool public immutable asBase;
 
+    /// @notice Returns whether zaps are used to interact with hyperdrive.
+    bool public immutable zapEnabled;
+
     /// @dev The Hyperdrive's PoolConfig.
     IHyperdrive.PoolConfig internal _poolConfig;
+
+    /// @dev The zap configuration.
+    IEverlongStrategy.ZapConfig internal _zapConfig;
 
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                                 State                                 │
@@ -147,16 +155,67 @@ contract EverlongStrategy is BaseStrategy {
     /// @param _asset Asset to use for the strategy.
     /// @param __name Name for the strategy.
     /// @param _hyperdrive Address of the Hyperdrive instance.
-    /// @param _asBase Whether `_asset` is Hyperdrive's base asset.
+    /// @param __zapConfig Configures how `asset` is converted to one of the
+    ///                    hyperdrive instance's tokens.
     constructor(
         address _asset,
         string memory __name,
         address _hyperdrive,
-        bool _asBase
+        IEverlongStrategy.ZapConfig memory __zapConfig
     ) BaseStrategy(_asset, __name) {
+        // Save the hyperdrive address.
         hyperdrive = _hyperdrive;
-        asBase = _asBase;
+
+        // Retrieve the hyperdrive's PoolConfig.
         _poolConfig = IHyperdrive(_hyperdrive).getPoolConfig();
+
+        // Determine from the `__zapConfig` whether we should process opening
+        // and closing longs with the base token or the vault shares token.
+        asBase = __zapConfig.asBase;
+
+        // If the strategy asset is the same as the hyperdrive token specified
+        // by `asBase` then no zapping is needed and we can return early.
+        if (
+            _asset ==
+            address(
+                __zapConfig.asBase
+                    ? _poolConfig.baseToken
+                    : _poolConfig.vaultSharesToken
+            )
+        ) {
+            return;
+        }
+
+        // Ensure the zap contract is set.
+        if (__zapConfig.zap == address(0)) {
+            revert IEverlongStrategy.InvalidZapContract();
+        }
+
+        // Ensure the inputExpiry is set.
+        if (__zapConfig.inputExpiry == 0) {
+            revert IEverlongStrategy.InvalidZapInputExpiry();
+        }
+
+        // Ensure the outputExpiry is set.
+        if (__zapConfig.outputExpiry == 0) {
+            revert IEverlongStrategy.InvalidZapOutputExpiry();
+        }
+
+        // TODO: Validate start and end addresses.
+        //
+        // Ensure the inputPath is set.
+        if (__zapConfig.inputPath.length == 0) {
+            revert IEverlongStrategy.InvalidZapInputPath();
+        }
+
+        // TODO: Validate start and end addresses.
+        //
+        // Ensure the outputPath is set.
+        if (__zapConfig.outputPath.length == 0) {
+            revert IEverlongStrategy.InvalidZapOutputPath();
+        }
+
+        _zapConfig = __zapConfig;
     }
 
     // ╭───────────────────────────────────────────────────────────────────────╮
@@ -215,7 +274,7 @@ contract EverlongStrategy is BaseStrategy {
         // extended period is Hyperdrive's minimumTransactionAmount.
         //
         // Since idle liquidity won't vary greatly and has little effect on
-        // totalAssets it's likely safe for us to simply use totalAssets to
+        // totalAssets it's safe for us to simply use totalAssets to
         // determine and attribute losses.
 
         // Calculate the current `totalAssets` and retrieve the previous value.
@@ -298,14 +357,10 @@ contract EverlongStrategy is BaseStrategy {
         if (toSpend > _poolConfig.minimumTransactionAmount) {
             // Approve leaving an extra wei so the slot stays warm.
             ERC20(asset).forceApprove(address(hyperdrive), toSpend + 1);
-            (uint256 maturityTime, uint256 bondAmount) = IHyperdrive(hyperdrive)
-                .openLong(
-                    asBase,
-                    toSpend,
-                    tendConfig.minOutput,
-                    tendConfig.minVaultSharePrice,
-                    tendConfig.extraData
-                );
+            (uint256 maturityTime, uint256 bondAmount) = _openLong(
+                toSpend,
+                tendConfig
+            );
 
             // Account for the new position in the portfolio.
             _portfolio.handleOpenPosition(maturityTime, bondAmount);
@@ -412,6 +467,7 @@ contract EverlongStrategy is BaseStrategy {
         // - The current position is not mature.
         // - The limit on closed positions has been reached.
         IEverlongStrategy.EverlongPosition memory position;
+        (, IEverlongStrategy.TendConfig memory tendConfig) = getTendConfig();
         for (uint256 count; !_portfolio.isEmpty() && count < _limit; ++count) {
             // Retrieve the most mature position.
             position = _portfolio.head();
@@ -424,12 +480,7 @@ contract EverlongStrategy is BaseStrategy {
 
             // Close the position add the amount of assets received to the
             // cumulative output.
-            output += IHyperdrive(hyperdrive).closeLong(
-                asBase,
-                position,
-                0,
-                ""
-            );
+            output += _closeLong(position, tendConfig);
 
             // Update portfolio accounting to reflect the closed position.
             _portfolio.handleClosePosition();
@@ -453,6 +504,7 @@ contract EverlongStrategy is BaseStrategy {
         // closure.
         IEverlongStrategy.EverlongPosition memory position;
         uint256 totalPositionValue;
+        (, IEverlongStrategy.TendConfig memory tendConfig) = getTendConfig();
         while (!_portfolio.isEmpty() && output < _targetOutput) {
             // Retrieve the most mature position.
             position = _portfolio.head();
@@ -485,14 +537,12 @@ contract EverlongStrategy is BaseStrategy {
 
                 // Close part of the position and enforce the slippage guard.
                 // Add the amount of assets received to the total output.
-                output += IHyperdrive(hyperdrive).closeLong(
-                    asBase,
+                output += _closeLong(
                     IEverlongStrategy.EverlongPosition({
                         maturityTime: position.maturityTime,
                         bondAmount: bondsNeeded.toUint128()
                     }),
-                    0,
-                    ""
+                    tendConfig
                 );
 
                 // Update portfolio accounting to include the partial closure.
@@ -504,12 +554,7 @@ contract EverlongStrategy is BaseStrategy {
             // Close the entire position.
             else {
                 // Close the entire position and increase the cumulative output.
-                output += IHyperdrive(hyperdrive).closeLong(
-                    asBase,
-                    position,
-                    0,
-                    ""
-                );
+                output += _closeLong(position, tendConfig);
 
                 // Update portfolio accounting to include the partial closure.
                 _portfolio.handleClosePosition();
@@ -518,6 +563,91 @@ contract EverlongStrategy is BaseStrategy {
 
         // The target has been reached or no more positions remain.
         return output;
+    }
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                            Open/Close Long                            │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
+    function _openLong(
+        uint256 _toSpend,
+        IEverlongStrategy.TendConfig memory _tendConfig
+    ) internal returns (uint256 maturityTime, uint256 bondAmount) {
+        if (zapEnabled) {
+            return
+                IUniV3Zap(_zapConfig.zap).openLongZap(
+                    IHyperdrive(hyperdrive),
+                    _tendConfig.minOutput,
+                    _tendConfig.minVaultSharePrice,
+                    IHyperdrive.Options({
+                        destination: address(this),
+                        asBase: asBase,
+                        extraData: _tendConfig.extraData
+                    }),
+                    IUniV3Zap.ZapInOptions({
+                        swapParams: ISwapRouter.ExactInputParams({
+                            path: _zapConfig.inputPath,
+                            recipient: address(_zapConfig.zap),
+                            deadline: block.timestamp + _zapConfig.inputExpiry,
+                            amountIn: _toSpend,
+                            // TODO: Fix me. Use real value.
+                            amountOutMinimum: 0
+                        }),
+                        sourceAsset: address(asset),
+                        sourceAmount: _toSpend,
+                        shouldWrap: _zapConfig.shouldWrap,
+                        isRebasing: _zapConfig.isRebasing
+                    })
+                );
+        }
+        return
+            IHyperdrive(hyperdrive).openLong(
+                asBase,
+                _toSpend,
+                _tendConfig.minOutput,
+                _tendConfig.minVaultSharePrice,
+                _tendConfig.extraData
+            );
+    }
+
+    function _closeLong(
+        IEverlongStrategy.EverlongPosition memory _position,
+        IEverlongStrategy.TendConfig memory _tendConfig
+    ) internal returns (uint256) {
+        if (zapEnabled) {
+            return
+                IUniV3Zap(_zapConfig.zap).closeLongZap(
+                    IHyperdrive(hyperdrive),
+                    _position.maturityTime,
+                    _position.bondAmount,
+                    _tendConfig.minOutput,
+                    IHyperdrive.Options({
+                        destination: address(this),
+                        asBase: asBase,
+                        extraData: _tendConfig.extraData
+                    }),
+                    ISwapRouter.ExactInputParams({
+                        path: _zapConfig.outputPath,
+                        recipient: address(_zapConfig.zap),
+                        deadline: block.timestamp + _zapConfig.outputExpiry,
+                        // TODO: Verify that the `amountIn` for zap outs isn't
+                        //       considered.
+                        amountIn: 0,
+                        // TODO: Fix me. Use real value.
+                        amountOutMinimum: 0
+                    }),
+                    // TODO: Talk to alex about the implications of wrapping the
+                    //       proceeds token.
+                    false
+                );
+        }
+        return
+            IHyperdrive(hyperdrive).closeLong(
+                asBase,
+                _position,
+                0,
+                _tendConfig.extraData
+            );
     }
 
     // ╭───────────────────────────────────────────────────────────────────────╮

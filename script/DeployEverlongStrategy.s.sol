@@ -113,6 +113,10 @@ contract DeployEverlongStrategy is BaseDeployScript {
         // Save the strategy's kind to output.
         output.kind = EVERLONG_STRATEGY_KIND;
 
+        // FIXME: Actually set the ZapConfig from inputs.
+        IEverlongStrategy.ZapConfig memory zapConfig;
+        zapConfig.asBase = AS_BASE;
+
         // As the `deployer` account:
         //   1. Deploy the strategy contract.
         //   2. Set the strategy's performanceFeeRecipient.
@@ -121,7 +125,12 @@ contract DeployEverlongStrategy is BaseDeployScript {
         //   5. Set the strategy's emergencyAdmin to `emergencyAdmin`.
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
         output.strategy = address(
-            new EverlongStrategy(asset, output.name, output.hyperdrive, AS_BASE)
+            new EverlongStrategy(
+                asset,
+                output.name,
+                output.hyperdrive,
+                zapConfig
+            )
         );
         IEverlongStrategy(output.strategy).setPerformanceFeeRecipient(
             output.governance

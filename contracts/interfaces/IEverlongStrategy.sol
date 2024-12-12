@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
+import { IUniV3Zap } from "hyperdrive/contracts/src/interfaces/IUniV3Zap.sol";
 import { IEverlongEvents } from "./IEverlongEvents.sol";
 import { IPermissionedStrategy } from "./IPermissionedStrategy.sol";
 
@@ -16,6 +17,36 @@ interface IEverlongStrategy is IPermissionedStrategy, IEverlongEvents {
         uint128 maturityTime;
         /// @notice Amount of bonds in the position.
         uint128 bondAmount;
+    }
+
+    /// @notice Configuration on how the strategy's `asset` is converted to and
+    ///         from a token used by the hyperdrive instance.
+    struct ZapConfig {
+        /// @notice Whether to use hyperdrive's base token. If false, use the
+        ///         vault shares token.
+        bool asBase;
+        /// @notice Contract to use for zaps.
+        address zap;
+        /// @notice A flag that indicates whether or not the source token should
+        ///         be wrapped into the input token. Uniswap v3 demands complete
+        ///         precision on the input token amounts, which makes it hard to
+        ///         work with rebasing tokens that have imprecise transfer
+        ///         functions. Wrapping tokens provides a workaround for these
+        ///         issues.
+        bool shouldWrap;
+        /// @notice A flag that indicates whether or not the Hyperdrive vault
+        ///         shares token is a vault shares token. This is used to ensure
+        ///         that the input into Hyperdrive properly handles rebasing
+        ///         tokens.
+        bool isRebasing;
+        /// @notice Amount of time in seconds before the input zap expires.
+        uint64 inputExpiry;
+        /// @notice Amount of time in seconds before the output zap expires.
+        uint64 outputExpiry;
+        /// @notice Path for the zap from strategy to hyperdrive.
+        bytes inputPath;
+        /// @notice Path for the zap from hyperdrive to the strategy.
+        bytes outputPath;
     }
 
     /// @notice Configuration for how `tend()` will be performed.
@@ -37,9 +68,17 @@ interface IEverlongStrategy is IPermissionedStrategy, IEverlongEvents {
 
     /// @notice Sets the temporary tend configuration. Necessary for `tend()`
     ///         call to succeed. Must be called in the same tx as `tend()`.
-    function setTendConfig(
-        IEverlongStrategy.TendConfig memory _config
-    ) external;
+    function setTendConfig(TendConfig memory _config) external;
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                                ERRORS                                 │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
+    error InvalidZapContract();
+    error InvalidZapInputExpiry();
+    error InvalidZapOutputExpiry();
+    error InvalidZapInputPath();
+    error InvalidZapOutputPath();
 
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                                 VIEWS                                 │
@@ -108,4 +147,8 @@ interface IEverlongStrategy is IPermissionedStrategy, IEverlongEvents {
     /// @notice Gets the Everlong instance's version.
     /// @return The Everlong instance's version.
     function version() external pure returns (string memory);
+
+    /// @notice Returns whether zaps are used to interact with hyperdrive.
+    /// @return True if zaps are used, false otherwise.
+    function zapEnabled() external view returns (bool);
 }
