@@ -61,7 +61,7 @@ contract TestZap is EverlongTest {
 
     /// @dev The USDC whale address
     address internal constant USDC_WHALE =
-        0x37305B1cD40574E4C5Ce33f8e8306Be057fD7341;
+        0xDFd5293D8e347dFe59E90eFd55b2956a1343963d;
 
     /// @dev The DAI whale address
     address internal constant DAI_WHALE =
@@ -126,11 +126,11 @@ contract TestZap is EverlongTest {
         // Instantiate the zap contract.
         zap = IUniV3Zap(new UniV3Zap("Test Zap", SWAP_ROUTER, IWETH(WETH)));
 
-        // StETH Hyperdrive mainnet address.
-        hyperdrive = STETH_HYPERDRIVE;
+        // SDAI Hyperdrive mainnet address.
+        hyperdrive = SDAI_HYPERDRIVE;
 
         // Set the correct asset.
-        asset = IERC20(WETH);
+        asset = IERC20(USDC);
 
         vm.startPrank(deployer);
 
@@ -140,17 +140,29 @@ contract TestZap is EverlongTest {
             address(
                 new EverlongStrategy(
                     address(asset),
-                    "WETH StETHHyperdrive Strategy",
+                    "USDC sDAIHyperdrive Strategy",
                     address(hyperdrive),
                     IEverlongStrategy.ZapConfig({
                         asBase: AS_BASE,
                         zap: address(zap),
                         shouldWrap: true,
-                        isRebasing: true,
+                        isRebasing: false,
                         inputExpiry: 1 minutes,
                         outputExpiry: 1 minutes,
-                        inputPath: abi.encodePacked(WETH, LOW_FEE_TIER, STETH),
-                        outputPath: abi.encodePacked(STETH, LOW_FEE_TIER, WETH)
+                        inputPath: abi.encodePacked(
+                            USDC,
+                            LOW_FEE_TIER,
+                            DAI,
+                            LOW_FEE_TIER,
+                            SDAI
+                        ),
+                        outputPath: abi.encodePacked(
+                            SDAI,
+                            LOW_FEE_TIER,
+                            DAI,
+                            LOW_FEE_TIER,
+                            USDC
+                        )
                     })
                 )
             )
@@ -229,11 +241,12 @@ contract TestZap is EverlongTest {
         vm.stopPrank();
     }
 
-    /// @dev Ensure the deposit functions work as expected.
-    function test_deposit() external {
+    /// @dev Ensure the deposit/redeem functions work as expected for the happy
+    ///      path.
+    function test_simple_deposit_redeem() external {
         // Alice deposit into the vault.
-        uint256 depositAmount = 100e18;
-        mint(WETH, WETH_WHALE, depositAmount, alice);
+        uint256 depositAmount = 100e8;
+        mint(USDC, USDC_WHALE, depositAmount, alice);
 
         vm.startPrank(alice);
         asset.approve(address(vault), depositAmount);
@@ -244,5 +257,9 @@ contract TestZap is EverlongTest {
 
         // Alice should have non-zero share amounts.
         assertGt(aliceShares, 0);
+
+        vm.startPrank(alice);
+        uint256 proceeds = vault.redeem(aliceShares, alice, alice);
+        assertApproxEqRel(proceeds, depositAmount, 0.1e18);
     }
 }

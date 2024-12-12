@@ -213,9 +213,7 @@ abstract contract VaultTest is HyperdriveTest {
 
         // As the `governance` address:
         //   1. Accept the "Fee Manager" role for the Accountant.
-        //   2. Set the default `config.maxLoss` for the accountant to be 10%.
-        //      This will enable losses of up to 10% across reports before
-        //      reverting.
+        //   2. Disable fees in the default vault configuration.
         vm.startPrank(governance);
         accountant.acceptFeeManager();
         IAccountant.Fee memory defaultConfig = accountant.defaultConfig();
