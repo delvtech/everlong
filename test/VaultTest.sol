@@ -192,7 +192,6 @@ abstract contract VaultTest is HyperdriveTest {
             HYPERDRIVE_INITIALIZER = deployer;
         }
         initialize(HYPERDRIVE_INITIALIZER, FIXED_RATE, INITIAL_CONTRIBUTION);
-        advanceTimeWithCheckpoints(1);
 
         vm.stopPrank();
     }
