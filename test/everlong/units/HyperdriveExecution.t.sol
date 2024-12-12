@@ -196,16 +196,16 @@ contract TestHyperdriveExecution is EverlongTest {
     ) external {
         // Deploy Hyperdrive.
         fixedRate = fixedRate.normalizeToRange(0.001e18, 0.5e18);
+        FIXED_RATE = fixedRate;
         deploy(alice, fixedRate, 0, 0, 0, 0);
-
-        // Initialize the Hyperdrive pool.
         contribution = contribution.normalizeToRange(1_000e18, 500_000_000e18);
+        INITIAL_CONTRIBUTION = contribution;
         initialize(alice, fixedRate, contribution);
 
         // Open a long position that will be held for an entire term. This will
         // decrease the value of the share adjustment to a non-trivial value.
         matureLongAmount = matureLongAmount.normalizeToRange(
-            MINIMUM_TRANSACTION_AMOUNT,
+            MINIMUM_TRANSACTION_AMOUNT + 1,
             hyperdrive.calculateMaxLong() / 2
         );
         openLong(alice, matureLongAmount);
@@ -234,10 +234,10 @@ contract TestHyperdriveExecution is EverlongTest {
     ) external {
         // Deploy Hyperdrive.
         fixedRate = fixedRate.normalizeToRange(0.001e18, 0.5e18);
+        FIXED_RATE = fixedRate;
         deploy(alice, fixedRate, 0, 0, 0, 0);
-
-        // Initialize the Hyperdrive pool.
         contribution = contribution.normalizeToRange(1_000e18, 500_000_000e18);
+        INITIAL_CONTRIBUTION = contribution;
         initialize(alice, fixedRate, contribution);
 
         // Open a short position that will be held for an entire term. This will
@@ -314,10 +314,10 @@ contract TestHyperdriveExecution is EverlongTest {
     ) internal {
         // Deploy Hyperdrive.
         fixedRate = fixedRate.normalizeToRange(0.001e18, 0.5e18);
+        FIXED_RATE = fixedRate;
         deploy(alice, fixedRate, 0, 0, 0, 0);
-
-        // Initialize the Hyperdrive pool.
         contribution = contribution.normalizeToRange(1_000e18, 500_000_000e18);
+        INITIAL_CONTRIBUTION = contribution;
         initialize(alice, fixedRate, contribution);
 
         // Ensure that the max long is actually the max long.
@@ -342,12 +342,12 @@ contract TestHyperdriveExecution is EverlongTest {
         // Open a long and a short. This sets the long buffer to a non-trivial
         // value which stress tests the max long function.
         initialLongAmount = initialLongAmount.normalizeToRange(
-            MINIMUM_TRANSACTION_AMOUNT,
+            MINIMUM_TRANSACTION_AMOUNT + 1,
             hyperdrive.calculateMaxLong() / 2
         );
         openLong(bob, initialLongAmount);
         initialShortAmount = initialShortAmount.normalizeToRange(
-            MINIMUM_TRANSACTION_AMOUNT,
+            MINIMUM_TRANSACTION_AMOUNT + 1,
             HyperdriveUtils.calculateMaxShort(hyperdrive) / 2
         );
         openShort(bob, initialShortAmount);
@@ -398,7 +398,7 @@ contract TestHyperdriveExecution is EverlongTest {
         vm.stopPrank();
         vm.startPrank(bob);
         finalLongAmount = finalLongAmount.normalizeToRange(
-            maxLong.mulDown(0.1e18).max(MINIMUM_TRANSACTION_AMOUNT),
+            maxLong.mulDown(0.1e18).max(MINIMUM_TRANSACTION_AMOUNT + 1),
             maxLong.mulDown(1000e18).max(
                 MINIMUM_TRANSACTION_AMOUNT.mulDown(10e18)
             )

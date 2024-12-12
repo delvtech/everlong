@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
+import { IERC4626 } from "hyperdrive/contracts/src/interfaces/IERC4626.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
+import { ILido } from "hyperdrive/contracts/src/interfaces/ILido.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { HyperdriveMath } from "hyperdrive/contracts/src/libraries/HyperdriveMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
@@ -11,7 +13,7 @@ import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { Packing } from "openzeppelin/utils/Packing.sol";
 import { IEverlongEvents } from "../interfaces/IEverlongEvents.sol";
 import { IEverlongStrategy } from "../interfaces/IEverlongStrategy.sol";
-import { ONE } from "./Constants.sol";
+import { ONE, LEGACY_SDAI_HYPERDRIVE, LEGACY_STETH_HYPERDRIVE } from "./Constants.sol";
 
 // TODO: Extract into its own library.
 uint256 constant HYPERDRIVE_SHARE_RESERVES_BOND_RESERVES_SLOT = 2;
@@ -51,7 +53,11 @@ library HyperdriveExecutionLibrary {
             _amount,
             0,
             0,
-            IHyperdrive.Options(address(this), _asBase, _extraData)
+            IHyperdrive.Options({
+                destination: address(this),
+                asBase: _asBase,
+                extraData: _extraData
+            })
         );
         emit IEverlongEvents.PositionOpened(
             maturityTime.toUint128(),
@@ -79,7 +85,11 @@ library HyperdriveExecutionLibrary {
             _amount,
             _minOutput,
             _minVaultSharePrice,
-            IHyperdrive.Options(address(this), _asBase, _extraData)
+            IHyperdrive.Options({
+                destination: address(this),
+                asBase: _asBase,
+                extraData: _extraData
+            })
         );
         emit IEverlongEvents.PositionOpened(
             maturityTime.toUint128(),
@@ -103,7 +113,7 @@ library HyperdriveExecutionLibrary {
             _calculateOpenLong(
                 self,
                 _poolConfig,
-                _asBase ? self.convertToShares(_amount) : _amount
+                _asBase ? _convertToShares(self, _amount) : _amount
             );
     }
 
@@ -302,7 +312,7 @@ library HyperdriveExecutionLibrary {
             _position
         );
         if (_asBase) {
-            return self.convertToBase(shareProceeds);
+            return _convertToBase(self, shareProceeds);
         }
         return shareProceeds;
     }
@@ -414,7 +424,8 @@ library HyperdriveExecutionLibrary {
         // Correct for any error that crept into the calculation of the share
         // amount by converting the shares to base and then back to shares
         // using the vault's share conversion logic.
-        data.shareProceeds = self.convertToShares(
+        data.shareProceeds = _convertToShares(
+            self,
             data.shareProceeds.mulDown(data.closeVaultSharePrice)
         );
 
@@ -1232,7 +1243,7 @@ library HyperdriveExecutionLibrary {
     /// @dev Obtains the vaultSharePrice from the hyperdrive instance.
     /// @return The current vaultSharePrice.
     function vaultSharePrice(IHyperdrive self) internal view returns (uint256) {
-        return self.convertToBase(ONE);
+        return _convertToBase(self, ONE);
     }
 
     /// @dev Returns whether a position is mature.
@@ -1336,5 +1347,75 @@ library HyperdriveExecutionLibrary {
         uint256 _timestamp
     ) internal view returns (IHyperdrive.Checkpoint memory) {
         return self.getCheckpoint(getCheckpointIdUp(self, _timestamp));
+    }
+
+    /// @dev Convert the input `_shareAmount` to base assets and return the
+    ///      amount.
+    /// @dev Modern hyperdrive instances expose a `convertToBase` function but
+    ///      some legacy instances do not. For those legacy cases, we perform
+    ///      the calculation here.
+    /// @param _shareAmount Amount of shares to convert to base assets.
+    /// @return The converted base amount.
+    function _convertToBase(
+        IHyperdrive self,
+        uint256 _shareAmount
+    ) internal view returns (uint256) {
+        // Check whether the chain is mainnet. If so, special accomodations may
+        // be needed for legacy hyperdrive instances.
+        if (block.chainid == 1) {
+            // If the address is the legacy stETH pool, we have to convert the
+            // proceeds to base manually using Lido's `getPooledEthByShares`
+            // function.
+            if (address(self) == LEGACY_STETH_HYPERDRIVE) {
+                return
+                    ILido(address(self.vaultSharesToken()))
+                        .getPooledEthByShares(_shareAmount);
+            }
+            // If the address is the legacy sDAI pool, we have to convert the
+            // proceeds to base manually using ERC4626's `convertToAssets`
+            // function.
+            else if (address(self) == LEGACY_SDAI_HYPERDRIVE) {
+                return
+                    IERC4626(self.vaultSharesToken()).convertToAssets(
+                        _shareAmount
+                    );
+            }
+        }
+        return self.convertToBase(_shareAmount);
+    }
+
+    /// @dev Convert the input `_baseAmount` to vault shares and return the
+    ///      amount.
+    /// @dev Modern hyperdrive instances expose a `convertToShares` function but
+    ///      some legacy instances do not. For those legacy cases, we perform
+    ///      the calculation here.
+    /// @param _baseAmount Amount of base to convert to shares.
+    /// @return The converted share amount.
+    function _convertToShares(
+        IHyperdrive self,
+        uint256 _baseAmount
+    ) internal view returns (uint256) {
+        // Check whether the chain is mainnet. If so, special accomodations may
+        // be needed for legacy hyperdrive instances.
+        if (block.chainid == 1) {
+            // If the address is the legacy stETH pool, we have to convert the
+            // proceeds to shares manually using Lido's `getSharesByPooledEth`
+            // function.
+            if (address(self) == LEGACY_STETH_HYPERDRIVE) {
+                return
+                    ILido(address(self.vaultSharesToken()))
+                        .getSharesByPooledEth(_baseAmount);
+            }
+            // If the address is the legacy sDAI pool, we have to convert the
+            // proceeds to base manually using ERC4626's `convertToShares`
+            // function.
+            else if (address(self) == LEGACY_SDAI_HYPERDRIVE) {
+                return
+                    IERC4626(self.vaultSharesToken()).convertToShares(
+                        _baseAmount
+                    );
+            }
+        }
+        return self.convertToShares(_baseAmount);
     }
 }

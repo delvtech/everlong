@@ -33,22 +33,22 @@ contract EverlongStrategyKeeper is Ownable {
     using SafeERC20 for ERC20;
 
     /// @notice Kind of the EverlongStrategyKeeper.
-    string constant kind = EVERLONG_STRATEGY_KEEPER_KIND;
+    string public constant kind = EVERLONG_STRATEGY_KEEPER_KIND;
 
     /// @notice Version of the EverlongStrategyKeeper.
-    string constant version = EVERLONG_VERSION;
+    string public constant version = EVERLONG_VERSION;
 
     /// @notice Name of the EverlongStrategyKeeper.
-    string name;
+    string public name;
 
     /// @notice Address of the target RoleManager contract.
     /// @dev Helpful for getting periphery contract addresses and enumerating
     ///      vaults.
-    address roleManager;
+    address public roleManager;
 
     /// @notice Address of the external `CommonReportTrigger` contract.
     /// @dev This contract contains default checks for whether to report+tend.
-    address trigger;
+    address public trigger;
 
     /// @notice Initialize the EverlongStrategyKeeper contract.
     /// @param _name Name for the keeper contract.
