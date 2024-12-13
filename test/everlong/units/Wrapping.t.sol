@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
+import { EtchingUtils } from "hyperdrive/test/utils/EtchingUtils.sol";
+
 import { console2 as console } from "forge-std/console2.sol";
 import { IERC20, IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
@@ -10,7 +12,7 @@ import { EVERLONG_STRATEGY_KIND, EVERLONG_VERSION } from "../../../contracts/lib
 import { EverlongTest } from "../EverlongTest.sol";
 
 /// @dev Tests wrapping functionality for rebasing tokens.
-contract TestWrapping is EverlongTest {
+contract TestWrapping is EtchingUtils, EverlongTest {
     using FixedPointMath for *;
 
     /// @dev The StETH token address.
@@ -71,6 +73,9 @@ contract TestWrapping is EverlongTest {
         IS_WRAPPED = true;
         WRAPPED_ASSET = WSTETH;
         hyperdrive = IHyperdrive(STETH_HYPERDRIVE);
+
+        // FIXME
+        etchHyperdrive(address(hyperdrive));
 
         setUpEverlongStrategy();
         setUpEverlongVault();

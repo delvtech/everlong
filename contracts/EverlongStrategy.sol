@@ -650,6 +650,9 @@ contract EverlongStrategy is BaseStrategy {
                 address(hyperdrive),
                 _toSpend + 1
             );
+
+            // FIXME
+            _toSpend = convertToWrapped(_toSpend);
         }
         // The strategy asset is not wrapped, no conversions are necessary.
         // Approve the hyperdrive contract for strategy asset.
