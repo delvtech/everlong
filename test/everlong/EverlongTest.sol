@@ -203,6 +203,9 @@ contract EverlongTest is VaultTest, IEverlongEvents {
             })
         );
         vm.stopPrank();
+        // Skip forward one second so that `update_debt` doesn't get called on
+        // the same timestamp.
+        skip(1);
     }
 
     /// @dev Call `report` on the strategy then call `process_report` on the

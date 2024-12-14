@@ -753,9 +753,9 @@ contract EverlongStrategy is BaseStrategy {
 
         // If the strategy asset is a wrapped hyperdrive token, convert
         // amounts so that they are denominated in the unwrapped token.
-        if (isWrapped) {
-            proceeds = convertToWrapped(proceeds);
-        }
+        // if (isWrapped) {
+        //     proceeds = convertToWrapped(proceeds);
+        // }
     }
 
     // ╭───────────────────────────────────────────────────────────────────────╮

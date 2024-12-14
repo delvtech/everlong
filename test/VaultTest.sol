@@ -166,8 +166,8 @@ abstract contract VaultTest is HyperdriveTest {
 
     /// @dev Set up the testing environment on a fork of mainnet.
     function setUp() public virtual override {
-        super.setUp();
         vm.createSelectFork(vm.rpcUrl("mainnet"), FORK_BLOCK_NUMBER);
+        super.setUp();
         setUpHyperdrive();
         setUpRoleManager();
     }
