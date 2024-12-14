@@ -28,6 +28,28 @@ contract TestWrapping is EverlongTest {
     address internal constant STETH_WHALE =
         0x1982b2F5814301d4e9a8b0201555376e62F82428;
 
+    /// @dev Using the standard set up process with the mainnet
+    ///      `StETHHyperdrive` instance leads to issues with the `LPMath`
+    ///      library. To avoid this, we have to use a custom `setUp` that
+    ///      does not attempt to deploy a test instance of hyperdrive.
+    function setUp() public virtual override {
+        vm.createSelectFork(vm.rpcUrl("mainnet"), FORK_BLOCK_NUMBER);
+        (alice, ) = createUser("alice");
+        (bob, ) = createUser("bob");
+        (governance, ) = createUser("governance");
+        (management, ) = createUser("management");
+        (deployer, ) = createUser("deployer");
+
+        AS_BASE = false;
+        IS_WRAPPED = true;
+        WRAPPED_ASSET = WSTETH;
+        hyperdrive = IHyperdrive(STETH_HYPERDRIVE);
+
+        setUpRoleManager();
+        setUpEverlongStrategy();
+        setUpEverlongVault();
+    }
+
     /// @dev Mint some WStETH to the specified account.
     function mint(address _to, uint256 _amount) internal {
         vm.startPrank(STETH_WHALE);
@@ -62,18 +84,6 @@ contract TestWrapping is EverlongTest {
 
         assets = vault.redeem(_shares, _from, _from);
         vm.stopPrank();
-    }
-
-    function setUp() public virtual override {
-        super.setUp();
-
-        AS_BASE = false;
-        IS_WRAPPED = true;
-        WRAPPED_ASSET = WSTETH;
-        hyperdrive = IHyperdrive(STETH_HYPERDRIVE);
-
-        setUpEverlongStrategy();
-        setUpEverlongVault();
     }
 
     /// @dev Ensure the deposit and redeem functions work as expected.
