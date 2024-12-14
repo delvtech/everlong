@@ -636,12 +636,6 @@ contract EverlongStrategy is BaseStrategy {
             // unwrapped.
             _toSpend = _unwrap(_toSpend);
 
-            // Convert amounts so that they are denominated in the unwrapped
-            // token.
-            _minOutput = convertToUnwrapped(_minOutput);
-            _minVaultSharePrice = convertToUnwrapped(_minVaultSharePrice);
-
-            // NOTE: Converting between wrappi
             // Approve hyperdrive for the unwrapped asset, which is also the
             // `hyperdriveToken`.
             //
@@ -650,6 +644,10 @@ contract EverlongStrategy is BaseStrategy {
                 address(hyperdrive),
                 _toSpend + 1
             );
+
+            // Convert back to hyperdrive's base denomination, same as the
+            // wrapped token's.
+            _toSpend = convertToWrapped(_toSpend);
         }
         // The strategy asset is not wrapped, no conversions are necessary.
         // Approve the hyperdrive contract for strategy asset.
@@ -732,7 +730,7 @@ contract EverlongStrategy is BaseStrategy {
             ERC20(hyperdriveToken).forceApprove(address(asset), proceeds + 1);
 
             // Wrap the proceeds.
-            proceeds = _wrap(proceeds);
+            proceeds = _wrap(convertToUnwrapped(proceeds));
         }
     }
 

@@ -76,19 +76,26 @@ contract TestWrapping is EverlongTest {
         setUpEverlongVault();
     }
 
-    /// @dev Ensure the deposit functions work as expected.
-    function test_deposit() external {
+    /// @dev Ensure the deposit and redeem functions work as expected.
+    function test_deposit_redeem() external {
         // Alice deposits into the vault.
         uint256 depositAmount = 100e18;
         uint256 aliceShares = depositWrapped(alice, depositAmount);
+        uint256 bobShares = depositWrapped(bob, depositAmount);
 
-        // Alice should have non-zero share amounts.
+        // Alice and Bob should have non-zero share amounts.
         assertGt(aliceShares, 0);
+        assertGt(bobShares, 0);
 
-        // FIXME: The call below fails with `ALLOWANCE_EXCEEDED` despite the
-        //        proper approval being in place...
-        //
         // Call update_debt and tend.
         rebalance();
+
+        // Alice and Bob redeem from the vault.
+        uint256 aliceProceeds = redeemWrapped(alice, aliceShares);
+        uint256 bobProceeds = redeemWrapped(bob, bobShares);
+
+        // Alice and Bob should have within 1% of their starting balance.
+        assertApproxEqRel(depositAmount, aliceProceeds, 0.01e18);
+        assertApproxEqRel(depositAmount, bobProceeds, 0.01e18);
     }
 }
