@@ -73,7 +73,7 @@ contract EverlongStrategy is BaseStrategy {
     using FixedPointMath for uint256;
     using HyperdriveExecutionLibrary for IHyperdrive;
     using EverlongPortfolioLibrary for EverlongPortfolioLibrary.State;
-    using SafeCast for uint256;
+    using SafeCast for *;
     using SafeERC20 for ERC20;
 
     // ╭───────────────────────────────────────────────────────────────────────╮
@@ -324,13 +324,6 @@ contract EverlongStrategy is BaseStrategy {
 
         // Limit the amount that can be spent by the deposit limit.
         uint256 toSpend = _totalIdle.min(availableDepositLimit(address(this)));
-
-        // Calculate the minimum transaction amount in strategy assets for the
-        // hyperdrive instance.
-        uint256 minTransactionAmount = _poolConfig.minimumTransactionAmount;
-        if (isWrapped) {
-            minTransactionAmount = convertToWrapped(minTransactionAmount);
-        }
 
         // If Everlong has sufficient idle, open a new position.
         if (toSpend > _poolConfig.minimumTransactionAmount) {
@@ -606,12 +599,6 @@ contract EverlongStrategy is BaseStrategy {
         if (!asBase) {
             assets = IHyperdrive(hyperdrive)._convertToShares(assets);
         }
-
-        // If using a wrapped token, convert the amount to be denominated in
-        // the wrapped token.
-        if (isWrapped) {
-            assets = convertToWrapped(assets);
-        }
     }
 
     /// @dev Open a long with the specified amount of assets. Return the amount
@@ -676,14 +663,6 @@ contract EverlongStrategy is BaseStrategy {
         uint256 _toSpend,
         bytes memory _extraData
     ) internal view returns (uint256 bondAmount) {
-        // Prepare for opening the long differently if the strategy asset is
-        // a wrapped hyperdrive token.
-        if (isWrapped) {
-            // Convert amounts so that they are denominated in the unwrapped
-            // token.
-            _toSpend = convertToUnwrapped(_toSpend);
-        }
-
         // Call the preview function and return the expected amount of bonds
         // to be received.
         bondAmount = IHyperdrive(hyperdrive).previewOpenLong(
@@ -705,14 +684,6 @@ contract EverlongStrategy is BaseStrategy {
         uint256 _minOutput,
         bytes memory _extraData
     ) internal returns (uint256 proceeds) {
-        // Prepare for closing the long differently if the strategy asset is
-        // a wrapped hyperdrive token.
-        if (isWrapped) {
-            // Convert amounts so that they are denominated in the unwrapped
-            // token.
-            _minOutput = convertToUnwrapped(_minOutput);
-        }
-
         // Close the long.
         proceeds = IHyperdrive(hyperdrive).closeLong(
             asBase,
@@ -750,12 +721,6 @@ contract EverlongStrategy is BaseStrategy {
             _position,
             _extraData
         );
-
-        // If the strategy asset is a wrapped hyperdrive token, convert
-        // amounts so that they are denominated in the unwrapped token.
-        // if (isWrapped) {
-        //     proceeds = convertToWrapped(proceeds);
-        // }
     }
 
     // ╭───────────────────────────────────────────────────────────────────────╮
@@ -810,9 +775,6 @@ contract EverlongStrategy is BaseStrategy {
     /// @return True if a new position can be opened, false otherwise.
     function canOpenPosition() public view returns (bool) {
         uint256 currentBalance = asset.balanceOf(address(this));
-        if (isWrapped) {
-            currentBalance = convertToUnwrapped(currentBalance);
-        }
         return currentBalance > _poolConfig.minimumTransactionAmount;
     }
 
