@@ -330,7 +330,7 @@ contract EverlongStrategy is BaseStrategy {
         uint256 toSpend = _totalIdle.min(availableDepositLimit(address(this)));
 
         // If Everlong has sufficient idle, open a new position.
-        if (toSpend > _poolConfig.minimumTransactionAmount) {
+        if (toSpend > _minimumTransactionAmount()) {
             (uint256 maturityTime, uint256 bondAmount) = _openLong(
                 toSpend,
                 tendConfig.minOutput,
@@ -473,7 +473,7 @@ contract EverlongStrategy is BaseStrategy {
         uint256 _targetOutput
     ) internal returns (uint256 output) {
         // Round `_targetOutput` up to Hyperdrive's minimum transaction amount.
-        _targetOutput = _targetOutput.max(_poolConfig.minimumTransactionAmount);
+        _targetOutput = _targetOutput.max(_minimumTransactionAmount());
 
         // Since multiple position's worth of bonds may need to be closed,
         // iterate through each position starting with the most mature.
@@ -502,8 +502,9 @@ contract EverlongStrategy is BaseStrategy {
             // Hyperdrive's minimum transaction amount.
             if (
                 totalPositionValue >
-                (_targetOutput - output + _poolConfig.minimumTransactionAmount)
-                    .mulUp(ONE + partialPositionClosureBuffer)
+                (_targetOutput - output + _minimumTransactionAmount()).mulUp(
+                    ONE + partialPositionClosureBuffer
+                )
             ) {
                 // Calculate the amount of bonds to close from the position.
                 uint256 bondsNeeded = uint256(position.bondAmount).mulDivUp(
@@ -681,6 +682,22 @@ contract EverlongStrategy is BaseStrategy {
         }
     }
 
+    /// @dev Retrieve hyperdrive's minimum transaction amount.
+    /// @return amount Hyperdrive's minimum transaction amount.
+    function _minimumTransactionAmount()
+        internal
+        view
+        returns (uint256 amount)
+    {
+        amount = _poolConfig.minimumTransactionAmount;
+
+        // Since `amount` is denominated in hyperdrive's base currency. We must
+        // convert it.
+        if (!asBase || isWrapped) {
+            IHyperdrive(hyperdrive)._convertToShares(amount);
+        }
+    }
+
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                                 Views                                 │
     // ╰───────────────────────────────────────────────────────────────────────╯
@@ -696,7 +713,7 @@ contract EverlongStrategy is BaseStrategy {
         // Only pre-approved addresses are able to deposit.
         if (_depositors[_depositor] || _depositor == address(this)) {
             // Limit deposits to the maximum long that can be opened in hyperdrive.
-            return IHyperdrive(hyperdrive).calculateMaxLong();
+            return IHyperdrive(hyperdrive).calculateMaxLong(asBase);
         }
         // Address has not been pre-approved, return 0.
         return 0;
@@ -735,7 +752,7 @@ contract EverlongStrategy is BaseStrategy {
     /// @return True if a new position can be opened, false otherwise.
     function canOpenPosition() public view returns (bool) {
         uint256 currentBalance = asset.balanceOf(address(this));
-        return currentBalance > _poolConfig.minimumTransactionAmount;
+        return currentBalance > _minimumTransactionAmount();
     }
 
     /// @notice Converts an amount denominated in wrapped tokens to an amount

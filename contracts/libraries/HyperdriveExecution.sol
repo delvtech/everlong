@@ -492,15 +492,18 @@ library HyperdriveExecutionLibrary {
     // HACK: Copied from `delvtech/hyperdrive` repo.
     //
     /// @dev Calculates the maximum amount of longs that can be opened.
+    /// @param _asBase Whether to transact using hyperdrive's base or vault
+    ///                shares token.
     /// @param _maxIterations The maximum number of iterations to use.
-    /// @return baseAmount The cost of buying the maximum amount of longs.
+    /// @return amount The cost of buying the maximum amount of longs.
     function calculateMaxLong(
         IHyperdrive self,
+        bool _asBase,
         uint256 _maxIterations
-    ) internal view returns (uint256 baseAmount) {
+    ) internal view returns (uint256 amount) {
         IHyperdrive.PoolConfig memory poolConfig = self.getPoolConfig();
         IHyperdrive.PoolInfo memory poolInfo = self.getPoolInfo();
-        (baseAmount, ) = calculateMaxLong(
+        (amount, ) = calculateMaxLong(
             MaxTradeParams({
                 shareReserves: poolInfo.shareReserves,
                 shareAdjustment: poolInfo.shareAdjustment,
@@ -518,17 +521,28 @@ library HyperdriveExecutionLibrary {
             self.getCheckpointExposure(latestCheckpoint(self)),
             _maxIterations
         );
-        return baseAmount;
+
+        // The above `amount` is denominated in hyperdrive's base token.
+        // If `_asBase == false` then hyperdrive's vault shares token is being
+        // used and we must convert the value.
+        if (!_asBase) {
+            amount = _convertToShares(self, amount);
+        }
+
+        return amount;
     }
 
     // HACK: Copied from `delvtech/hyperdrive` repo.
     //
     /// @dev Calculates the maximum amount of longs that can be opened.
+    /// @param _asBase Whether to transact using hyperdrive's base or vault
+    ///                shares token.
     /// @return baseAmount The cost of buying the maximum amount of longs.
     function calculateMaxLong(
-        IHyperdrive self
+        IHyperdrive self,
+        bool _asBase
     ) internal view returns (uint256 baseAmount) {
-        return calculateMaxLong(self, 7);
+        return calculateMaxLong(self, _asBase, 7);
     }
 
     // HACK: Copied from `delvtech/hyperdrive` repo.

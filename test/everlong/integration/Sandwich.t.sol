@@ -42,7 +42,7 @@ contract TestSandwichHelper is EverlongTest {
         _bystanderDeposit = bound(
             _bystanderDeposit,
             MINIMUM_TRANSACTION_AMOUNT * 5,
-            hyperdrive.calculateMaxLong() / 3
+            hyperdrive.calculateMaxLong(AS_BASE) / 3
         );
         uint256 bystanderShares = depositVault(
             _bystanderDeposit,
@@ -67,7 +67,7 @@ contract TestSandwichHelper is EverlongTest {
         _attackerDeposit = bound(
             _attackerDeposit,
             MINIMUM_TRANSACTION_AMOUNT * 5,
-            hyperdrive.calculateMaxLong() / 3
+            hyperdrive.calculateMaxLong(AS_BASE) / 3
         );
         uint256 attackerShares = depositVault(
             _attackerDeposit,
@@ -125,7 +125,7 @@ contract TestSandwichHelper is EverlongTest {
         _bystanderDeposit = bound(
             _bystanderDeposit,
             MINIMUM_TRANSACTION_AMOUNT * 5,
-            hyperdrive.calculateMaxLong() / 3
+            hyperdrive.calculateMaxLong(AS_BASE) / 3
         );
         uint256 bystanderShares = depositVault(
             _bystanderDeposit,
@@ -139,7 +139,7 @@ contract TestSandwichHelper is EverlongTest {
         _attackerDeposit = bound(
             _attackerDeposit,
             MINIMUM_TRANSACTION_AMOUNT * 5,
-            hyperdrive.calculateMaxLong() / 3
+            hyperdrive.calculateMaxLong(AS_BASE) / 3
         );
         uint256 attackerShares = depositVault(
             _attackerDeposit,
@@ -212,7 +212,7 @@ contract TestSandwichHelper is EverlongTest {
         _bystanderDeposit = bound(
             _bystanderDeposit,
             MINIMUM_TRANSACTION_AMOUNT * 5,
-            hyperdrive.calculateMaxLong() / 3
+            hyperdrive.calculateMaxLong(AS_BASE) / 3
         );
         uint256 bystanderEverlongShares = depositVault(
             _bystanderDeposit,
@@ -226,7 +226,7 @@ contract TestSandwichHelper is EverlongTest {
         _attackerDeposit = bound(
             _attackerDeposit,
             MINIMUM_TRANSACTION_AMOUNT * 5,
-            hyperdrive.calculateMaxLong() / 3
+            hyperdrive.calculateMaxLong(AS_BASE) / 3
         );
         uint256 attackerEverlongShares = depositVault(
             _attackerDeposit,
@@ -279,7 +279,7 @@ contract TestSandwichHelper is EverlongTest {
         _bystanderDeposit = bound(
             _bystanderDeposit,
             MINIMUM_TRANSACTION_AMOUNT * 5,
-            hyperdrive.calculateMaxLong() / 3
+            hyperdrive.calculateMaxLong(AS_BASE) / 3
         );
         uint256 bystanderShares = depositVault(
             _bystanderDeposit,
@@ -293,7 +293,7 @@ contract TestSandwichHelper is EverlongTest {
         _attackerDeposit = bound(
             _attackerDeposit,
             MINIMUM_TRANSACTION_AMOUNT * 5,
-            hyperdrive.calculateMaxLong() / 3
+            hyperdrive.calculateMaxLong(AS_BASE) / 3
         );
         uint256 attackerShares = depositVault(
             _attackerDeposit,
