@@ -485,7 +485,12 @@ contract EverlongStrategy is BaseStrategy {
 
             // Calculate the value of the entire position, and use it to derive
             // the expected output for partial closures.
-            totalPositionValue = _previewCloseLong(position, "");
+            totalPositionValue = IHyperdrive(hyperdrive).previewCloseLong(
+                asBase,
+                _poolConfig,
+                position,
+                ""
+            );
 
             // Close only part of the position if there are sufficient bonds
             // to reach the target output without leaving a small amount left.
@@ -587,20 +592,6 @@ contract EverlongStrategy is BaseStrategy {
         );
     }
 
-    /// @dev Calculate the maximum amount of strategy assets that can be spent
-    ///      on longs before hyperdrive runs out of liquidity.
-    /// @return assets Max amount of strategy assets that can be spent on longs.
-    function _calculateMaxLong() internal view returns (uint256 assets) {
-        // Retrieve the max long amount denominated in hyperdrive base tokens.
-        assets = IHyperdrive(hyperdrive).calculateMaxLong();
-
-        // If `asBase` is false, convert the amount to be denominated in vault
-        // share tokens.
-        if (!asBase) {
-            assets = IHyperdrive(hyperdrive)._convertToShares(assets);
-        }
-    }
-
     /// @dev Open a long with the specified amount of assets. Return the amount
     ///      of bonds received and their maturityTime.
     /// @param _toSpend Amount of strategy assets to spend.
@@ -632,7 +623,7 @@ contract EverlongStrategy is BaseStrategy {
                 _toSpend + 1
             );
 
-            // Convert back to hyperdrive's base denomination, same as the
+            // Convert back to hyperdrive token's denomination, same as the
             // wrapped token's.
             _toSpend = convertToWrapped(_toSpend);
         }
@@ -650,25 +641,6 @@ contract EverlongStrategy is BaseStrategy {
             _toSpend,
             _minOutput,
             _minVaultSharePrice,
-            _extraData
-        );
-    }
-
-    /// @dev Preview the amount of bonds received from opening a position with
-    ///      the specified amount of strategy assets.
-    /// @param _toSpend Amount of strategy assets to spend.
-    /// @param _extraData Extra data to pass to hyperdrive.
-    /// @return bondAmount Amount of bonds that would be received.
-    function _previewOpenLong(
-        uint256 _toSpend,
-        bytes memory _extraData
-    ) internal view returns (uint256 bondAmount) {
-        // Call the preview function and return the expected amount of bonds
-        // to be received.
-        bondAmount = IHyperdrive(hyperdrive).previewOpenLong(
-            asBase,
-            _poolConfig,
-            _toSpend,
             _extraData
         );
     }
@@ -705,24 +677,6 @@ contract EverlongStrategy is BaseStrategy {
         }
     }
 
-    /// @dev Preview the amount of assets received from closing the specified
-    ///      position.
-    /// @param _position Position to close.
-    /// @param _extraData Extra data to pass to hyperdrive.
-    /// @return proceeds Amount of strategy assets that would be received.
-    function _previewCloseLong(
-        IEverlongStrategy.EverlongPosition memory _position,
-        bytes memory _extraData
-    ) internal view returns (uint256 proceeds) {
-        // Call the preview function.
-        proceeds = IHyperdrive(hyperdrive).previewCloseLong(
-            asBase,
-            _poolConfig,
-            _position,
-            _extraData
-        );
-    }
-
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                                 Views                                 │
     // ╰───────────────────────────────────────────────────────────────────────╯
@@ -738,7 +692,7 @@ contract EverlongStrategy is BaseStrategy {
         // Only pre-approved addresses are able to deposit.
         if (_depositors[_depositor] || _depositor == address(this)) {
             // Limit deposits to the maximum long that can be opened in hyperdrive.
-            return _calculateMaxLong();
+            return IHyperdrive(hyperdrive).calculateMaxLong();
         }
         // Address has not been pre-approved, return 0.
         return 0;
@@ -758,7 +712,9 @@ contract EverlongStrategy is BaseStrategy {
         if (_portfolio.totalBonds != 0) {
             // NOTE: The maturity time is rounded to the next checkpoint to
             //       underestimate the portfolio value.
-            value += _previewCloseLong(
+            value += IHyperdrive(hyperdrive).previewCloseLong(
+                asBase,
+                _poolConfig,
                 IEverlongStrategy.EverlongPosition({
                     maturityTime: IHyperdrive(hyperdrive)
                         .getCheckpointIdUp(_portfolio.avgMaturityTime)
@@ -778,6 +734,10 @@ contract EverlongStrategy is BaseStrategy {
         return currentBalance > _poolConfig.minimumTransactionAmount;
     }
 
+    /// @notice Converts an amount denominated in wrapped tokens to an amount
+    ///         denominated in unwrapped tokens.
+    /// @param _wrappedAmount Amount in wrapped tokens.
+    /// @return _unwrappedAmount Amount in unwrapped tokens.
     function convertToUnwrapped(
         uint256 _wrappedAmount
     ) public view returns (uint256 _unwrappedAmount) {
@@ -789,6 +749,10 @@ contract EverlongStrategy is BaseStrategy {
         );
     }
 
+    /// @notice Converts an amount denominated in unwrapped tokens to an amount
+    ///         denominated in wrapped tokens.
+    /// @param _unwrappedAmount Amount in unwrapped tokens.
+    /// @return _wrappedAmount Amount in wrapped tokens.
     function convertToWrapped(
         uint256 _unwrappedAmount
     ) public view returns (uint256 _wrappedAmount) {
