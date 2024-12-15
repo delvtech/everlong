@@ -122,7 +122,8 @@ contract EverlongStrategy is BaseStrategy {
     ///         If false, use the Hyperdrive's `vaultSharesToken`.
     bool public immutable asBase;
 
-    /// @notice Whether the strategy asset is a wrapped hyperdrive token.
+    /// @notice Whether the strategy asset is a wrapped version of hyperdrive's
+    ///         base/vaultShares token.
     /// @dev Wrapping is a workaround to allow using hyperdrive instances with
     ///      rebasing tokens when Yearn explicitly does not support them.
     bool public immutable isWrapped;
@@ -130,10 +131,12 @@ contract EverlongStrategy is BaseStrategy {
     /// @dev The Hyperdrive's PoolConfig.
     IHyperdrive.PoolConfig internal _poolConfig;
 
-    /// @notice Address of the hyperdrive token.
-    /// @dev Determined by `asBase`. If true, then hyperdrive's base token is
-    ///      used. If false, then hyperdrive's vault shares token is used.
-    address public immutable hyperdriveToken;
+    /// @notice Token used to execute trades with hyperdrive.
+    /// @dev Determined by `asBase`.
+    ///      If `asBase=true`, then hyperdrive's base token is used.
+    ///      If `asBase=false`, then hyperdrive's vault shares token is used.
+    ///      Same as the strategy asset `asset` unless `isWrapped=true`
+    address public immutable executionToken;
 
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                                 State                                 │
@@ -160,7 +163,8 @@ contract EverlongStrategy is BaseStrategy {
     /// @param _hyperdrive Address of the Hyperdrive instance.
     /// @param _asBase Whether to use the base token when interacting with
     ///                hyperdrive. If false, use the vault shares token.
-    /// @param _isWrapped True if `asset` is a wrapped hyperdrive token.
+    /// @param _isWrapped True if `asset` is a wrapped version of hyperdrive's
+    ///                   base/vaultShares token.
     constructor(
         address _asset,
         string memory __name,
@@ -177,8 +181,8 @@ contract EverlongStrategy is BaseStrategy {
         // Store the hyperdrive's PoolConfig since it's static.
         _poolConfig = IHyperdrive(_hyperdrive).getPoolConfig();
 
-        // Store the hyperdrive token to use when opening/closing longs.
-        hyperdriveToken = address(
+        // Store the execution token to use when opening/closing longs.
+        executionToken = address(
             _asBase ? _poolConfig.baseToken : _poolConfig.vaultSharesToken
         );
 
@@ -555,8 +559,8 @@ contract EverlongStrategy is BaseStrategy {
     // │                         Wrapped Token Helpers                         │
     // ╰───────────────────────────────────────────────────────────────────────╯
 
-    /// @dev Wrap the hyperdrive token so that it can be used in the strategy.
-    /// @param _unwrappedAmount Amount of unwrapped hyperdrive tokens to wrap.
+    /// @dev Wrap the `executionToken` so that it can be used in the strategy.
+    /// @param _unwrappedAmount Amount of unwrapped execution tokens to wrap.
     /// @return _wrappedAmount Amount of wrapped tokens received.
     function _wrap(
         uint256 _unwrappedAmount
@@ -566,12 +570,12 @@ contract EverlongStrategy is BaseStrategy {
             revert IEverlongStrategy.AssetNotWrapped();
         }
 
-        // Approve the wrapped asset contract for the hyperdrive tokens.
+        // Approve the wrapped asset contract for the execution token.
         // Add one to the approval amount to leave the slot dirty and save
         // gas on future approvals.
-        ERC20(hyperdriveToken).approve(address(asset), _unwrappedAmount);
+        ERC20(executionToken).approve(address(asset), _unwrappedAmount);
 
-        // Wrap the hyperdrive tokens.
+        // Wrap the execution tokens.
         _wrappedAmount = IERC20Wrappable(address(asset)).wrap(_unwrappedAmount);
     }
 
@@ -608,22 +612,22 @@ contract EverlongStrategy is BaseStrategy {
         bytes memory _extraData
     ) internal returns (uint256 maturityTime, uint256 bondAmount) {
         // Prepare for opening the long differently if the strategy asset is
-        // a wrapped hyperdrive token.
+        // a wrapped `executionToken`.
         if (isWrapped) {
-            // The strategy asset is a wrapped hyperdrive token so it must be
+            // The strategy asset is a wrapped `executionToken` so it must be
             // unwrapped.
             _toSpend = _unwrap(_toSpend);
 
             // Approve hyperdrive for the unwrapped asset, which is also the
-            // `hyperdriveToken`.
+            // `executionToken`.
             //
             // Leave the approval slot dirty to save gas on future approvals.
-            ERC20(hyperdriveToken).forceApprove(
+            ERC20(executionToken).forceApprove(
                 address(hyperdrive),
                 _toSpend + 1
             );
 
-            // Convert back to hyperdrive token's denomination, same as the
+            // Convert back to `executionToken`'s denomination, same as the
             // wrapped token's.
             _toSpend = convertToWrapped(_toSpend);
         }
@@ -665,12 +669,12 @@ contract EverlongStrategy is BaseStrategy {
         );
 
         // The proceeds must be wrapped if the strategy asset is a wrapped
-        // hyperdrive token.
+        // `executionToken`.
         if (isWrapped) {
             // Approve the wrapped contract for the proceeds. Add one to the
             // approval amount to save gas on future approvals by leaving the
             // slot dirty.
-            ERC20(hyperdriveToken).forceApprove(address(asset), proceeds + 1);
+            ERC20(executionToken).forceApprove(address(asset), proceeds + 1);
 
             // Wrap the proceeds.
             proceeds = _wrap(convertToUnwrapped(proceeds));

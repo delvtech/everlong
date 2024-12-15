@@ -88,6 +88,14 @@ interface IEverlongStrategy is IPermissionedStrategy, IEverlongEvents {
         uint256 _wrappedAmount
     ) external view returns (uint256 _unwrappedAmount);
 
+    /// @notice Token used to execute trades with hyperdrive.
+    /// @dev Determined by `asBase`.
+    ///      If `asBase=true`, then hyperdrive's base token is used.
+    ///      If `asBase=false`, then hyperdrive's vault shares token is used.
+    ///      Same as the strategy asset `asset` unless `isWrapped=true`
+    /// @return The token used to execute trades with hyperdrive.
+    function executionToken() external view returns (address);
+
     /// @notice Reads and returns the current tend configuration from transient
     ///         storage.
     /// @return tendEnabled Whether TendConfig has been set.
