@@ -338,12 +338,6 @@ contract EverlongStrategyKeeper is Ownable {
             return 0;
         }
 
-        // If the strategy is a wrapped token, convert the spend amount to
-        // be denominated in hyperdrive's token.
-        if (IEverlongStrategy(_strategy).isWrapped()) {
-            canSpend = IEverlongStrategy(_strategy).convertToWrapped(canSpend);
-        }
-
         // Calculate the amount of bonds that would be received if a long was
         // opened with `canSpend` assets.
         uint256 expectedOutput = hyperdrive.previewOpenLong(
