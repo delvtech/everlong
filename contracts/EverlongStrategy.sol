@@ -539,7 +539,7 @@ contract EverlongStrategy is BaseStrategy {
             else {
                 // Close the entire position.
                 //
-                // Since this functino would never be called as part of a
+                // Since this function would never be called as part of a
                 // `tend()`, there's no need to retrieve the `TendConfig` and
                 // set the slippage guard.
                 //
