@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.24;
 
+import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
 import { IEverlongStrategy } from "../contracts/interfaces/IEverlongStrategy.sol";
 import { EVERLONG_STRATEGY_KIND, EVERLONG_STRATEGY_KEEPER_KIND } from "../contracts/libraries/Constants.sol";
@@ -46,6 +47,12 @@ contract DeployEverlongStrategy is BaseDeployScript {
     ///      `EverlongStrategyKeeper` kind.
     string internal KEEPER_CONTRACT_NAME;
     string internal KEEPER_CONTRACT_NAME_DEFAULT;
+
+    bool internal IS_WRAPPED;
+    bool internal constant IS_WRAPPED_DEFAULT = false;
+
+    address internal ASSET;
+    address internal ASSET_DEFAULT;
 
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                           Artifact Struct.                            │
@@ -95,6 +102,13 @@ contract DeployEverlongStrategy is BaseDeployScript {
             KEEPER_CONTRACT_NAME_DEFAULT
         );
         output.keeperContractName = KEEPER_CONTRACT_NAME;
+        IS_WRAPPED = vm.envOr("IS_WRAPPED", IS_WRAPPED_DEFAULT);
+        ASSET_DEFAULT = address(
+            AS_BASE
+                ? IHyperdrive(output.hyperdrive).baseToken()
+                : IHyperdrive(output.hyperdrive).vaultSharesToken()
+        );
+        ASSET = vm.envOr("ASSET", ASSET_DEFAULT);
 
         // Validate optional arguments.
         require(
@@ -106,9 +120,7 @@ contract DeployEverlongStrategy is BaseDeployScript {
         ).keeperContract;
 
         // Resolve the asset address.
-        address asset = AS_BASE
-            ? IHyperdrive(output.hyperdrive).baseToken()
-            : IHyperdrive(output.hyperdrive).vaultSharesToken();
+        address asset = ASSET;
 
         // Save the strategy's kind to output.
         output.kind = EVERLONG_STRATEGY_KIND;
@@ -121,7 +133,13 @@ contract DeployEverlongStrategy is BaseDeployScript {
         //   5. Set the strategy's emergencyAdmin to `emergencyAdmin`.
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
         output.strategy = address(
-            new EverlongStrategy(asset, output.name, output.hyperdrive, AS_BASE)
+            new EverlongStrategy(
+                asset,
+                output.name,
+                output.hyperdrive,
+                AS_BASE,
+                IS_WRAPPED
+            )
         );
         IEverlongStrategy(output.strategy).setPerformanceFeeRecipient(
             output.governance

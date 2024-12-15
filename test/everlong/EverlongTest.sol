@@ -43,6 +43,12 @@ contract EverlongTest is VaultTest, IEverlongEvents {
     /// @dev Maximum slippage for vault share price.
     uint256 internal MIN_VAULT_SHARE_PRICE_SLIPPAGE = 500;
 
+    /// @dev Whether to use a wrapped asset for the strategy.
+    bool IS_WRAPPED;
+
+    /// @dev Asset to use for the strategy when IS_WRAPPED=true.
+    address WRAPPED_ASSET;
+
     /// @dev Periphery contract to simplify maintenance operations for vaults
     ///      and strategies.
     EverlongStrategyKeeper internal keeperContract;
@@ -76,12 +82,17 @@ contract EverlongTest is VaultTest, IEverlongEvents {
         strategy = IPermissionedStrategy(
             address(
                 new EverlongStrategy(
-                    AS_BASE
-                        ? hyperdrive.baseToken()
-                        : hyperdrive.vaultSharesToken(),
+                    IS_WRAPPED
+                        ? WRAPPED_ASSET
+                        : (
+                            AS_BASE
+                                ? hyperdrive.baseToken()
+                                : hyperdrive.vaultSharesToken()
+                        ),
                     EVERLONG_NAME,
                     address(hyperdrive),
-                    AS_BASE
+                    AS_BASE,
+                    IS_WRAPPED
                 )
             )
         );
@@ -93,7 +104,15 @@ contract EverlongTest is VaultTest, IEverlongEvents {
         vm.stopPrank();
 
         // Set the appropriate asset.
-        asset = IERC20(hyperdrive.baseToken());
+        asset = (
+            IS_WRAPPED
+                ? IERC20(WRAPPED_ASSET)
+                : IERC20(
+                    AS_BASE
+                        ? hyperdrive.baseToken()
+                        : hyperdrive.vaultSharesToken()
+                )
+        );
 
         // As the `management` address:
         //   1. Accept the `management` role for the strategy.

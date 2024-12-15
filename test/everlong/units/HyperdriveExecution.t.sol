@@ -206,7 +206,7 @@ contract TestHyperdriveExecution is EverlongTest {
         // decrease the value of the share adjustment to a non-trivial value.
         matureLongAmount = matureLongAmount.normalizeToRange(
             MINIMUM_TRANSACTION_AMOUNT + 1,
-            hyperdrive.calculateMaxLong() / 2
+            hyperdrive.calculateMaxLong(AS_BASE) / 2
         );
         openLong(alice, matureLongAmount);
         advanceTime(hyperdrive.getPoolConfig().positionDuration, 0);
@@ -343,7 +343,7 @@ contract TestHyperdriveExecution is EverlongTest {
         // value which stress tests the max long function.
         initialLongAmount = initialLongAmount.normalizeToRange(
             MINIMUM_TRANSACTION_AMOUNT + 1,
-            hyperdrive.calculateMaxLong() / 2
+            hyperdrive.calculateMaxLong(AS_BASE) / 2
         );
         openLong(bob, initialLongAmount);
         initialShortAmount = initialShortAmount.normalizeToRange(

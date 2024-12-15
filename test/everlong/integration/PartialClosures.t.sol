@@ -25,7 +25,7 @@ contract TestPartialClosures is EverlongTest {
         uint256 aliceDepositAmount = bound(
             _deposit,
             MINIMUM_TRANSACTION_AMOUNT * 100, // Increase minimum bound otherwise partial redemption won't occur
-            hyperdrive.calculateMaxLong()
+            hyperdrive.calculateMaxLong(AS_BASE)
         );
         uint256 aliceShares = depositStrategy(aliceDepositAmount, alice, true);
         uint256 positionBondsAfterDeposit = IEverlongStrategy(address(strategy))

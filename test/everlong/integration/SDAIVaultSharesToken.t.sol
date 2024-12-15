@@ -79,6 +79,7 @@ contract TestSDAIVaultSharesToken is EverlongTest {
                     address(asset),
                     "sDAI Strategy",
                     address(hyperdrive),
+                    false,
                     false
                 )
             )

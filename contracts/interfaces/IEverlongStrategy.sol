@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
+import { IERC20 } from "openzeppelin/interfaces/IERC20.sol";
 import { IEverlongEvents } from "./IEverlongEvents.sol";
 import { IPermissionedStrategy } from "./IPermissionedStrategy.sol";
 
@@ -30,6 +31,14 @@ interface IEverlongStrategy is IPermissionedStrategy, IEverlongEvents {
         /// @notice Passed to hyperdrive `openLong()` and `closeLong()`.
         bytes extraData;
     }
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                                Errors                                 │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
+    /// @notice Thrown when calling wrap conversion functions on a strategy with
+    ///         a non-wrapped asset.
+    error AssetNotWrapped();
 
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                                SETTERS                                │
@@ -63,6 +72,30 @@ interface IEverlongStrategy is IPermissionedStrategy, IEverlongEvents {
     /// @return True if a new position can be opened, false otherwise.
     function canOpenPosition() external view returns (bool);
 
+    /// @notice Convert the amount of unwrapped tokens to the amount received
+    ///         after wrapping.
+    /// @param _unwrappedAmount Amount of unwrapped tokens.
+    /// @return _wrappedAmount Amount of wrapped tokens.
+    function convertToWrapped(
+        uint256 _unwrappedAmount
+    ) external view returns (uint256 _wrappedAmount);
+
+    /// @notice Convert the amount of wrapped tokens to the amount received
+    ///         after unwrapping.
+    /// @param _wrappedAmount Amount of wrapped tokens.
+    /// @return _unwrappedAmount Amount of unwrapped tokens.
+    function convertToUnwrapped(
+        uint256 _wrappedAmount
+    ) external view returns (uint256 _unwrappedAmount);
+
+    /// @notice Token used to execute trades with hyperdrive.
+    /// @dev Determined by `asBase`.
+    ///      If `asBase=true`, then hyperdrive's base token is used.
+    ///      If `asBase=false`, then hyperdrive's vault shares token is used.
+    ///      Same as the strategy asset `asset` unless `isWrapped=true`
+    /// @return The token used to execute trades with hyperdrive.
+    function executionToken() external view returns (address);
+
     /// @notice Reads and returns the current tend configuration from transient
     ///         storage.
     /// @return tendEnabled Whether TendConfig has been set.
@@ -77,6 +110,9 @@ interface IEverlongStrategy is IPermissionedStrategy, IEverlongEvents {
 
     /// @notice Gets the address of the underlying Hyperdrive Instance
     function hyperdrive() external view returns (address);
+
+    /// @notice Returns whether the strategy's asset is a wrapped hyperdrive token.
+    function isWrapped() external view returns (bool);
 
     /// @notice Gets the Everlong instance's kind.
     /// @return The Everlong instance's kind.

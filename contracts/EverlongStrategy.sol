@@ -7,6 +7,7 @@ import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { BaseStrategy, ERC20 } from "tokenized-strategy/BaseStrategy.sol";
 import { IEverlongStrategy } from "./interfaces/IEverlongStrategy.sol";
+import { IERC20Wrappable } from "./interfaces/IERC20Wrappable.sol";
 import { EVERLONG_STRATEGY_KIND, EVERLONG_VERSION, ONE } from "./libraries/Constants.sol";
 import { EverlongPortfolioLibrary } from "./libraries/EverlongPortfolio.sol";
 import { HyperdriveExecutionLibrary } from "./libraries/HyperdriveExecution.sol";
@@ -121,8 +122,21 @@ contract EverlongStrategy is BaseStrategy {
     ///         If false, use the Hyperdrive's `vaultSharesToken`.
     bool public immutable asBase;
 
+    /// @notice Whether the strategy asset is a wrapped version of hyperdrive's
+    ///         base/vaultShares token.
+    /// @dev Wrapping is a workaround to allow using hyperdrive instances with
+    ///      rebasing tokens when Yearn explicitly does not support them.
+    bool public immutable isWrapped;
+
     /// @dev The Hyperdrive's PoolConfig.
     IHyperdrive.PoolConfig internal _poolConfig;
+
+    /// @notice Token used to execute trades with hyperdrive.
+    /// @dev Determined by `asBase`.
+    ///      If `asBase=true`, then hyperdrive's base token is used.
+    ///      If `asBase=false`, then hyperdrive's vault shares token is used.
+    ///      Same as the strategy asset `asset` unless `isWrapped=true`
+    address public immutable executionToken;
 
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                                 State                                 │
@@ -147,16 +161,34 @@ contract EverlongStrategy is BaseStrategy {
     /// @param _asset Asset to use for the strategy.
     /// @param __name Name for the strategy.
     /// @param _hyperdrive Address of the Hyperdrive instance.
-    /// @param _asBase Whether `_asset` is Hyperdrive's base asset.
+    /// @param _asBase Whether to use the base token when interacting with
+    ///                hyperdrive. If false, use the vault shares token.
+    /// @param _isWrapped True if `asset` is a wrapped version of hyperdrive's
+    ///                   base/vaultShares token.
     constructor(
         address _asset,
         string memory __name,
         address _hyperdrive,
-        bool _asBase
+        bool _asBase,
+        bool _isWrapped
     ) BaseStrategy(_asset, __name) {
+        // Store the hyperdrive instance's address.
         hyperdrive = _hyperdrive;
+
+        // Store whether to interact with hyperdrive using its base token.
         asBase = _asBase;
+
+        // Store the hyperdrive's PoolConfig since it's static.
         _poolConfig = IHyperdrive(_hyperdrive).getPoolConfig();
+
+        // Store the execution token to use when opening/closing longs.
+        executionToken = address(
+            _asBase ? _poolConfig.baseToken : _poolConfig.vaultSharesToken
+        );
+
+        // Store whether `asset` should be treated as a wrapped hyperdrive
+        // token.
+        isWrapped = _isWrapped;
     }
 
     // ╭───────────────────────────────────────────────────────────────────────╮
@@ -289,23 +321,22 @@ contract EverlongStrategy is BaseStrategy {
         }
 
         // Close matured positions.
-        _totalIdle += _closeMaturedPositions(tendConfig.positionClosureLimit);
+        _totalIdle += _closeMaturedPositions(
+            tendConfig.positionClosureLimit,
+            tendConfig.extraData
+        );
 
         // Limit the amount that can be spent by the deposit limit.
         uint256 toSpend = _totalIdle.min(availableDepositLimit(address(this)));
 
         // If Everlong has sufficient idle, open a new position.
-        if (toSpend > _poolConfig.minimumTransactionAmount) {
-            // Approve leaving an extra wei so the slot stays warm.
-            ERC20(asset).forceApprove(address(hyperdrive), toSpend + 1);
-            (uint256 maturityTime, uint256 bondAmount) = IHyperdrive(hyperdrive)
-                .openLong(
-                    asBase,
-                    toSpend,
-                    tendConfig.minOutput,
-                    tendConfig.minVaultSharePrice,
-                    tendConfig.extraData
-                );
+        if (toSpend > _minimumTransactionAmount()) {
+            (uint256 maturityTime, uint256 bondAmount) = _openLong(
+                toSpend,
+                tendConfig.minOutput,
+                tendConfig.minVaultSharePrice,
+                tendConfig.extraData
+            );
 
             // Account for the new position in the portfolio.
             _portfolio.handleOpenPosition(maturityTime, bondAmount);
@@ -399,7 +430,8 @@ contract EverlongStrategy is BaseStrategy {
     ///               A value of zero indicates no limit.
     /// @return output Proceeds of closing the matured positions.
     function _closeMaturedPositions(
-        uint256 _limit
+        uint256 _limit,
+        bytes memory _extraData
     ) internal returns (uint256 output) {
         // A value of zero for `_limit` indicates no limit.
         if (_limit == 0) {
@@ -424,12 +456,10 @@ contract EverlongStrategy is BaseStrategy {
 
             // Close the position add the amount of assets received to the
             // cumulative output.
-            output += IHyperdrive(hyperdrive).closeLong(
-                asBase,
-                position,
-                0,
-                ""
-            );
+            //
+            // There's no need to set the slippage guard when closing matured
+            // positions.
+            output += _closeLong(position, 0, _extraData);
 
             // Update portfolio accounting to reflect the closed position.
             _portfolio.handleClosePosition();
@@ -443,7 +473,7 @@ contract EverlongStrategy is BaseStrategy {
         uint256 _targetOutput
     ) internal returns (uint256 output) {
         // Round `_targetOutput` up to Hyperdrive's minimum transaction amount.
-        _targetOutput = _targetOutput.max(_poolConfig.minimumTransactionAmount);
+        _targetOutput = _targetOutput.max(_minimumTransactionAmount());
 
         // Since multiple position's worth of bonds may need to be closed,
         // iterate through each position starting with the most mature.
@@ -472,8 +502,9 @@ contract EverlongStrategy is BaseStrategy {
             // Hyperdrive's minimum transaction amount.
             if (
                 totalPositionValue >
-                (_targetOutput - output + _poolConfig.minimumTransactionAmount)
-                    .mulUp(ONE + partialPositionClosureBuffer)
+                (_targetOutput - output + _minimumTransactionAmount()).mulUp(
+                    ONE + partialPositionClosureBuffer
+                )
             ) {
                 // Calculate the amount of bonds to close from the position.
                 uint256 bondsNeeded = uint256(position.bondAmount).mulDivUp(
@@ -483,10 +514,14 @@ contract EverlongStrategy is BaseStrategy {
                     totalPositionValue
                 );
 
-                // Close part of the position and enforce the slippage guard.
+                // Close part of the position.
+                //
+                // Since this functino would never be called as part of a
+                // `tend()`, there's no need to retrieve the `TendConfig` and
+                // set the slippage guard.
+                //
                 // Add the amount of assets received to the total output.
-                output += IHyperdrive(hyperdrive).closeLong(
-                    asBase,
+                output += _closeLong(
                     IEverlongStrategy.EverlongPosition({
                         maturityTime: position.maturityTime,
                         bondAmount: bondsNeeded.toUint128()
@@ -503,21 +538,164 @@ contract EverlongStrategy is BaseStrategy {
             }
             // Close the entire position.
             else {
-                // Close the entire position and increase the cumulative output.
-                output += IHyperdrive(hyperdrive).closeLong(
-                    asBase,
-                    position,
-                    0,
-                    ""
-                );
+                // Close the entire position.
+                //
+                // Since this function would never be called as part of a
+                // `tend()`, there's no need to retrieve the `TendConfig` and
+                // set the slippage guard.
+                //
+                // Add the amount of assets received to the total output.
+                output += _closeLong(position, 0, "");
 
-                // Update portfolio accounting to include the partial closure.
+                // Update portfolio accounting to include the closed position.
                 _portfolio.handleClosePosition();
             }
         }
 
         // The target has been reached or no more positions remain.
         return output;
+    }
+
+    // ╭───────────────────────────────────────────────────────────────────────╮
+    // │                         Wrapped Token Helpers                         │
+    // ╰───────────────────────────────────────────────────────────────────────╯
+
+    /// @dev Wrap the `executionToken` so that it can be used in the strategy.
+    /// @param _unwrappedAmount Amount of unwrapped execution tokens to wrap.
+    /// @return _wrappedAmount Amount of wrapped tokens received.
+    function _wrap(
+        uint256 _unwrappedAmount
+    ) internal returns (uint256 _wrappedAmount) {
+        // If the strategy doesn't use a wrapped asset, revert.
+        if (!isWrapped) {
+            revert IEverlongStrategy.AssetNotWrapped();
+        }
+
+        // Approve the wrapped asset contract for the execution token.
+        // Add one to the approval amount to leave the slot dirty and save
+        // gas on future approvals.
+        ERC20(executionToken).approve(address(asset), _unwrappedAmount);
+
+        // Wrap the execution tokens.
+        _wrappedAmount = IERC20Wrappable(address(asset)).wrap(_unwrappedAmount);
+    }
+
+    /// @dev Unwrap the strategy asset so that it can be used with hyperdrive.
+    /// @param _wrappedAmount Amount of wrapped strategy assets to unwrap.
+    /// @return _unwrappedAmount Amount of unwrapped tokens received.
+    function _unwrap(
+        uint256 _wrappedAmount
+    ) internal returns (uint256 _unwrappedAmount) {
+        // If the strategy doesn't use a wrapped asset, revert.
+        if (!isWrapped) {
+            revert IEverlongStrategy.AssetNotWrapped();
+        }
+
+        // Unwrap the strategy assets.
+        _unwrappedAmount = IERC20Wrappable(address(asset)).unwrap(
+            _wrappedAmount
+        );
+    }
+
+    /// @dev Open a long with the specified amount of assets. Return the amount
+    ///      of bonds received and their maturityTime.
+    /// @param _toSpend Amount of strategy assets to spend.
+    /// @param _minOutput Minimum amount of bonds to accept.
+    /// @param _minVaultSharePrice Minimum hyperdrive vault share price to
+    ///                            purchase at.
+    /// @param _extraData Extra data to pass to hyperdrive.
+    /// @return maturityTime Maturity time for bonds received.
+    /// @return bondAmount Amount of bonds received.
+    function _openLong(
+        uint256 _toSpend,
+        uint256 _minOutput,
+        uint256 _minVaultSharePrice,
+        bytes memory _extraData
+    ) internal returns (uint256 maturityTime, uint256 bondAmount) {
+        // Prepare for opening the long differently if the strategy asset is
+        // a wrapped `executionToken`.
+        if (isWrapped) {
+            // The strategy asset is a wrapped `executionToken` so it must be
+            // unwrapped.
+            _toSpend = _unwrap(_toSpend);
+
+            // Approve hyperdrive for the unwrapped asset, which is also the
+            // `executionToken`.
+            //
+            // Leave the approval slot dirty to save gas on future approvals.
+            ERC20(executionToken).forceApprove(
+                address(hyperdrive),
+                _toSpend + 1
+            );
+
+            // Convert back to `executionToken`'s denomination, same as the
+            // wrapped token's.
+            _toSpend = convertToWrapped(_toSpend);
+        }
+        // The strategy asset is not wrapped, no conversions are necessary.
+        // Approve the hyperdrive contract for strategy asset.
+        //
+        // Leave the approval slot dirty to save gas on future approvals.
+        else {
+            ERC20(asset).forceApprove(address(hyperdrive), _toSpend + 1);
+        }
+
+        // Open the long. Return the maturity time and amount of bonds received.
+        (maturityTime, bondAmount) = IHyperdrive(hyperdrive).openLong(
+            asBase,
+            _toSpend,
+            _minOutput,
+            _minVaultSharePrice,
+            _extraData
+        );
+    }
+
+    /// @dev Preview the amount of assets received from closing the specified
+    ///      position.
+    /// @param _position Position to close.
+    /// @param _minOutput Minimum amount of proceeds to accept.
+    /// @param _extraData Extra data to pass to hyperdrive.
+    /// @return proceeds Amount of strategy assets that would be received.
+    function _closeLong(
+        IEverlongStrategy.EverlongPosition memory _position,
+        uint256 _minOutput,
+        bytes memory _extraData
+    ) internal returns (uint256 proceeds) {
+        // Close the long.
+        proceeds = IHyperdrive(hyperdrive).closeLong(
+            asBase,
+            _position,
+            _minOutput,
+            _extraData
+        );
+
+        // The proceeds must be wrapped if the strategy asset is a wrapped
+        // `executionToken`.
+        if (isWrapped) {
+            // Approve the wrapped contract for the proceeds. Add one to the
+            // approval amount to save gas on future approvals by leaving the
+            // slot dirty.
+            ERC20(executionToken).forceApprove(address(asset), proceeds + 1);
+
+            // Wrap the proceeds.
+            proceeds = _wrap(convertToUnwrapped(proceeds));
+        }
+    }
+
+    /// @dev Retrieve hyperdrive's minimum transaction amount.
+    /// @return amount Hyperdrive's minimum transaction amount.
+    function _minimumTransactionAmount()
+        internal
+        view
+        returns (uint256 amount)
+    {
+        amount = _poolConfig.minimumTransactionAmount;
+
+        // Since `amount` is denominated in hyperdrive's base currency. We must
+        // convert it.
+        if (!asBase || isWrapped) {
+            IHyperdrive(hyperdrive)._convertToShares(amount);
+        }
     }
 
     // ╭───────────────────────────────────────────────────────────────────────╮
@@ -535,7 +713,7 @@ contract EverlongStrategy is BaseStrategy {
         // Only pre-approved addresses are able to deposit.
         if (_depositors[_depositor] || _depositor == address(this)) {
             // Limit deposits to the maximum long that can be opened in hyperdrive.
-            return IHyperdrive(hyperdrive).calculateMaxLong();
+            return IHyperdrive(hyperdrive).calculateMaxLong(asBase);
         }
         // Address has not been pre-approved, return 0.
         return 0;
@@ -551,6 +729,7 @@ contract EverlongStrategy is BaseStrategy {
     ///         bonds and the weighted average maturity of all positions.
     /// @return value The present portfolio value.
     function calculatePortfolioValue() public view returns (uint256 value) {
+        (, IEverlongStrategy.TendConfig memory tendConfig) = getTendConfig();
         if (_portfolio.totalBonds != 0) {
             // NOTE: The maturity time is rounded to the next checkpoint to
             //       underestimate the portfolio value.
@@ -563,7 +742,7 @@ contract EverlongStrategy is BaseStrategy {
                         .toUint128(),
                     bondAmount: _portfolio.totalBonds
                 }),
-                ""
+                tendConfig.extraData
             );
         }
     }
@@ -572,9 +751,38 @@ contract EverlongStrategy is BaseStrategy {
     ///         a new position.
     /// @return True if a new position can be opened, false otherwise.
     function canOpenPosition() public view returns (bool) {
-        return
-            asset.balanceOf(address(this)) >
-            _poolConfig.minimumTransactionAmount;
+        uint256 currentBalance = asset.balanceOf(address(this));
+        return currentBalance > _minimumTransactionAmount();
+    }
+
+    /// @notice Converts an amount denominated in wrapped tokens to an amount
+    ///         denominated in unwrapped tokens.
+    /// @param _wrappedAmount Amount in wrapped tokens.
+    /// @return _unwrappedAmount Amount in unwrapped tokens.
+    function convertToUnwrapped(
+        uint256 _wrappedAmount
+    ) public view returns (uint256 _unwrappedAmount) {
+        if (!isWrapped) {
+            revert IEverlongStrategy.AssetNotWrapped();
+        }
+        _unwrappedAmount = IHyperdrive(hyperdrive)._convertToBase(
+            _wrappedAmount
+        );
+    }
+
+    /// @notice Converts an amount denominated in unwrapped tokens to an amount
+    ///         denominated in wrapped tokens.
+    /// @param _unwrappedAmount Amount in unwrapped tokens.
+    /// @return _wrappedAmount Amount in wrapped tokens.
+    function convertToWrapped(
+        uint256 _unwrappedAmount
+    ) public view returns (uint256 _wrappedAmount) {
+        if (!isWrapped) {
+            revert IEverlongStrategy.AssetNotWrapped();
+        }
+        _wrappedAmount = IHyperdrive(hyperdrive)._convertToShares(
+            _unwrappedAmount
+        );
     }
 
     /// @notice Returns whether the portfolio has matured positions.
