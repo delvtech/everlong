@@ -120,6 +120,7 @@ contract EverlongStrategy is BaseStrategy {
 
     /// @notice Whether to use Hyperdrive's base token to purchase bonds.
     ///         If false, use the Hyperdrive's `vaultSharesToken`.
+    /// @dev When `isWrapped=true`, `asBase` must be set to false.
     bool public immutable asBase;
 
     /// @notice Whether the strategy asset is a wrapped version of hyperdrive's
@@ -172,11 +173,20 @@ contract EverlongStrategy is BaseStrategy {
         bool _asBase,
         bool _isWrapped
     ) BaseStrategy(_asset, __name) {
+        // When the asset is wrapped, `_asBase` must be false.
+        if (_isWrapped && _asBase) {
+            revert IEverlongStrategy.WrappedBaseMismatch();
+        }
+
         // Store the hyperdrive instance's address.
         hyperdrive = _hyperdrive;
 
         // Store whether to interact with hyperdrive using its base token.
         asBase = _asBase;
+
+        // Store whether `asset` should be treated as a wrapped hyperdrive
+        // token.
+        isWrapped = _isWrapped;
 
         // Store the hyperdrive's PoolConfig since it's static.
         _poolConfig = IHyperdrive(_hyperdrive).getPoolConfig();
@@ -185,10 +195,6 @@ contract EverlongStrategy is BaseStrategy {
         executionToken = address(
             _asBase ? _poolConfig.baseToken : _poolConfig.vaultSharesToken
         );
-
-        // Store whether `asset` should be treated as a wrapped hyperdrive
-        // token.
-        isWrapped = _isWrapped;
     }
 
     // ╭───────────────────────────────────────────────────────────────────────╮
