@@ -2,6 +2,8 @@
 pragma solidity 0.8.24;
 
 import { IHyperdrive } from "hyperdrive/contracts/src/interfaces/IHyperdrive.sol";
+import { IMultiToken } from "hyperdrive/contracts/src/interfaces/IMultiToken.sol";
+import { AssetId } from "hyperdrive/contracts/src/libraries/AssetId.sol";
 import { FixedPointMath } from "hyperdrive/contracts/src/libraries/FixedPointMath.sol";
 import { SafeCast } from "hyperdrive/contracts/src/libraries/SafeCast.sol";
 import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
@@ -217,6 +219,31 @@ contract EverlongStrategy is BaseStrategy {
         // Opening longs on Hyperdrive is sandwichable so funds should only be
         // deployed when the `keeper` calls `tend()`.
         return;
+    }
+
+    /// @dev Withdraw function that can be called after the vault is shut down.
+    ///      Takes all longs controlled by the strategy and transfers them to
+    ///      the management address.
+    /// @param . Amount of assets to withdraw. This is ignored to reduce the
+    ///          likelihood of reverts.
+    function _emergencyWithdraw(uint256) internal override {
+        IEverlongStrategy.EverlongPosition memory position;
+        while (!_portfolio.isEmpty()) {
+            // Retrieve the most mature position.
+            position = _portfolio.head();
+
+            // Transfer the tokens to the management address.
+            IMultiToken(hyperdrive).transferFrom(
+                AssetId.encodeAssetId(
+                    AssetId.AssetIdPrefix.Long,
+                    uint256(position.maturityTime)
+                ),
+                address(this),
+                TokenizedStrategy.emergencyAdmin(),
+                uint256(position.bondAmount)
+            );
+            _portfolio.handleClosePosition();
+        }
     }
 
     /// @dev Attempt to free the '_amount' of 'asset'.
