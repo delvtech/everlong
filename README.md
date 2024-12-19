@@ -100,11 +100,11 @@ token is a rebasing token, `IS_WRAPPED` must be set to true since Yearn vaults
 explicitly do not support rebasing tokens.
 
 | :exclamation: IMPORTANT                                                 |
-| ----------------------------------------------------------------------- |
+| :---------------------------------------------------------------------- |
 | The address for the wrapped asset must be set via the `ASSET` parameter |
 
 | :exclamation: IMPORTANT                                                                                        |
-| -------------------------------------------------------------------------------------------------------------- |
+| :------------------------------------------------------------------------------------------------------------- |
 | Only rebasing tokens whos "share" token quantities equal the wrapped token quantities can be used (EX: StETH). |
 
 ##### `ASSET=<address>`
