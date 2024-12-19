@@ -40,6 +40,10 @@ interface IEverlongStrategy is IPermissionedStrategy, IEverlongEvents {
     ///         a non-wrapped asset.
     error AssetNotWrapped();
 
+    /// @notice Thrown when creating a strategy with both `isWrapped == true`
+    ///         and `isBase == true`.
+    error WrappedBaseMismatch();
+
     // ╭───────────────────────────────────────────────────────────────────────╮
     // │                                SETTERS                                │
     // ╰───────────────────────────────────────────────────────────────────────╯
