@@ -223,7 +223,7 @@ contract EverlongStrategy is BaseStrategy {
 
     /// @dev Withdraw function that can be called after the vault is shut down.
     ///      Takes all longs controlled by the strategy and transfers them to
-    ///      the management address.
+    ///      the emergency admin address.
     /// @param . Amount of assets to withdraw. This is ignored to reduce the
     ///          likelihood of reverts.
     function _emergencyWithdraw(uint256) internal override {
