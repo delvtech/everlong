@@ -119,9 +119,7 @@ contract TestPartialClosures is EverlongTest {
     /// @dev Tests that when a partial closure would result in a remaining
     ///      position value less than the minimum transaction amount, the entire
     ///      position is closed.
-    function test_partial_closures_position_remainder_gt_minTransactionAmount()
-        external
-    {
+    function test_partial_closures_position_min_transaction_amount() external {
         // Alice deposits into Everlong.
         uint256 aliceDepositAmount = 1000e18;
         uint256 aliceShares = depositStrategy(aliceDepositAmount, alice, true);
@@ -138,7 +136,6 @@ contract TestPartialClosures is EverlongTest {
         // Redeem shares such that the remaining share value should be less
         // than the minimum transaction amount.
         redeemStrategy(aliceShares - minTxShareAmount, alice, true);
-        redeemStrategy(minTxShareAmount, alice, true);
 
         // There should be no positions left.
         assertEq(IEverlongStrategy(address(strategy)).positionCount(), 0);
