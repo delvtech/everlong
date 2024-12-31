@@ -24,7 +24,8 @@ contract TestPartialClosures is EverlongTest {
         // Alice deposits into Everlong.
         uint256 aliceDepositAmount = bound(
             _deposit,
-            MINIMUM_TRANSACTION_AMOUNT * 100, // Increase minimum bound otherwise partial redemption won't occur
+            IEverlongStrategy(address(strategy)).minimumTransactionAmount() *
+                100, // Increase minimum bound otherwise partial redemption won't occur
             hyperdrive.calculateMaxLong(AS_BASE)
         );
         uint256 aliceShares = depositStrategy(aliceDepositAmount, alice, true);
@@ -113,5 +114,30 @@ contract TestPartialClosures is EverlongTest {
 
         // Ensure Everlong has one position left.
         assertEq(IEverlongStrategy(address(strategy)).positionCount(), 1);
+    }
+
+    function test_partial_closures_position_remainder_gt_minTransactionAmount()
+        external
+    {
+        // Alice deposits into Everlong.
+        uint256 aliceDepositAmount = 1000e18;
+        uint256 aliceShares = depositStrategy(aliceDepositAmount, alice, true);
+
+        // Ensure there is now one position.
+        assertEq(IEverlongStrategy(address(strategy)).positionCount(), 1);
+
+        // Calculate how many shares are neeed to reach the minimum transaction
+        // amount.
+        uint256 minTxShareAmount = (
+            IEverlongStrategy(address(strategy)).minimumTransactionAmount()
+        ).mulDivDown(aliceShares, aliceDepositAmount);
+
+        // Redeem shares such that the remaining share value should be less
+        // than the minimum transaction amount.
+        redeemStrategy(aliceShares - minTxShareAmount, alice, true);
+        redeemStrategy(minTxShareAmount, alice, true);
+
+        // There should be no positions left.
+        assertEq(IEverlongStrategy(address(strategy)).positionCount(), 0);
     }
 }
