@@ -116,6 +116,9 @@ contract TestPartialClosures is EverlongTest {
         assertEq(IEverlongStrategy(address(strategy)).positionCount(), 1);
     }
 
+    /// @dev Tests that when a partial closure would result in a remaining
+    ///      position value less than the minimum transaction amount, the entire
+    ///      position is closed.
     function test_partial_closures_position_remainder_gt_minTransactionAmount()
         external
     {
