@@ -795,17 +795,6 @@ contract EverlongStrategy is BaseStrategy {
             asBase
         );
 
-        // If we're using a wrapped token, make sure to convert to the unwrapped
-        // value.
-        if (isWrapped) {
-            amount = convertToUnwrapped(
-                IHyperdrive(hyperdrive)._minimumTransactionAmount(
-                    _poolConfig,
-                    asBase
-                )
-            );
-        }
-
         // NOTE: Since some rounding occurs within hyperdrive when using its
         //       shares token, we choose to be safe and add a buffer to ensure
         //       that the amount will be above hyperdrive's minimum.
