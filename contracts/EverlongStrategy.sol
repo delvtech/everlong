@@ -502,12 +502,9 @@ contract EverlongStrategy is BaseStrategy {
                 ""
             );
 
-            // Calculate the amount of bonds needed to reach the minimum
-            // transaction amount.
-            uint256 minimumBonds = minimumTransactionAmount().mulDivUp(
-                position.bondAmount,
-                totalPositionValue
-            );
+            // No conversions are needed for hyperdrive's minimum transaction
+            // amount when closing longs since it's denominated in bonds.
+            uint256 minimumBonds = _poolConfig.minimumTransactionAmount;
 
             // Calculate how many bonds out of the position need to be closed.
             uint256 bondsNeeded;

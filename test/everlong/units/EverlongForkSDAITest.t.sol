@@ -90,9 +90,10 @@ contract TestEverlongForkSDAI is EverlongForkSDAITest {
 
         // Calculate how many shares are neeed to reach the minimum transaction
         // amount.
-        uint256 minTxShareAmount = IEverlongStrategy(address(strategy))
-            .minimumTransactionAmount()
-            .mulDivDown(aliceShares, aliceDepositAmount);
+        uint256 minTxShareAmount = (aliceShares).mulDivDown(
+            hyperdrive.getPoolConfig().minimumTransactionAmount,
+            IEverlongStrategy(address(strategy)).positionAt(0).bondAmount
+        );
 
         // Redeem shares such that the remaining share value should be less
         // than the minimum transaction amount.
