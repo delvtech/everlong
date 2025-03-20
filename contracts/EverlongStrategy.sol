@@ -344,8 +344,11 @@ contract EverlongStrategy is BaseStrategy {
                 tendConfig.extraData
             );
 
-            // Account for the new position in the portfolio.
-            _portfolio.handleOpenPosition(maturityTime, bondAmount);
+            // Only update the portfolio if _openLong was successful (indicated by non-zero bondAmount)
+            if (bondAmount > 0) {
+                // Account for the new position in the portfolio.
+                _portfolio.handleOpenPosition(maturityTime, bondAmount);
+            }
         }
     }
 
@@ -708,14 +711,24 @@ contract EverlongStrategy is BaseStrategy {
             ERC20(asset).forceApprove(address(hyperdrive), _toSpend + 1);
         }
 
-        // Open the long. Return the maturity time and amount of bonds received.
-        (maturityTime, bondAmount) = IHyperdrive(hyperdrive).openLong(
+        // Open the long using a try-catch to handle potential failures
+        // (e.g., deposit caps) gracefully.
+        try IHyperdrive(hyperdrive).openLong(
             asBase,
             _toSpend,
             _minOutput,
             _minVaultSharePrice,
             _extraData
-        );
+        ) returns (uint256 _maturityTime, uint256 _bondAmount) {
+            maturityTime = _maturityTime;
+            bondAmount = _bondAmount;
+        } catch {
+            // If the openLong fails (e.g., due to deposit caps), return zeros
+            // to indicate no position was opened. The calling function (_tend)
+            // will not update the portfolio in this case.
+            maturityTime = 0;
+            bondAmount = 0;
+        }
     }
 
     /// @dev Preview the amount of assets received from closing the specified
