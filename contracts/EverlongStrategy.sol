@@ -713,13 +713,18 @@ contract EverlongStrategy is BaseStrategy {
 
         // Open the long using a try-catch to handle potential failures
         // (e.g., deposit caps) gracefully.
-        try IHyperdrive(hyperdrive).openLong(
-            asBase,
-            _toSpend,
-            _minOutput,
-            _minVaultSharePrice,
-            _extraData
-        ) returns (uint256 _maturityTime, uint256 _bondAmount) {
+        try 
+            IHyperdrive(hyperdrive).openLong(
+                _toSpend,
+                _minOutput,
+                _minVaultSharePrice,
+                IHyperdrive.Options({
+                    destination: address(this),
+                    asBase: asBase,
+                    extraData: _extraData
+                })
+            ) 
+        returns (uint256 _maturityTime, uint256 _bondAmount) {
             maturityTime = _maturityTime;
             bondAmount = _bondAmount;
         } catch {
