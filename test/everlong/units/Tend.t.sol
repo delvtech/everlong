@@ -321,4 +321,195 @@ contract TestTend is EverlongTest {
         // Stop the prank.
         vm.stopPrank();
     }
+
+    /// @dev Tests that `TendConfig.extraData` is fully loaded even when the
+    ///      content is greater than a single storage slot.
+    function test_extraData_large() external {
+        // Start a prank as the keeper address.
+        vm.startPrank(address(keeperContract));
+
+        // Prepare a large `bytes` array for `extraData`.
+        bytes memory largeExtraData = new bytes(1024);
+        for (uint256 i = 0; i < 1024; i++) {
+            largeExtraData[i] = bytes1(uint8(i % 256));
+        }
+
+        // Call `setTendConfig` with the large `extraData`.
+        IEverlongStrategy(address(strategy)).setTendConfig(
+            IEverlongStrategy.TendConfig({
+                minOutput: 1,
+                minVaultSharePrice: 2,
+                positionClosureLimit: 3,
+                extraData: largeExtraData
+            })
+        );
+
+        // Retrieve the TendConfig.
+        (, IEverlongStrategy.TendConfig memory tendConfig) = IEverlongStrategy(
+            address(strategy)
+        ).getTendConfig();
+
+        // Assert that the retrieved `extraData` is the same as the input.
+        assertEq(tendConfig.minOutput, 1, "minOutput mismatch");
+        assertEq(tendConfig.minVaultSharePrice, 2, "minVaultSharePrice mismatch");
+        assertEq(tendConfig.positionClosureLimit, 3, "positionClosureLimit mismatch");
+        
+        // Use bytes comparison for extraData
+        assertEq(tendConfig.extraData.length, largeExtraData.length, "extraData length mismatch");
+        
+        for (uint256 i = 0; i < largeExtraData.length; i++) {
+            assertEq(uint8(tendConfig.extraData[i]), uint8(largeExtraData[i]), string(abi.encodePacked("extraData byte mismatch at index ", i)));
+        }
+
+        // Stop the prank.
+        vm.stopPrank();
+    }
+
+    /// @dev Tests that empty `extraData` is correctly handled.
+    function test_extraData_empty() external {
+        // Start a prank as the keeper address.
+        vm.startPrank(address(keeperContract));
+
+        // Empty extraData
+        bytes memory emptyData = new bytes(0);
+
+        // Set TendConfig with empty extraData
+        IEverlongStrategy(address(strategy)).setTendConfig(
+            IEverlongStrategy.TendConfig({
+                minOutput: 42,
+                minVaultSharePrice: 100,
+                positionClosureLimit: 5,
+                extraData: emptyData
+            })
+        );
+
+        // Retrieve the TendConfig
+        (, IEverlongStrategy.TendConfig memory tendConfig) = IEverlongStrategy(
+            address(strategy)
+        ).getTendConfig();
+
+        // Assert all fields
+        assertEq(tendConfig.minOutput, 42, "minOutput mismatch");
+        assertEq(tendConfig.minVaultSharePrice, 100, "minVaultSharePrice mismatch");
+        assertEq(tendConfig.positionClosureLimit, 5, "positionClosureLimit mismatch");
+        assertEq(tendConfig.extraData.length, 0, "extraData should be empty");
+
+        // Stop the prank.
+        vm.stopPrank();
+    }
+
+    /// @dev Tests that `extraData` smaller than 32 bytes is correctly handled.
+    function test_extraData_small() external {
+        // Start a prank as the keeper address.
+        vm.startPrank(address(keeperContract));
+
+        // Small extraData (<32 bytes)
+        bytes memory smallData = bytes("small data");
+
+        // Set TendConfig with small extraData
+        IEverlongStrategy(address(strategy)).setTendConfig(
+            IEverlongStrategy.TendConfig({
+                minOutput: 123,
+                minVaultSharePrice: 456,
+                positionClosureLimit: 789,
+                extraData: smallData
+            })
+        );
+
+        // Retrieve the TendConfig
+        (, IEverlongStrategy.TendConfig memory tendConfig) = IEverlongStrategy(
+            address(strategy)
+        ).getTendConfig();
+
+        // Assert all fields
+        assertEq(tendConfig.minOutput, 123, "minOutput mismatch");
+        assertEq(tendConfig.minVaultSharePrice, 456, "minVaultSharePrice mismatch");
+        assertEq(tendConfig.positionClosureLimit, 789, "positionClosureLimit mismatch");
+        
+        // Check extraData
+        assertEq(tendConfig.extraData.length, smallData.length, "extraData length mismatch");
+        assertEq(keccak256(tendConfig.extraData), keccak256(smallData), "extraData content mismatch");
+
+        // Stop the prank.
+        vm.stopPrank();
+    }
+
+    /// @dev Tests that `extraData` exactly 32 bytes is correctly handled.
+    function test_extraData_exactly32Bytes() external {
+        // Start a prank as the keeper address.
+        vm.startPrank(address(keeperContract));
+
+        // Create exactly 32 bytes of data
+        bytes memory data32 = new bytes(32);
+        for (uint256 i = 0; i < 32; i++) {
+            data32[i] = bytes1(uint8(i + 1));
+        }
+
+        // Set TendConfig with 32-byte extraData
+        IEverlongStrategy(address(strategy)).setTendConfig(
+            IEverlongStrategy.TendConfig({
+                minOutput: 0xdead,
+                minVaultSharePrice: 0xbeef,
+                positionClosureLimit: 0xcafe,
+                extraData: data32
+            })
+        );
+
+        // Retrieve the TendConfig
+        (, IEverlongStrategy.TendConfig memory tendConfig) = IEverlongStrategy(
+            address(strategy)
+        ).getTendConfig();
+
+        // Assert all fields
+        assertEq(tendConfig.minOutput, 0xdead, "minOutput mismatch");
+        assertEq(tendConfig.minVaultSharePrice, 0xbeef, "minVaultSharePrice mismatch");
+        assertEq(tendConfig.positionClosureLimit, 0xcafe, "positionClosureLimit mismatch");
+        
+        // Check extraData
+        assertEq(tendConfig.extraData.length, data32.length, "extraData length mismatch");
+        
+        for (uint256 i = 0; i < data32.length; i++) {
+            assertEq(uint8(tendConfig.extraData[i]), uint8(data32[i]), string(abi.encodePacked("extraData byte mismatch at index ", i)));
+        }
+
+        // Stop the prank.
+        vm.stopPrank();
+    }
+
+    /// @dev Tests that `extraData` with a single byte is correctly handled.
+    function test_extraData_singleByte() external {
+        // Start a prank as the keeper address.
+        vm.startPrank(address(keeperContract));
+
+        // Single byte extraData
+        bytes memory singleByteData = new bytes(1);
+        singleByteData[0] = 0x42;
+
+        // Set TendConfig with single byte extraData
+        IEverlongStrategy(address(strategy)).setTendConfig(
+            IEverlongStrategy.TendConfig({
+                minOutput: 999,
+                minVaultSharePrice: 888,
+                positionClosureLimit: 777,
+                extraData: singleByteData
+            })
+        );
+
+        // Retrieve the TendConfig
+        (, IEverlongStrategy.TendConfig memory tendConfig) = IEverlongStrategy(
+            address(strategy)
+        ).getTendConfig();
+
+        // Assert all fields
+        assertEq(tendConfig.minOutput, 999, "minOutput mismatch");
+        assertEq(tendConfig.minVaultSharePrice, 888, "minVaultSharePrice mismatch");
+        assertEq(tendConfig.positionClosureLimit, 777, "positionClosureLimit mismatch");
+        
+        // Check extraData
+        assertEq(tendConfig.extraData.length, 1, "extraData length should be 1");
+        assertEq(uint8(tendConfig.extraData[0]), 0x42, "extraData byte value mismatch");
+
+        // Stop the prank.
+        vm.stopPrank();
+    }
 }

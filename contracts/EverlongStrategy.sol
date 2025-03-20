@@ -377,11 +377,31 @@ contract EverlongStrategy is BaseStrategy {
         uint256 positionClosureLimit = _config.positionClosureLimit;
         bytes memory extraData = _config.extraData;
         assembly {
-            tstore(tendEnabledSlot, 1)
+            tstore(tendEnabledSlot, 0x1)
             tstore(minOutputSlot, minOutput)
             tstore(minVaultSharePriceSlot, minVaultSharePrice)
             tstore(positionClosureLimitSlot, positionClosureLimit)
-            tstore(extraDataSlot, extraData)
+
+            // Load the length of `extraData`.
+            let extraDataLength := mload(extraData)
+
+            // Pointer to the actual data.
+            let extraDataData := add(extraData, 0x20)
+
+            // Store the length in the `extraDataSlot`.
+            tstore(extraDataSlot, extraDataLength)
+
+            // Store the data in subsequent slots.
+            for {
+                let i := 0
+            } lt(i, extraDataLength) {
+                i := add(i, 0x20)
+            } {
+                tstore(
+                    add(extraDataSlot, add(div(i, 0x20), 0x1)),
+                    mload(add(extraDataData, i))
+                )
+            }
         }
     }
 
@@ -412,7 +432,32 @@ contract EverlongStrategy is BaseStrategy {
             minOutput := tload(minOutputSlot)
             minVaultSharePrice := tload(minVaultSharePriceSlot)
             positionClosureLimit := tload(positionClosureLimitSlot)
-            extraData := tload(extraDataSlot)
+
+            // Load the length of `extraData`.
+            let extraDataLength := tload(extraDataSlot)
+
+            // Get free memory pointer.
+            let extraDataData := mload(0x40)
+
+            // Allocate memory.
+            mstore(0x40, add(extraDataData, add(extraDataLength, 0x20)))
+
+            // Store the length.
+            mstore(extraDataData, extraDataLength)
+
+            // Load the data from transient storage.
+            for {
+                let i := 0
+            } lt(i, extraDataLength) {
+                i := add(i, 0x20)
+            } {
+                mstore(
+                    add(extraDataData, add(0x20, i)),
+                    tload(add(extraDataSlot, add(div(i, 0x20), 0x1)))
+                )
+            }
+
+            extraData := extraDataData
         }
 
         // Return the TendConfig.
