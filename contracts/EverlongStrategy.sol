@@ -8,9 +8,10 @@ import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { BaseStrategy, ERC20 } from "tokenized-strategy/BaseStrategy.sol";
 import { IEverlongStrategy } from "./interfaces/IEverlongStrategy.sol";
 import { IERC20Wrappable } from "./interfaces/IERC20Wrappable.sol";
-import { EVERLONG_STRATEGY_KIND, EVERLONG_VERSION, MAX_BPS, ONE } from "./libraries/Constants.sol";
+import { EVERLONG_STRATEGY_KIND, EVERLONG_VERSION, ONE } from "./libraries/Constants.sol";
 import { EverlongPortfolioLibrary } from "./libraries/EverlongPortfolio.sol";
 import { HyperdriveExecutionLibrary } from "./libraries/HyperdriveExecution.sol";
+import { IEverlongEvents } from "./interfaces/IEverlongEvents.sol";
 
 //           ,---..-.   .-.,---.  ,---.   ,-.    .---.  .-. .-.  ,--,
 //           | .-' \ \ / / | .-'  | .-.\  | |   / .-. ) |  \| |.' .'
@@ -727,6 +728,12 @@ contract EverlongStrategy is BaseStrategy {
         returns (uint256 _maturityTime, uint256 _bondAmount) {
             maturityTime = _maturityTime;
             bondAmount = _bondAmount;
+            
+            // Emit the position opened event as the library function would
+            emit IEverlongEvents.PositionOpened(
+                maturityTime.toUint128(),
+                bondAmount.toUint128()
+            );
         } catch {
             // If the openLong fails (e.g., due to deposit caps), return zeros
             // to indicate no position was opened. The calling function (_tend)
