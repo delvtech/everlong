@@ -8,9 +8,10 @@ import { SafeERC20 } from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import { BaseStrategy, ERC20 } from "tokenized-strategy/BaseStrategy.sol";
 import { IEverlongStrategy } from "./interfaces/IEverlongStrategy.sol";
 import { IERC20Wrappable } from "./interfaces/IERC20Wrappable.sol";
-import { EVERLONG_STRATEGY_KIND, EVERLONG_VERSION, MAX_BPS, ONE } from "./libraries/Constants.sol";
+import { EVERLONG_STRATEGY_KIND, EVERLONG_VERSION, ONE } from "./libraries/Constants.sol";
 import { EverlongPortfolioLibrary } from "./libraries/EverlongPortfolio.sol";
 import { HyperdriveExecutionLibrary } from "./libraries/HyperdriveExecution.sol";
+import { IEverlongEvents } from "./interfaces/IEverlongEvents.sol";
 
 //           ,---..-.   .-.,---.  ,---.   ,-.    .---.  .-. .-.  ,--,
 //           | .-' \ \ / / | .-'  | .-.\  | |   / .-. ) |  \| |.' .'
@@ -344,8 +345,11 @@ contract EverlongStrategy is BaseStrategy {
                 tendConfig.extraData
             );
 
-            // Account for the new position in the portfolio.
-            _portfolio.handleOpenPosition(maturityTime, bondAmount);
+            // Only update the portfolio if _openLong was successful (indicated by non-zero bondAmount)
+            if (bondAmount > 0) {
+                // Account for the new position in the portfolio.
+                _portfolio.handleOpenPosition(maturityTime, bondAmount);
+            }
         }
     }
 
@@ -708,14 +712,35 @@ contract EverlongStrategy is BaseStrategy {
             ERC20(asset).forceApprove(address(hyperdrive), _toSpend + 1);
         }
 
-        // Open the long. Return the maturity time and amount of bonds received.
-        (maturityTime, bondAmount) = IHyperdrive(hyperdrive).openLong(
-            asBase,
-            _toSpend,
-            _minOutput,
-            _minVaultSharePrice,
-            _extraData
-        );
+        // Open the long using a try-catch to handle potential failures
+        // (e.g., deposit caps) gracefully.
+        try 
+            IHyperdrive(hyperdrive).openLong(
+                _toSpend,
+                _minOutput,
+                _minVaultSharePrice,
+                IHyperdrive.Options({
+                    destination: address(this),
+                    asBase: asBase,
+                    extraData: _extraData
+                })
+            ) 
+        returns (uint256 _maturityTime, uint256 _bondAmount) {
+            maturityTime = _maturityTime;
+            bondAmount = _bondAmount;
+            
+            // Emit the position opened event as the library function would
+            emit IEverlongEvents.PositionOpened(
+                maturityTime.toUint128(),
+                bondAmount.toUint128()
+            );
+        } catch {
+            // If the openLong fails (e.g., due to deposit caps), return zeros
+            // to indicate no position was opened. The calling function (_tend)
+            // will not update the portfolio in this case.
+            maturityTime = 0;
+            bondAmount = 0;
+        }
     }
 
     /// @dev Preview the amount of assets received from closing the specified

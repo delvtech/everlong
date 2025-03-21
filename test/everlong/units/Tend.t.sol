@@ -227,8 +227,11 @@ contract TestTend is EverlongTest {
         // Set minOutput to a very high value.
         uint256 minOutput = type(uint256).max;
 
-        // Ensure `tend()` reverts.
-        vm.expectRevert();
+        // Record the initial position count and portfolio state
+        uint256 initialPositionCount = IEverlongStrategy(address(strategy)).positionCount();
+        uint256 initialTotalBonds = IEverlongStrategy(address(strategy)).totalBonds();
+
+        // Call tend() with extreme minOutput - should not revert with try/catch in place
         keeperContract.tend(
             address(strategy),
             IEverlongStrategy.TendConfig({
@@ -237,6 +240,18 @@ contract TestTend is EverlongTest {
                 positionClosureLimit: 0,
                 extraData: ""
             })
+        );
+
+        // Verify that no new position was opened (portfolio was not updated)
+        assertEq(
+            IEverlongStrategy(address(strategy)).positionCount(),
+            initialPositionCount,
+            "Position count should not change with impossible minOutput"
+        );
+        assertEq(
+            IEverlongStrategy(address(strategy)).totalBonds(),
+            initialTotalBonds,
+            "Total bonds should not change with impossible minOutput"
         );
 
         // Stop the prank.
@@ -257,8 +272,11 @@ contract TestTend is EverlongTest {
         // Set minVaultSharePrice to a very high value.
         uint256 minVaultSharePrice = type(uint256).max;
 
-        // Ensure `tend()` reverts.
-        vm.expectRevert();
+        // Record the initial position count and portfolio state
+        uint256 initialPositionCount = IEverlongStrategy(address(strategy)).positionCount();
+        uint256 initialTotalBonds = IEverlongStrategy(address(strategy)).totalBonds();
+
+        // Call tend() with extreme minVaultSharePrice - should not revert with try/catch in place
         keeperContract.tend(
             address(strategy),
             IEverlongStrategy.TendConfig({
@@ -267,6 +285,18 @@ contract TestTend is EverlongTest {
                 positionClosureLimit: 0,
                 extraData: ""
             })
+        );
+
+        // Verify that no new position was opened (portfolio was not updated)
+        assertEq(
+            IEverlongStrategy(address(strategy)).positionCount(),
+            initialPositionCount,
+            "Position count should not change with impossible minVaultSharePrice"
+        );
+        assertEq(
+            IEverlongStrategy(address(strategy)).totalBonds(),
+            initialTotalBonds,
+            "Total bonds should not change with impossible minVaultSharePrice"
         );
 
         // Stop the prank.
