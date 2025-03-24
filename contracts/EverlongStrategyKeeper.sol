@@ -321,6 +321,8 @@ contract EverlongStrategyKeeper is Ownable {
             for (uint256 i = 0; i < positionCount; i++) {
                 position = IEverlongStrategy(_strategy).positionAt(i);
                 if (hyperdrive.isMature(position)) {
+                    // For accurate calculation of position value, ensure we're using the
+                    // correct state as would be used in an actual closeLong call
                     canSpend += hyperdrive.previewCloseLong(
                         asBase,
                         poolConfig,
@@ -340,6 +342,7 @@ contract EverlongStrategyKeeper is Ownable {
 
         // Calculate the amount of bonds that would be received if a long was
         // opened with `canSpend` assets.
+        // For accurate preview, ensure the calculation simulates the correct state
         uint256 expectedOutput = hyperdrive.previewOpenLong(
             asBase,
             poolConfig,

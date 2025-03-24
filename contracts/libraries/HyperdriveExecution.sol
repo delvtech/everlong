@@ -14,6 +14,7 @@ import { Packing } from "openzeppelin/utils/Packing.sol";
 import { IEverlongEvents } from "../interfaces/IEverlongEvents.sol";
 import { IEverlongStrategy } from "../interfaces/IEverlongStrategy.sol";
 import { ONE, LEGACY_SDAI_HYPERDRIVE, LEGACY_STETH_HYPERDRIVE } from "./Constants.sol";
+import { LPMath } from "./LPMath.sol";
 
 // TODO: Extract into its own library.
 uint256 constant HYPERDRIVE_SHARE_RESERVES_BOND_RESERVES_SLOT = 2;
@@ -290,6 +291,28 @@ library HyperdriveExecutionLibrary {
         IEverlongStrategy.EverlongPosition memory _position,
         bytes memory // unused extradata
     ) internal view returns (uint256) {
+        // Check if the bond amount is less than minimumTransactionAmount.
+        // In the actual closeLong function, this would revert.
+        if (_position.bondAmount < _poolConfig.minimumTransactionAmount) {
+            return 0;
+        }
+
+        // If the long hasn't matured, we checkpoint the latest checkpoint.
+        // Otherwise, we perform a checkpoint at the time the long matured.
+        // This ensures the long and all of the other positions in the
+        // checkpoint are closed.
+        if (block.timestamp < _position.maturityTime) {
+            self.checkpoint(
+                latestCheckpoint(self), 
+                LPMath.SHARE_PROCEEDS_MAX_ITERATIONS
+            );
+        } else {
+            self.checkpoint(
+                _position.maturityTime,
+                LPMath.SHARE_PROCEEDS_MAX_ITERATIONS
+            );
+        }
+
         // Read select `PoolInfo` fields directly from Hyperdrive's storage to
         // save on gas costs.
         uint256[] memory slots = new uint256[](2);
